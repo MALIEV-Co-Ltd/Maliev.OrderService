@@ -58,3 +58,5 @@ maliev-shared-secrets.yaml
 migration_source/
 reference_project/
 .vs/
+.gemini/
+gha-creds-*.json
