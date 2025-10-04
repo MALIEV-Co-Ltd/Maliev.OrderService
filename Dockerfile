@@ -2,15 +2,16 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
-COPY Maliev.OrderService.sln .
+# Copy project files for restore
 COPY Maliev.OrderService.Api/Maliev.OrderService.Api.csproj Maliev.OrderService.Api/
 COPY Maliev.OrderService.Data/Maliev.OrderService.Data.csproj Maliev.OrderService.Data/
 
-# Restore dependencies
-RUN dotnet restore Maliev.OrderService.sln
+# Restore dependencies (only production projects)
+WORKDIR /src/Maliev.OrderService.Api
+RUN dotnet restore
 
 # Copy source code
+WORKDIR /src
 COPY Maliev.OrderService.Api/ Maliev.OrderService.Api/
 COPY Maliev.OrderService.Data/ Maliev.OrderService.Data/
 
