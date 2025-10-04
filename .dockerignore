@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# VS Code / IDE
+.vscode
+.vs
+.idea
+*.swp
+*.swo
+*~
+
+# Build outputs
+**/bin
+**/obj
+**/out
+**/publish
+
+# Test results
+**/TestResults
+**/*.trx
+
+# NuGet packages
+**/*.nupkg
+**/*.snupkg
+.nuget
+
+# User-specific files
+**/*.user
+**/*.suo
+**/*.userosscache
+**/*.sln.docstates
+
+# Documentation and specs
+*.md
+!README.md
+specs/
+.specify/
+.claude/
+
+# Docker
+**/Dockerfile*
+**/docker-compose*
+**/.dockerignore
+
+# Misc
+**/node_modules
+**/npm-debug.log
+**/.DS_Store
+**/thumbs.db
