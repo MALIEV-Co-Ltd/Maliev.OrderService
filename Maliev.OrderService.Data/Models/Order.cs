@@ -1,79 +1,74 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+namespace Maliev.OrderService.Data.Models;
 
-namespace Maliev.OrderService.Data.Models
+public class Order
 {
-    public class Order
-    {
-        [Key]
-        [Column("ID")]
-        public int Id { get; set; }
+    // Primary Key
+    public string OrderId { get; set; } = null!;
 
-        [StringLength(100)]
-        public string Name { get; set; } = "unnamed";
+    // Customer Information
+    public string CustomerId { get; set; } = null!;
+    public string CustomerType { get; set; } = null!; // "Customer" or "Employee"
 
-        [StringLength(250)]
-        public string? Description { get; set; }
+    // Service Classification
+    public int ServiceCategoryId { get; set; }
+    public int? ProcessTypeId { get; set; } // Nullable - consulting/procurement may not have process
 
-        public int Quantity { get; set; }
+    // Material Information (External Service Integration)
+    public int? MaterialId { get; set; }
+    public int? ColorId { get; set; }
+    public int? SurfaceFinishingId { get; set; }
+    public string? MaterialName { get; set; } // Cached display name (24-hour TTL)
+    public string? ColorName { get; set; } // Cached display name (24-hour TTL)
+    public string? SurfaceFinishingName { get; set; } // Cached display name (24-hour TTL)
+    public DateTime? MaterialCacheUpdatedAt { get; set; }
 
-        [Column(TypeName = "decimal(18, 2)")]
-        public decimal UnitPrice { get; set; }
+    // Quantity Tracking
+    public int? OrderedQuantity { get; set; } // Nullable - manufacturing orders only
+    public int? ManufacturedQuantity { get; set; } // Running total of completed units
+    // RemainingQuantity is computed: ordered_quantity - manufactured_quantity
 
-        [Column(TypeName = "decimal(5, 2)")]
-        public decimal DiscountPercent { get; set; }
+    // Date Tracking
+    public int? LeadTimeDays { get; set; }
+    public DateTime? PromisedDeliveryDate { get; set; }
+    public DateTime? ActualDeliveryDate { get; set; }
 
-        public int Manufactured { get; set; }
+    // Quoting Information
+    public decimal? QuotedAmount { get; set; }
+    public string? QuoteCurrency { get; set; } = "THB";
 
-        [Column(TypeName = "decimal(18, 2)")]
-        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public decimal Subtotal { get; set; }
+    // Confidentiality (Auto-set based on NDA)
+    public bool IsConfidential { get; set; }
 
-        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public int Remaining { get; set; }
+    // Payment Information (External Service Integration)
+    public string? PaymentId { get; set; }
+    public string PaymentStatus { get; set; } = "Unpaid"; // Unpaid, Paid, POIssued
 
-        public DateTime CreatedDate { get; set; }
+    // Assignment Information
+    public string? AssignedEmployeeId { get; set; }
+    public string? DepartmentId { get; set; }
 
-        public DateTime ModifiedDate { get; set; }
+    // Requirements
+    public string? Requirements { get; set; }
 
-        [Column(TypeName = "date")]
-        public DateTime? PromisedDate { get; set; }
+    // Audit Fields
+    public byte[] Version { get; set; } = null!; // RowVersion for optimistic concurrency
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string CreatedBy { get; set; } = null!;
+    public string UpdatedBy { get; set; } = null!;
 
-        [Column(TypeName = "date")]
-        public DateTime? FinishedDate { get; set; }
+    // Navigation Properties
+    public ServiceCategory ServiceCategory { get; set; } = null!;
+    public ProcessType? ProcessType { get; set; }
+    public ICollection<OrderStatus> OrderStatuses { get; set; } = new List<OrderStatus>();
+    public ICollection<OrderFile> OrderFiles { get; set; } = new List<OrderFile>();
+    public ICollection<OrderNote> OrderNotes { get; set; } = new List<OrderNote>();
+    public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 
-        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public int? Turnaround { get; set; }
-
-        [StringLength(250)]
-        public string? TrackingNumber { get; set; }
-
-        [Column("ProcessID")]
-        public int ProcessId { get; set; }
-
-        [Column("ColorID")]
-        public int? ColorId { get; set; }
-
-        [Column("CurrencyID")]
-        public int? CurrencyId { get; set; }
-
-        [Column("CustomerID")]
-        public int? CustomerId { get; set; }
-
-        [Column("EmployeeID")]
-        public int? EmployeeId { get; set; }
-
-        [Column("MaterialID")]
-        public int? MaterialId { get; set; }
-
-        [Column("SurfaceFinishID")]
-        public int? SurfaceFinishId { get; set; }
-
-        [ForeignKey(nameof(ProcessId))]
-        public virtual Process Process { get; set; } = null!;
-
-        public virtual ICollection<OrderFile> OrderFile { get; set; } = new List<OrderFile>();
-    }
+    // Service-Specific Attributes (One-to-One)
+    public Order3DPrintingAttributes? PrintingAttributes { get; set; }
+    public OrderCncMachiningAttributes? CncAttributes { get; set; }
+    public OrderSheetMetalAttributes? SheetMetalAttributes { get; set; }
+    public Order3DScanningAttributes? ScanningAttributes { get; set; }
+    public Order3DDesignAttributes? DesignAttributes { get; set; }
 }

@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell:*)",
+      "Bash(ls:*)",
+      "Bash(test:*)",
+      "Bash(powershell.exe:*)",
+      "Read(//r/**)",
+      "Bash(dotnet --version)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln add:*)",
+      "Bash(dotnet add package:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet add reference:*)",
+      "Bash(dotnet ef migrations add:*)",
+      "Bash(dotnet test:*)",
+      "Bash(Select-String -Pattern \"Total tests:|Passed:|Failed:|Error Message:\" -Context 0,2)",
+      "Bash(Select-String -Pattern \"(Passed!|Failed!)\" -Context 0,1)",
+      "Bash(Select-String -Pattern \"BadRequest|400|validation\" -Context 2,2)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

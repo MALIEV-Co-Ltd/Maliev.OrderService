@@ -1,175 +1,303 @@
-using AutoMapper;
-using Maliev.OrderService.Api.Profiles;
-using Maliev.OrderService.Api.Services;
-using Maliev.OrderService.Data.Data;
+using Asp.Versioning;
+using FluentValidation;
+using HealthChecks.UI.Client;
+using Maliev.OrderService.Api.Configuration;
+using Maliev.OrderService.Api.Middleware;
+using Maliev.OrderService.Api.Services.Business;
+using Maliev.OrderService.Api.Services.External;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using System.Reflection;
+using Polly;
+using Polly.Extensions.Http;
+using Serilog;
 using System.Text;
-using Asp.Versioning;
-using Asp.Versioning.ApiExplorer;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add AutoMapper
-builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
+// Serilog Configuration (Console only)
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+        formatProvider: System.Globalization.CultureInfo.InvariantCulture)
+    .CreateLogger();
 
-// Add DbContext
-builder.Services.AddDbContext<OrderContext>(options =>
+builder.Host.UseSerilog();
+
+// Secrets from Google Secret Manager
+var secretsPath = "/mnt/secrets";
+if (Directory.Exists(secretsPath))
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("OrderServiceDbContext"));
-});
+    builder.Configuration.AddKeyPerFile(directoryPath: secretsPath, optional: true);
+}
 
-// Configure Authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSecurityKey"] ?? throw new InvalidOperationException("JwtSecurityKey not configured"))),
-        };
-    });
+// Services
+builder.Services.AddControllers();
+builder.Services.AddMemoryCache(); // Simple configuration without SizeLimit
+builder.Services.AddAutoMapper(typeof(Program));
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
-// Configure API Versioning Services
-builder.Services.AddApiVersioning(options =>
+// External Service HttpClients with Retry Policies (3 attempts, exponential backoff)
+var retryPolicy = HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+builder.Services.AddHttpClient<ICustomerServiceClient, CustomerServiceClient>((serviceProvider, client) =>
 {
-    options.ReportApiVersions = true;
-    options.AssumeDefaultVersionWhenUnspecified = true;
-    options.DefaultApiVersion = new ApiVersion(1, 0);
-})
-.AddApiExplorer(options =>
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var options = config.GetSection("ExternalServices:CustomerService").Get<ExternalServiceOptions>()
+        ?? throw new InvalidOperationException("ExternalServices:CustomerService configuration not found");
+
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+}).AddPolicyHandler(retryPolicy);
+
+builder.Services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>((serviceProvider, client) =>
 {
-    options.GroupNameFormat = "'v'VVV";
-    options.SubstituteApiVersionInUrl = true;
-});
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var options = config.GetSection("ExternalServices:MaterialService").Get<ExternalServiceOptions>()
+        ?? throw new InvalidOperationException("ExternalServices:MaterialService configuration not found");
 
-// Configure Swagger
-builder.Services.AddSwaggerGen(options =>
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+}).AddPolicyHandler(retryPolicy);
+
+builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>((serviceProvider, client) =>
 {
-    OpenApiSecurityScheme apiKey = new OpenApiSecurityScheme
-    {
-        Description = @"JWT Authorization header using the Bearer scheme. Example: ""Bearer {token}""",
-        In = ParameterLocation.Header,
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-    };
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var options = config.GetSection("ExternalServices:PaymentService").Get<ExternalServiceOptions>()
+        ?? throw new InvalidOperationException("ExternalServices:PaymentService configuration not found");
 
-    OpenApiInfo info = new OpenApiInfo
-    {
-        Title = "Order Service",
-        Version = "v1", // Explicitly set to v1
-        Contact = new OpenApiContact
-        {
-            Name = "MALIEV Co., Ltd.",
-            Email = "support@maliev.com",
-            Url = new Uri("https://www.maliev.com"),
-        },
-    };
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+}).AddPolicyHandler(retryPolicy);
 
-    options.SwaggerDoc("v1", info); // Define a single SwaggerDoc for v1
-    options.AddSecurityDefinition("Bearer", apiKey);
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer",
-                },
-                Scheme = "oauth2",
-                Name = "Bearer",
-                In = ParameterLocation.Header,
-            },
-            new List<string>()
-        },
-    });
-    options.DescribeAllParametersInCamelCase();
+builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>((serviceProvider, client) =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var options = config.GetSection("ExternalServices:UploadService").Get<ExternalServiceOptions>()
+        ?? throw new InvalidOperationException("ExternalServices:UploadService configuration not found");
 
-    // Set the comments path for the Swagger JSON and UI.
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    options.IncludeXmlComments(xmlPath);
-});
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds); // Should be 300 for file uploads
+}).AddPolicyHandler(retryPolicy);
 
-// Configure CORS
+builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>((serviceProvider, client) =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var options = config.GetSection("ExternalServices:AuthService").Get<ExternalServiceOptions>()
+        ?? throw new InvalidOperationException("ExternalServices:AuthService configuration not found");
+
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+}).AddPolicyHandler(retryPolicy);
+
+builder.Services.AddHttpClient<IEmployeeServiceClient, EmployeeServiceClient>((serviceProvider, client) =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var options = config.GetSection("ExternalServices:EmployeeService").Get<ExternalServiceOptions>()
+        ?? throw new InvalidOperationException("ExternalServices:EmployeeService configuration not found");
+
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+}).AddPolicyHandler(retryPolicy);
+
+builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceClient>((serviceProvider, client) =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var options = config.GetSection("ExternalServices:NotificationService").Get<ExternalServiceOptions>()
+        ?? throw new InvalidOperationException("ExternalServices:NotificationService configuration not found");
+
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+}).AddPolicyHandler(retryPolicy);
+
+// Business Services
+builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
+builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
+builder.Services.AddScoped<IOrderFileService, OrderFileService>();
+builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
+
+// CORS Configuration (environment-based)
+var corsOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"]?.Split(',') ?? Array.Empty<string>();
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(
-        policy =>
-        {
-            policy.WithOrigins(
-                "http://*.maliev.com",
-                "https://*.maliev.com")
-            .SetIsOriginAllowedToAllowWildcardSubdomains()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-        });
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins(corsOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
 });
 
-// Register service layer
-builder.Services.AddScoped<IOrderServiceService, OrderServiceService>();
+// Rate Limiting Configuration
+builder.Services.AddRateLimiter(options =>
+{
+    // General endpoints: 100 requests per minute per IP
+    options.AddFixedWindowLimiter("general", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 100;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 10;
+    });
 
-builder.Services.AddControllers();
+    // Batch operations: 10 requests per minute per IP (more restrictive)
+    options.AddSlidingWindowLimiter("batch", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.SegmentsPerWindow = 6; // 10-second segments
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 2;
+    });
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            error = "Too many requests. Please try again later.",
+            retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter) ? retryAfter.TotalSeconds : 60
+        }, cancellationToken);
+    };
+});
+
+// JWT Authentication Configuration
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    var jwtSecret = builder.Configuration["Jwt:SecurityKey"] ?? throw new InvalidOperationException("Jwt:SecurityKey configuration not found");
+    var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("Jwt:Issuer configuration not found");
+    var jwtAudience = builder.Configuration["Jwt:Audience"] ?? throw new InvalidOperationException("Jwt:Audience configuration not found");
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtIssuer,
+                ValidAudience = jwtAudience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+                ClockSkew = TimeSpan.FromMinutes(5) // Allow 5 minutes clock skew
+            };
+
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
+                {
+                    Log.Warning("JWT authentication failed: {Error}", context.Exception.Message);
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = context =>
+                {
+                    Log.Debug("JWT token validated for user: {UserId}", context.Principal?.Identity?.Name);
+                    return Task.CompletedTask;
+                }
+            };
+        });
+}
+
+// Authorization Policies (registered for all environments including Testing)
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("Customer", policy => policy.RequireClaim("userType", "customer"))
+    .AddPolicy("Employee", policy => policy.RequireClaim("userType", "employee"))
+    .AddPolicy("Manager", policy => policy.RequireClaim("role", "Manager"))
+    .AddPolicy("Admin", policy => policy.RequireClaim("role", "Admin"))
+    .AddPolicy("EmployeeOrHigher", policy =>
+        policy.RequireAssertion(context =>
+            context.User.HasClaim("userType", "employee") ||
+            context.User.HasClaim("role", "Manager") ||
+            context.User.HasClaim("role", "Admin")));
+
+// API Versioning
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+}).AddMvc();
+
+// OpenAPI/Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "Order Service API", Version = "v1" });
+});
+
+// Database Configuration
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    var connectionString = builder.Configuration.GetConnectionString("OrderDbContext")
+        ?? throw new InvalidOperationException("Connection string 'OrderDbContext' not found.");
+
+    builder.Services.AddDbContext<Maliev.OrderService.Data.OrderDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
+
+// Health Checks
+var readinessTags = new[] { "readiness" };
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<Maliev.OrderService.Data.OrderDbContext>(tags: readinessTags);
 
 var app = builder.Build();
 
-// Configure Base Path Middleware
+// Use path base for all routes (Kubernetes ingress routing)
 app.UsePathBase("/orders");
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-    // app.UseMigrationsEndPoint(); // Not needed for this project
-}
-else
-{
-    app.UseExceptionHandler(errorApp =>
-    {
-        errorApp.Run(async context =>
-        {
-            var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
-            var exception = exceptionHandlerPathFeature?.Error;
-
-            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(exception, "An unhandled exception has occurred.");
-
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await context.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred." });
-        });
-    });
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-
-app.UseCors();
-
-app.UseAuthentication();
-
-app.UseAuthorization();
+// Middleware Pipeline (EXACT ORDER)
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseSwagger();
-app.UseSwaggerUI(options =>
+app.UseSwaggerUI(c =>
 {
-    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-    foreach (var description in provider.ApiVersionDescriptions)
-    {
-        options.SwaggerEndpoint($"/orders/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
-    }
-    options.RoutePrefix = "swagger";
+    c.RoutePrefix = "swagger";
+    c.SwaggerEndpoint("/orders/swagger/v1/swagger.json", "Order Service API v1");
 });
+
+app.UseHttpsRedirection();
+app.UseCors();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Health checks
+app.MapGet("/liveness", () => "Healthy")
+   .WithName("Liveness")
+   .ExcludeFromDescription()
+   .AllowAnonymous();
+
+app.MapHealthChecks("/readiness", new HealthCheckOptions
+{
+    Predicate = healthCheck => healthCheck.Tags.Contains("readiness"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+}).ExcludeFromDescription()
+  .AllowAnonymous();
 
 app.MapControllers();
 
-app.Run();
+try
+{
+    Log.Information("Starting Order Service API");
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Order Service API terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+// Make Program class accessible for integration tests
+public partial class Program { }
