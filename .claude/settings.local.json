@@ -16,7 +16,17 @@
       "Bash(dotnet test:*)",
       "Bash(Select-String -Pattern \"Total tests:|Passed:|Failed:|Error Message:\" -Context 0,2)",
       "Bash(Select-String -Pattern \"(Passed!|Failed!)\" -Context 0,1)",
-      "Bash(Select-String -Pattern \"BadRequest|400|validation\" -Context 2,2)"
+      "Bash(Select-String -Pattern \"BadRequest|400|validation\" -Context 2,2)",
+      "Bash(docker-compose:*)",
+      "Bash(docker start:*)",
+      "Bash(Test-NetConnection -ComputerName localhost -Port 5432)",
+      "Bash(docker exec:*)",
+      "Bash(psql:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist)",
+      "Bash($env:ConnectionStrings__OrderDbContext=\"Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=postgres;\")",
+      "Bash(export ConnectionStrings__OrderDbContext=\"Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=postgres;\")",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

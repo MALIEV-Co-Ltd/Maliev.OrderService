@@ -29,7 +29,8 @@ C# / .NET 9.0: Follow standard conventions
 - PostgreSQL 18: `order_app_db` database
 - EF Core 9.0.9 with Npgsql 9.0.2
 - Optimistic concurrency: `RowVersion` byte[] on Order entity
-- Migrations: Auto-apply on startup via `dotnet ef database update`
+- Migrations: Applied manually via `dotnet ef database update` (not auto-applied on startup)
+- Testing: Uses actual PostgreSQL database (not in-memory) to validate real behavior including transactions and constraints
 
 ### 16-State Order Workflow
 **Primary Flow**: New → Reviewing → [Rejected|Reviewed] → Quoted → [Declined|Accepted|Expired] → [Paid|POIssued] → InProgress → Finished → Shipped
@@ -84,9 +85,17 @@ builder.Services.AddHttpClient<ICustomerServiceClient, CustomerServiceClient>((s
 - **Manager**: Department orders (`Order.DepartmentId = UserContext.DepartmentId`)
 - **Admin**: All orders (no restrictions)
 
-### Batch Operations
-- All-or-nothing transactions: `DbContext.Database.BeginTransactionAsync()`
-- Rollback on any failure, return detailed error with failed item index
+### ASP.NET Core Identity Claims Pattern
+- **Standard Claims Used**: ClaimTypes.NameIdentifier (user ID), ClaimTypes.Name (username), ClaimTypes.Email (email), ClaimTypes.Role (roles)
+- **Custom Claims**: userType (customer or employee for authentication source distinction)
+- **Authorization Policies**: Manager and Admin policies use ClaimTypes.Role for ASP.NET Core Identity compatibility
+- **Test Authentication**: TestAuthHandler returns Admin user with all standard Identity claims
+
+### Batch Operations and Transactions
+- All batch operations use transactions: `DbContext.Database.BeginTransactionAsync()`
+- Single order creation also uses transaction (Order + initial OrderStatus created atomically)
+- All-or-nothing rollback on any failure
+- Return detailed error with failed item index in batch operations
 - Optimistic locking: Check `version` (RowVersion) for concurrent updates
 
 ### File Management

@@ -210,13 +210,13 @@ if (!builder.Environment.IsEnvironment("Testing"))
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("Customer", policy => policy.RequireClaim("userType", "customer"))
     .AddPolicy("Employee", policy => policy.RequireClaim("userType", "employee"))
-    .AddPolicy("Manager", policy => policy.RequireClaim("role", "Manager"))
-    .AddPolicy("Admin", policy => policy.RequireClaim("role", "Admin"))
+    .AddPolicy("Manager", policy => policy.RequireClaim(System.Security.Claims.ClaimTypes.Role, "Manager"))
+    .AddPolicy("Admin", policy => policy.RequireClaim(System.Security.Claims.ClaimTypes.Role, "Admin"))
     .AddPolicy("EmployeeOrHigher", policy =>
         policy.RequireAssertion(context =>
             context.User.HasClaim("userType", "employee") ||
-            context.User.HasClaim("role", "Manager") ||
-            context.User.HasClaim("role", "Admin")));
+            context.User.HasClaim(System.Security.Claims.ClaimTypes.Role, "Manager") ||
+            context.User.HasClaim(System.Security.Claims.ClaimTypes.Role, "Admin")));
 
 // API Versioning
 builder.Services.AddApiVersioning(options =>

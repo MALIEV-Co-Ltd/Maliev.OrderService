@@ -87,7 +87,7 @@ The service uses `UsePathBase("/orders")` for clean Kubernetes ingress routing:
 - 75 unit and integration tests
 - Contract tests for all endpoints
 - TDD approach with mock external services
-- In-memory database for isolation
+- PostgreSQL database for real behavior validation
 
 #### Phase 6: Infrastructure ✅
 - Exception handling middleware
@@ -376,6 +376,46 @@ dotnet ef database update --project Maliev.OrderService.Data
   - RBAC authorization
   - Material caching
 
+### Local Testing Prerequisites
+
+**REQUIRED: PostgreSQL Connection**
+
+Tests require a PostgreSQL database connection. You MUST set the `ConnectionStrings__OrderDbContext` environment variable before running tests.
+
+#### Option 1: Docker Compose (Recommended)
+```bash
+# Start PostgreSQL using Docker Compose
+docker-compose -f docker-compose.test.yml up -d
+
+# Set connection string
+# Windows PowerShell
+$env:ConnectionStrings__OrderDbContext="Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=postgres;"
+
+# Linux/macOS
+export ConnectionStrings__OrderDbContext="Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=postgres;"
+
+# Stop PostgreSQL when done
+docker-compose -f docker-compose.test.yml down
+```
+
+#### Option 2: Existing PostgreSQL Installation
+```bash
+# Create test_db database (if it doesn't exist)
+psql -U postgres -c "CREATE DATABASE test_db;"
+
+# Set connection string with YOUR credentials
+# Windows PowerShell
+$env:ConnectionStrings__OrderDbContext="Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=YOUR_PASSWORD;"
+
+# Linux/macOS
+export ConnectionStrings__OrderDbContext="Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=YOUR_PASSWORD;"
+```
+
+**Important**: The test framework will automatically:
+- Run EF Core migrations to create/update schema
+- Seed required reference data (ServiceCategories, ProcessTypes)
+- Clean up test data between test runs
+
 ### Run Tests
 ```bash
 # Run all tests
@@ -388,9 +428,13 @@ dotnet test Maliev.OrderService.Tests --filter "FullyQualifiedName~Contract"
 dotnet test Maliev.OrderService.Tests --filter "FullyQualifiedName~Unit"
 ```
 
-### Known Test Limitations
-- **Optimistic Concurrency**: In-memory database doesn't auto-update RowVersion like PostgreSQL. Full concurrency testing requires integration tests against real database.
-- **Transactions**: In-memory database ignores transaction warnings (configured to suppress).
+### Testing Infrastructure
+- **Database**: Tests use actual PostgreSQL database to validate real database behavior including transactions, constraints, and RowVersion
+- **PostgreSQL Required**: Local testing requires PostgreSQL 18 running on localhost:5432 or configure ConnectionStrings__OrderDbContext environment variable
+- **Docker Compose**: Use `docker-compose.test.yml` for easy PostgreSQL setup (recommended for local development)
+- **GitHub Actions**: CI/CD workflows include PostgreSQL service container for automated testing
+- **Authentication**: TestAuthHandler provides mock authentication using standard ASP.NET Core Identity claims (ClaimTypes.NameIdentifier, ClaimTypes.Role, etc.)
+- **External Services**: All external service clients are mocked for test isolation
 
 ---
 

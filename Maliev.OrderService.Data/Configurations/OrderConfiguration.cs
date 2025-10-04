@@ -46,7 +46,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.Requirements).HasColumnName("requirements").HasColumnType("text");
 
-        builder.Property(o => o.Version).HasColumnName("version").IsRowVersion().IsRequired();
+        builder.Property(o => o.Version)
+            .HasColumnName("version")
+            .IsRowVersion()
+            .HasDefaultValueSql("'\\x0000000000000000'::bytea")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsRequired();
         builder.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
         builder.Property(o => o.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
         builder.Property(o => o.CreatedBy).HasColumnName("created_by").HasMaxLength(50).IsRequired();

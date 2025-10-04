@@ -11,20 +11,19 @@ using Moq;
 
 namespace Maliev.OrderService.Tests.Unit.Services;
 
-public class OrderManagementServiceTests : IDisposable
+[Collection("Database")]
+public class OrderManagementServiceTests : IClassFixture<TestDatabaseFixture>, IDisposable
 {
+    private readonly TestDatabaseFixture _fixture;
     private readonly OrderDbContext _context;
     private readonly Mock<IMapper> _mapperMock;
     private readonly Mock<ILogger<OrderManagementService>> _loggerMock;
     private readonly OrderManagementService _service;
 
-    public OrderManagementServiceTests()
+    public OrderManagementServiceTests(TestDatabaseFixture fixture)
     {
-        var options = new DbContextOptionsBuilder<OrderDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
-        _context = new OrderDbContext(options);
+        _fixture = fixture;
+        _context = _fixture.CreateDbContext();
         _mapperMock = new Mock<IMapper>();
         _loggerMock = new Mock<ILogger<OrderManagementService>>();
 
@@ -32,23 +31,6 @@ public class OrderManagementServiceTests : IDisposable
             _context,
             _mapperMock.Object,
             _loggerMock.Object);
-
-        SeedTestData();
-    }
-
-    private void SeedTestData()
-    {
-        _context.ServiceCategories.AddRange(
-            new ServiceCategory { CategoryId = 1, Name = "3D Printing", IsActive = true },
-            new ServiceCategory { CategoryId = 2, Name = "CNC Machining", IsActive = true }
-        );
-
-        _context.ProcessTypes.AddRange(
-            new ProcessType { ProcessTypeId = 1, Name = "FDM", ServiceCategoryId = 1, IsActive = true },
-            new ProcessType { ProcessTypeId = 2, Name = "SLA", ServiceCategoryId = 1, IsActive = true }
-        );
-
-        _context.SaveChanges();
     }
 
     private static OrderResponse CreateTestOrderResponse(string orderId = "ORD-2025-00001")
@@ -445,6 +427,7 @@ public class OrderManagementServiceTests : IDisposable
     public void Dispose()
     {
         _context.Dispose();
+        _fixture.Cleanup(); // Clean up test data between tests
         GC.SuppressFinalize(this);
     }
 }

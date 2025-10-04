@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 
 namespace Maliev.OrderService.Tests.Contract;
 
+[Collection("Database")]
 public class StatusEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;

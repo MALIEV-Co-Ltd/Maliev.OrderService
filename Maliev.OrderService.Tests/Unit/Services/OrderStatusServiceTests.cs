@@ -11,20 +11,19 @@ using Moq;
 
 namespace Maliev.OrderService.Tests.Unit.Services;
 
-public class OrderStatusServiceTests : IDisposable
+[Collection("Database")]
+public class OrderStatusServiceTests : IClassFixture<TestDatabaseFixture>, IDisposable
 {
+    private readonly TestDatabaseFixture _fixture;
     private readonly OrderDbContext _context;
     private readonly Mock<IMapper> _mapperMock;
     private readonly Mock<ILogger<OrderStatusService>> _loggerMock;
     private readonly OrderStatusService _service;
 
-    public OrderStatusServiceTests()
+    public OrderStatusServiceTests(TestDatabaseFixture fixture)
     {
-        var options = new DbContextOptionsBuilder<OrderDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-
-        _context = new OrderDbContext(options);
+        _fixture = fixture;
+        _context = _fixture.CreateDbContext();
         _mapperMock = new Mock<IMapper>();
         _loggerMock = new Mock<ILogger<OrderStatusService>>();
 
@@ -419,6 +418,7 @@ public class OrderStatusServiceTests : IDisposable
     public void Dispose()
     {
         _context.Dispose();
+        _fixture.Cleanup(); // Clean up test data between tests
         GC.SuppressFinalize(this);
     }
 }

@@ -74,29 +74,57 @@ public partial class OrderManagementService : IOrderManagementService
 
     public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
     {
-        var order = _mapper.Map<Order>(request);
-        order.OrderId = await GenerateOrderIdAsync(cancellationToken);
-        order.CreatedBy = createdBy;
-        order.UpdatedBy = createdBy;
-        order.CreatedAt = DateTime.UtcNow;
-        order.UpdatedAt = DateTime.UtcNow;
-        order.Version = new byte[8]; // Initialize RowVersion for in-memory database
+        // Check if there's already an active transaction (e.g., from batch operations)
+        var existingTransaction = _context.Database.CurrentTransaction;
+        var shouldManageTransaction = existingTransaction == null;
 
-        _context.Orders.Add(order);
+        // Use transaction for atomic creation of Order and initial OrderStatus (only if not in a batch)
+        var transaction = shouldManageTransaction
+            ? await _context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
 
-        // Create initial status
-        var initialStatus = new OrderStatus
+        try
         {
-            OrderId = order.OrderId,
-            Status = "New",
-            UpdatedBy = createdBy,
-            Timestamp = DateTime.UtcNow
-        };
-        _context.OrderStatuses.Add(initialStatus);
+            var order = _mapper.Map<Order>(request);
+            order.OrderId = await GenerateOrderIdAsync(cancellationToken);
+            order.CreatedBy = createdBy;
+            order.UpdatedBy = createdBy;
+            order.CreatedAt = DateTime.UtcNow;
+            order.UpdatedAt = DateTime.UtcNow;
+            // Note: Version (RowVersion) is database-generated, do not set manually
 
-        await _context.SaveChangesAsync(cancellationToken);
+            _context.Orders.Add(order);
 
-        return _mapper.Map<OrderResponse>(order);
+            // Create initial status
+            var initialStatus = new OrderStatus
+            {
+                OrderId = order.OrderId,
+                Status = "New",
+                UpdatedBy = createdBy,
+                Timestamp = DateTime.UtcNow
+            };
+            _context.OrderStatuses.Add(initialStatus);
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // Only commit if we created the transaction
+            if (shouldManageTransaction && transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return _mapper.Map<OrderResponse>(order);
+        }
+        catch
+        {
+            // Only rollback if we created the transaction (outer transaction will handle rollback otherwise)
+            // Transaction automatically rolls back on exception via Dispose
+            throw;
+        }
+        finally
+        {
+            transaction?.Dispose();
+        }
     }
 
     public async Task<OrderResponse> UpdateOrderAsync(string orderId, UpdateOrderRequest request, string updatedBy, CancellationToken cancellationToken = default)
@@ -108,7 +136,16 @@ public partial class OrderManagementService : IOrderManagementService
         }
 
         // Optimistic concurrency check
-        var requestVersion = Convert.FromBase64String(request.Version);
+        byte[] requestVersion;
+        try
+        {
+            requestVersion = Convert.FromBase64String(request.Version);
+        }
+        catch (FormatException)
+        {
+            throw new InvalidOperationException($"Invalid version format for order {orderId}. Version must be a valid Base64 string.");
+        }
+
         if (!order.Version.SequenceEqual(requestVersion))
         {
             throw new DbUpdateConcurrencyException("Order has been modified by another user");

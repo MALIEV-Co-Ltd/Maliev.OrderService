@@ -14,8 +14,6 @@ namespace Maliev.OrderService.Tests;
 
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly string _databaseName = Guid.NewGuid().ToString();
-
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureServices(services =>
@@ -23,11 +21,15 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             // Remove the existing DbContext configuration
             services.RemoveAll<DbContextOptions<OrderDbContext>>();
 
-            // Add in-memory database for testing with unique name per instance
+            // Use actual PostgreSQL database for testing
+            var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__OrderDbContext")
+                ?? throw new InvalidOperationException(
+                    "ConnectionStrings__OrderDbContext environment variable must be set for testing. " +
+                    "Example: Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=your_password;");
+
             services.AddDbContext<OrderDbContext>(options =>
             {
-                options.UseInMemoryDatabase(_databaseName)
-                    .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+                options.UseNpgsql(connectionString);
             });
 
             // Mock authentication for testing
@@ -37,15 +39,15 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             // Mock external service clients
             MockExternalServices(services);
 
-            // Build the service provider to create and seed the database
+            // Build the service provider to initialize database
             var sp = services.BuildServiceProvider();
 
             using var scope = sp.CreateScope();
             var scopedServices = scope.ServiceProvider;
             var db = scopedServices.GetRequiredService<OrderDbContext>();
 
-            // Ensure the database is created
-            db.Database.EnsureCreated();
+            // Apply migrations to create database schema
+            db.Database.Migrate();
 
             // Seed test data if needed
             SeedTestData(db);
@@ -161,13 +163,14 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         // Create claims for test user (Admin with all permissions)
+        // Uses standard ASP.NET Core Identity claims
         var claims = new[]
         {
-            new Claim(ClaimTypes.Name, "test-user"),
             new Claim(ClaimTypes.NameIdentifier, "test-user-id"),
-            new Claim("userType", "employee"),
-            new Claim("role", "Admin"),
-            new Claim("userId", "test-user-id")
+            new Claim(ClaimTypes.Name, "test-user"),
+            new Claim(ClaimTypes.Email, "test-user@example.com"),
+            new Claim(ClaimTypes.Role, "Admin"),
+            new Claim("userType", "employee")
         };
 
         var identity = new ClaimsIdentity(claims, "Test");
