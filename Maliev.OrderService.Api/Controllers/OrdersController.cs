@@ -1,104 +1,162 @@
-using Microsoft.AspNetCore.Mvc;
-using Maliev.OrderService.Api.Models.DTOs;
-using Maliev.OrderService.Api.Services;
 using Asp.Versioning;
+using FluentValidation;
+using Maliev.OrderService.Api.DTOs.Request;
+using Maliev.OrderService.Api.Services.Business;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
-namespace Maliev.OrderService.Api.Controllers
+namespace Maliev.OrderService.Api.Controllers;
+
+[ApiController]
+[ApiVersion("1.0")]
+[Route("v{version:apiVersion}/orders")]
+[Authorize]
+[EnableRateLimiting("general")]
+public class OrdersController : ControllerBase
 {
-    /// <summary>
-    /// Controller for managing orders.
-    /// </summary>
-    [ApiController]
-    [ApiVersion("1.0")]
-    [Route("v{version:apiVersion}/orders")]
-    public class OrdersController : ControllerBase
+    private readonly IOrderManagementService _orderService;
+    private readonly IOrderStatusService _statusService;
+    private readonly IOrderFileService _fileService;
+    private readonly IOrderNoteService _noteService;
+    private readonly IValidator<CreateOrderRequest> _createOrderValidator;
+    private readonly IValidator<UpdateOrderRequest> _updateOrderValidator;
+    private readonly ILogger<OrdersController> _logger;
+
+    public OrdersController(
+        IOrderManagementService orderService,
+        IOrderStatusService statusService,
+        IOrderFileService fileService,
+        IOrderNoteService noteService,
+        IValidator<CreateOrderRequest> createOrderValidator,
+        IValidator<UpdateOrderRequest> updateOrderValidator,
+        ILogger<OrdersController> logger)
     {
-        private readonly IOrderServiceService _orderServiceService;
+        _orderService = orderService;
+        _statusService = statusService;
+        _fileService = fileService;
+        _noteService = noteService;
+        _createOrderValidator = createOrderValidator;
+        _updateOrderValidator = updateOrderValidator;
+        _logger = logger;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="OrdersController"/> class.
-        /// </summary>
-        /// <param name="orderServiceService">The order service.</param>
-        public OrdersController(IOrderServiceService orderServiceService)
+    [HttpGet]
+    public async Task<IActionResult> GetOrders(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? customerId = null,
+        [FromQuery] string? status = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _orderService.GetOrdersAsync(page, pageSize, customerId, status, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("{orderId}")]
+    public async Task<IActionResult> GetOrderById(string orderId, CancellationToken cancellationToken = default)
+    {
+        var order = await _orderService.GetOrderByIdAsync(orderId, cancellationToken);
+        if (order == null)
         {
-            _orderServiceService = orderServiceService;
+            return NotFound(new { message = $"Order {orderId} not found" });
         }
 
-        /// <summary>
-        /// Gets all orders.
-        /// </summary>
-        /// <returns>A list of orders.</returns>
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<OrderDto>>> GetAllOrders()
+        return Ok(order);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest request, CancellationToken cancellationToken = default)
+    {
+        var validationResult = await _createOrderValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
         {
-            var orders = await _orderServiceService.GetAllOrdersAsync();
-            return Ok(orders);
+            return BadRequest(validationResult.Errors);
         }
 
-        /// <summary>
-        /// Gets an order by its ID.
-        /// </summary>
-        /// <param name="id">The order ID.</param>
-        /// <returns>The order with the specified ID, or NotFound if not found.</returns>
-        [HttpGet("{id}")]
-        public async Task<ActionResult<OrderDto>> GetOrderById(int id)
+        var createdBy = "system"; // TODO: Get from user context after authentication
+        var order = await _orderService.CreateOrderAsync(request, createdBy, cancellationToken);
+
+        return CreatedAtAction(nameof(GetOrderById), new { orderId = order.OrderId }, order);
+    }
+
+    [HttpPut("{orderId}")]
+    public async Task<IActionResult> UpdateOrder(
+        string orderId,
+        [FromBody] UpdateOrderRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var validationResult = await _updateOrderValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
         {
-            var order = await _orderServiceService.GetOrderByIdAsync(id);
-            if (order == null)
-            {
-                return NotFound();
-            }
+            return BadRequest(validationResult.Errors);
+        }
+
+        try
+        {
+            var updatedBy = "system"; // TODO: Get from user context
+            var order = await _orderService.UpdateOrderAsync(orderId, request, updatedBy, cancellationToken);
             return Ok(order);
         }
-
-        /// <summary>
-        /// Creates a new order.
-        /// </summary>
-        /// <param name="request">The request to create an order.</param>
-        /// <returns>The newly created order.</returns>
-        [HttpPost]
-        public async Task<ActionResult<OrderDto>> CreateOrder(CreateOrderRequest request)
+        catch (InvalidOperationException ex)
         {
-            var order = await _orderServiceService.CreateOrderAsync(request);
-            return CreatedAtAction(nameof(GetOrderById), new { id = order.Id }, order);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "Order has been modified by another user. Please refresh and try again." });
+        }
+    }
+
+    [HttpDelete("{orderId}")]
+    public async Task<IActionResult> CancelOrder(string orderId, CancellationToken cancellationToken = default)
+    {
+        var cancelledBy = "system"; // TODO: Get from user context
+        var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
+
+        if (!result)
+        {
+            return NotFound(new { message = $"Order {orderId} not found" });
         }
 
-        /// <summary>
-        /// Updates an existing order.
-        /// </summary>
-        /// <param name="id">The ID of the order to update.</param>
-        /// <param name="request">The request to update an order.</param>
-        /// <returns>The updated order, or NotFound if not found.</returns>
-        [HttpPut("{id}")]
-        public async Task<ActionResult<OrderDto>> UpdateOrder(int id, UpdateOrderRequest request)
-        {
-            if (id != request.Id)
-            {
-                return BadRequest();
-            }
+        return Ok(new { message = "Order cancelled successfully" });
+    }
 
-            var order = await _orderServiceService.UpdateOrderAsync(request);
-            if (order == null)
-            {
-                return NotFound();
-            }
-            return Ok(order);
+    [HttpPost("{orderId}/cancel")]
+    public async Task<IActionResult> CancelOrderWithReason(
+        string orderId,
+        [FromBody] CancelOrderRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var cancelledBy = "system"; // TODO: Get from user context
+        var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, request.CancellationReason, cancellationToken);
+
+        if (!result)
+        {
+            return NotFound(new { message = $"Order {orderId} not found" });
         }
 
-        /// <summary>
-        /// Deletes an order by its ID.
-        /// </summary>
-        /// <param name="id">The order ID.</param>
-        /// <returns>NoContent if successful, or NotFound if not found.</returns>
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteOrder(int id)
-        {
-            var result = await _orderServiceService.DeleteOrderAsync(id);
-            if (!result)
-            {
-                return NotFound();
-            }
-            return NoContent();
-        }
+        return Ok(new { message = "Order cancelled successfully", reason = request.CancellationReason });
+    }
+
+    [HttpGet("{orderId}/statuses")]
+    public async Task<IActionResult> GetOrderStatuses(string orderId, CancellationToken cancellationToken = default)
+    {
+        var statuses = await _statusService.GetOrderStatusHistoryAsync(orderId, cancellationToken);
+        return Ok(statuses);
+    }
+
+    [HttpGet("{orderId}/files")]
+    public async Task<IActionResult> GetOrderFiles(string orderId, CancellationToken cancellationToken = default)
+    {
+        var files = await _fileService.GetOrderFilesAsync(orderId, cancellationToken);
+        return Ok(files);
+    }
+
+    [HttpGet("{orderId}/notes")]
+    public async Task<IActionResult> GetOrderNotes(string orderId, CancellationToken cancellationToken = default)
+    {
+        var notes = await _noteService.GetOrderNotesAsync(orderId, cancellationToken);
+        return Ok(notes);
     }
 }
