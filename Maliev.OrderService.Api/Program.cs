@@ -5,6 +5,7 @@ using Maliev.OrderService.Api.Configuration;
 using Maliev.OrderService.Api.Middleware;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
@@ -12,7 +13,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Polly.Extensions.Http;
+using Scalar.AspNetCore;
 using Serilog;
+using StackExchange.Redis;
 using System.Text;
 using System.Threading.RateLimiting;
 
@@ -35,9 +38,73 @@ if (Directory.Exists(secretsPath))
     builder.Configuration.AddKeyPerFile(directoryPath: secretsPath, optional: true);
 }
 
+// Redis Distributed Cache Configuration
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+var redisEnabled = bool.TryParse(builder.Configuration["Redis:Enabled"], out var isRedisEnabled) && isRedisEnabled;
+
+if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString) && !builder.Environment.IsEnvironment("Testing"))
+{
+    try
+    {
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = redisConnectionString;
+            options.InstanceName = "Order:";
+        });
+
+        var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+        builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+
+        Log.Information("Redis distributed cache configured: {RedisConnectionString}", redisConnectionString);
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Redis connection failed - will use in-memory cache fallback");
+    }
+}
+else
+{
+    Log.Information("Redis disabled or not configured - using in-memory cache only");
+}
+
+builder.Services.AddMemoryCache(); // Fallback in-memory cache
+
+// RabbitMQ Configuration (MassTransit)
+var rabbitmqHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+var rabbitmqPort = int.TryParse(builder.Configuration["RabbitMQ:Port"], out var port) ? port : 5672;
+var rabbitmqUser = builder.Configuration["RabbitMQ:Username"] ?? "guest";
+var rabbitmqPassword = builder.Configuration["RabbitMQ:Password"] ?? "guest";
+var rabbitmqVhost = builder.Configuration["RabbitMQ:VirtualHost"] ?? "/";
+var rabbitmqEnabled = bool.TryParse(builder.Configuration["RabbitMQ:Enabled"], out var isRabbitmqEnabled) && isRabbitmqEnabled;
+
+if (rabbitmqEnabled && !builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddMassTransit(x =>
+    {
+        // Add consumers here if needed in the future
+        // x.AddConsumer<SomeEventConsumer>();
+
+        x.UsingRabbitMq((context, cfg) =>
+        {
+            cfg.Host(rabbitmqHost, (ushort)rabbitmqPort, rabbitmqVhost, h =>
+            {
+                h.Username(rabbitmqUser);
+                h.Password(rabbitmqPassword);
+            });
+
+            cfg.ConfigureEndpoints(context);
+        });
+    });
+
+    Log.Information("MassTransit configured with RabbitMQ: {Host}:{Port}", rabbitmqHost, rabbitmqPort);
+}
+else
+{
+    Log.Information("RabbitMQ/MassTransit disabled by configuration");
+}
+
 // Services
 builder.Services.AddControllers();
-builder.Services.AddMemoryCache(); // Simple configuration without SizeLimit
 builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
@@ -53,7 +120,7 @@ builder.Services.AddHttpClient<ICustomerServiceClient, CustomerServiceClient>((s
         ?? throw new InvalidOperationException("ExternalServices:CustomerService configuration not found");
 
     client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
 }).AddPolicyHandler(retryPolicy);
 
 builder.Services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>((serviceProvider, client) =>
@@ -63,7 +130,7 @@ builder.Services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>((s
         ?? throw new InvalidOperationException("ExternalServices:MaterialService configuration not found");
 
     client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
 }).AddPolicyHandler(retryPolicy);
 
 builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>((serviceProvider, client) =>
@@ -73,7 +140,7 @@ builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>((ser
         ?? throw new InvalidOperationException("ExternalServices:PaymentService configuration not found");
 
     client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
 }).AddPolicyHandler(retryPolicy);
 
 builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>((serviceProvider, client) =>
@@ -83,7 +150,7 @@ builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>((servi
         ?? throw new InvalidOperationException("ExternalServices:UploadService configuration not found");
 
     client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds); // Should be 300 for file uploads
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds); // Should be 300 for file uploads
 }).AddPolicyHandler(retryPolicy);
 
 builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>((serviceProvider, client) =>
@@ -93,7 +160,7 @@ builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>((servicePr
         ?? throw new InvalidOperationException("ExternalServices:AuthService configuration not found");
 
     client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
 }).AddPolicyHandler(retryPolicy);
 
 builder.Services.AddHttpClient<IEmployeeServiceClient, EmployeeServiceClient>((serviceProvider, client) =>
@@ -103,7 +170,7 @@ builder.Services.AddHttpClient<IEmployeeServiceClient, EmployeeServiceClient>((s
         ?? throw new InvalidOperationException("ExternalServices:EmployeeService configuration not found");
 
     client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
 }).AddPolicyHandler(retryPolicy);
 
 builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceClient>((serviceProvider, client) =>
@@ -113,7 +180,7 @@ builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceCl
         ?? throw new InvalidOperationException("ExternalServices:NotificationService configuration not found");
 
     client.BaseAddress = new Uri(options.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
 }).AddPolicyHandler(retryPolicy);
 
 // Business Services
@@ -168,26 +235,51 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// JWT Authentication Configuration
+// JWT Authentication Configuration (RSA Asymmetric Public Key Validation)
 if (!builder.Environment.IsEnvironment("Testing"))
 {
-    var jwtSecret = builder.Configuration["Jwt:SecurityKey"] ?? throw new InvalidOperationException("Jwt:SecurityKey configuration not found");
-    var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("Jwt:Issuer configuration not found");
-    var jwtAudience = builder.Configuration["Jwt:Audience"] ?? throw new InvalidOperationException("Jwt:Audience configuration not found");
+    var publicKeyBase64 = builder.Configuration["Jwt:PublicKey"]
+        ?? throw new InvalidOperationException("JWT PublicKey not configured");
+    var issuer = builder.Configuration["Jwt:Issuer"]
+        ?? throw new InvalidOperationException("JWT Issuer not configured");
+    var audience = builder.Configuration["Jwt:Audience"]
+        ?? throw new InvalidOperationException("JWT Audience not configured");
+
+    // The public key from Google Secret Manager is double base64-encoded PEM format
+    // First decode to get the PEM string
+    var pemString = Encoding.UTF8.GetString(Convert.FromBase64String(publicKeyBase64));
+
+    // Extract base64 content from PEM format (remove headers)
+    var base64Key = pemString
+        .Replace("-----BEGIN PUBLIC KEY-----", "")
+        .Replace("-----END PUBLIC KEY-----", "")
+        .Replace("\r", "")
+        .Replace("\n", "")
+        .Trim();
+
+    // Decode the base64 content to get raw DER bytes
+    var keyBytes = Convert.FromBase64String(base64Key);
+
+    // Import the DER-formatted public key
+    var rsa = System.Security.Cryptography.RSA.Create();
+    rsa.ImportSubjectPublicKeyInfo(keyBytes, out _);
+    var securityKey = new RsaSecurityKey(rsa);
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            options.SaveToken = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtIssuer,
-                ValidAudience = jwtAudience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-                ClockSkew = TimeSpan.FromMinutes(5) // Allow 5 minutes clock skew
+                ValidIssuer = issuer,
+                ValidAudience = audience,
+                IssuerSigningKey = securityKey,
+                ClockSkew = TimeSpan.FromMinutes(5)
             };
 
             options.Events = new JwtBearerEvents
@@ -226,12 +318,8 @@ builder.Services.AddApiVersioning(options =>
     options.ReportApiVersions = true;
 }).AddMvc();
 
-// OpenAPI/Swagger
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { Title = "Order Service API", Version = "v1" });
-});
+// OpenAPI
+builder.Services.AddOpenApi();
 
 // Database Configuration
 if (!builder.Environment.IsEnvironment("Testing"))
@@ -245,8 +333,14 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
 // Health Checks
 var readinessTags = new[] { "readiness" };
-builder.Services.AddHealthChecks()
+var healthChecksBuilder = builder.Services.AddHealthChecks()
     .AddDbContextCheck<Maliev.OrderService.Data.OrderDbContext>(tags: readinessTags);
+
+// Add Redis health check if enabled
+if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString))
+{
+    healthChecksBuilder.AddRedis(redisConnectionString, "redis", tags: readinessTags);
+}
 
 var app = builder.Build();
 
@@ -257,12 +351,21 @@ app.UsePathBase("/orders");
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+if (!app.Environment.IsProduction())
 {
-    c.RoutePrefix = "swagger";
-    c.SwaggerEndpoint("/orders/swagger/v1/swagger.json", "Order Service API v1");
-});
+    app.MapOpenApi("/orders/openapi/{documentName}.json");
+    app.MapScalarApiReference(options =>
+    {
+        options
+            .WithTitle("Maliev Order Service API")
+            .WithTheme(Scalar.AspNetCore.ScalarTheme.Saturn)
+            .WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient)
+            .WithEndpointPrefix("/orders/scalar/{documentName}")
+            .WithOpenApiRoutePattern("/orders/openapi/{documentName}.json");
+    });
+
+    Log.Information("Scalar API documentation enabled at /orders/scalar/v1");
+}
 
 app.UseHttpsRedirection();
 app.UseCors();
@@ -298,6 +401,3 @@ finally
 {
     Log.CloseAndFlush();
 }
-
-// Make Program class accessible for integration tests
-public partial class Program { }

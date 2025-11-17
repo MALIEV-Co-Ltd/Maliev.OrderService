@@ -32,8 +32,8 @@ Comprehensive Order Service API for MALIEV's rapid prototyping and manufacturing
 
 ## Technical Context
 
-**Language/Version**: C# / .NET 9.0
-**Primary Dependencies**: ASP.NET Core 9.0, Entity Framework Core 9.0.9, Npgsql 9.0.2, Serilog 8.0.2, AutoMapper, FluentValidation
+**Language/Version**: C# / .NET 10.0
+**Primary Dependencies**: ASP.NET Core 9.0, Entity Framework Core 9.0.10, Npgsql 9.0.4, Serilog 9.0.0, AutoMapper 15.0.1, FluentValidation 11.3.1
 **Storage**: PostgreSQL 18 (`order_app_db` database)
 **Testing**: xUnit, Moq 4.20.72, FluentAssertions 8.6.0
 **Target Platform**: Linux containers (Kubernetes/GKE)
