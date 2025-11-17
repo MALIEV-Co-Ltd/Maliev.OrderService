@@ -26,12 +26,14 @@ WORKDIR /app
 # Install PostgreSQL client for health checks
 RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
 
-# Copy published files
-COPY --from=build /app/publish .
+# Ensure 'app' owns the workdir (app user already exists in ASP.NET runtime image)
+RUN chown -R app:app /app
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+# Switch to non-root user
+USER app
+
+# Copy published files (now owned by app)
+COPY --from=build /app/publish .
 
 # Expose port
 EXPOSE 8080

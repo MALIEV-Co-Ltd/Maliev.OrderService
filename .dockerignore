@@ -1,54 +1,52 @@
-# Git
-.git
-.gitignore
-.gitattributes
-
-# GitHub
-.github
-
-# VS Code / IDE
-.vscode
-.vs
-.idea
-*.swp
-*.swo
-*~
-
-# Build outputs
-**/bin
-**/obj
-**/out
-**/publish
+# .NET Build outputs
+**/bin/
+**/obj/
+**/out/
+**/.vs/
+**/.vscode/
 
 # Test results
-**/TestResults
+**/TestResults/
 **/*.trx
 
 # NuGet packages
 **/*.nupkg
 **/*.snupkg
-.nuget
+**/packages/
 
-# User-specific files
+# IDE and editor files
+**/.idea/
+**/.vscode/
 **/*.user
 **/*.suo
 **/*.userosscache
 **/*.sln.docstates
+**/.DS_Store
 
-# Documentation and specs
-*.md
-!README.md
-specs/
-.specify/
-.claude/
+# Git
+**/.git/
+**/.gitignore
+**/.gitattributes
+
+# Documentation
+**/README.md
+**/docs/
 
 # Docker
+**/.dockerignore
 **/Dockerfile*
 **/docker-compose*
-**/.dockerignore
 
-# Misc
-**/node_modules
-**/npm-debug.log
-**/.DS_Store
-**/thumbs.db
+# Temporary files
+**/*~
+**/*.swp
+**/*.tmp
+**/*.log
+
+# Specification and planning
+**/specs/
+**/.specify/
+**/CLAUDE.md
+
+# CI/CD
+**/.github/
