@@ -238,32 +238,45 @@ builder.Services.AddRateLimiter(options =>
 // JWT Authentication Configuration (RSA Asymmetric Public Key Validation)
 if (!builder.Environment.IsEnvironment("Testing"))
 {
-    var publicKeyBase64 = builder.Configuration["Jwt:PublicKey"]
-        ?? throw new InvalidOperationException("JWT PublicKey not configured");
-    var issuer = builder.Configuration["Jwt:Issuer"]
-        ?? throw new InvalidOperationException("JWT Issuer not configured");
-    var audience = builder.Configuration["Jwt:Audience"]
-        ?? throw new InvalidOperationException("JWT Audience not configured");
+    var publicKeyBase64 = builder.Configuration["Jwt:PublicKey"];
+    var issuer = builder.Configuration["Jwt:Issuer"] ?? (builder.Environment.IsDevelopment() ? "https://localhost:5001" : throw new InvalidOperationException("JWT Issuer not configured"));
+    var audience = builder.Configuration["Jwt:Audience"] ?? (builder.Environment.IsDevelopment() ? "MalievApi" : throw new InvalidOperationException("JWT Audience not configured"));
 
-    // The public key from Google Secret Manager is double base64-encoded PEM format
-    // First decode to get the PEM string
-    var pemString = Encoding.UTF8.GetString(Convert.FromBase64String(publicKeyBase64));
+    SecurityKey securityKey;
+    if (string.IsNullOrEmpty(publicKeyBase64))
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            Log.Warning("JWT PublicKey not configured. Using dummy key for development. THIS IS INSECURE FOR PRODUCTION.");
+            securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("SuperSecretKeyForDevelopmentOnly1234567890"));
+        }
+        else
+        {
+            throw new InvalidOperationException("JWT PublicKey not configured for non-development environment.");
+        }
+    }
+    else
+    {
+        // The public key from Google Secret Manager is double base64-encoded PEM format
+        // First decode to get the PEM string
+        var pemString = Encoding.UTF8.GetString(Convert.FromBase64String(publicKeyBase64));
 
-    // Extract base64 content from PEM format (remove headers)
-    var base64Key = pemString
-        .Replace("-----BEGIN PUBLIC KEY-----", "")
-        .Replace("-----END PUBLIC KEY-----", "")
-        .Replace("\r", "")
-        .Replace("\n", "")
-        .Trim();
+        // Extract base64 content from PEM format (remove headers)
+        var base64Key = pemString
+            .Replace("-----BEGIN PUBLIC KEY-----", "")
+            .Replace("-----END PUBLIC KEY-----", "")
+            .Replace("\r", "")
+            .Replace("\n", "")
+            .Trim();
 
-    // Decode the base64 content to get raw DER bytes
-    var keyBytes = Convert.FromBase64String(base64Key);
+        // Decode the base64 content to get raw DER bytes
+        var keyBytes = Convert.FromBase64String(base64Key);
 
-    // Import the DER-formatted public key
-    var rsa = System.Security.Cryptography.RSA.Create();
-    rsa.ImportSubjectPublicKeyInfo(keyBytes, out _);
-    var securityKey = new RsaSecurityKey(rsa);
+        // Import the DER-formatted public key
+        var rsa = System.Security.Cryptography.RSA.Create();
+        rsa.ImportSubjectPublicKeyInfo(keyBytes, out _);
+        securityKey = new RsaSecurityKey(rsa);
+    }
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
@@ -341,6 +354,9 @@ if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString))
 {
     healthChecksBuilder.AddRedis(redisConnectionString, "redis", tags: readinessTags);
 }
+
+// Add service defaults for .NET Aspire
+builder.AddServiceDefaults();
 
 var app = builder.Build();
 
