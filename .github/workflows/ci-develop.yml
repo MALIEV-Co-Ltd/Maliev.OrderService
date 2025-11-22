@@ -44,6 +44,9 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore Maliev.OrderService.sln
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Build
         run: dotnet build Maliev.OrderService.sln --no-restore
@@ -108,7 +111,10 @@ jobs:
       - name: Build and push Docker image
         run: |
           gcloud auth configure-docker asia-southeast1-docker.pkg.dev
-          docker build -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-order-service:${{ github.sha }} -f Dockerfile .
+          NUGET_USERNAME=${{ github.actor }} NUGET_PASSWORD=${{ secrets.GITOPS_PAT }} docker build \
+            --secret id=nuget_username,env=NUGET_USERNAME \
+            --secret id=nuget_password,env=NUGET_PASSWORD \
+            -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-order-service:${{ github.sha }} -f Dockerfile .
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-order-service:${{ github.sha }}
 
       - name: Checkout maliev-gitops repository
