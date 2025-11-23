@@ -394,7 +394,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Prometheus metrics
-app.MapMetrics("/metrics");
+app.MapMetrics("/orders/metrics");
 
 app.MapControllers();
 
