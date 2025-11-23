@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using Prometheus;
 using Serilog;
 using StackExchange.Redis;
 using System.Text;
@@ -373,6 +374,27 @@ app.MapHealthChecks("/readiness", new HealthCheckOptions
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 }).ExcludeFromDescription()
   .AllowAnonymous();
+
+// OpenAPI and Scalar (development only)
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi("/orders/openapi/{documentName}.json");
+    app.MapScalarApiReference("/orders/scalar/v1", options =>
+    {
+        options
+            .WithTitle("MALIEV Order Service API")
+            .WithTheme(ScalarTheme.Saturn)
+            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
+            .WithOpenApiRoutePattern("/orders/openapi/{documentName}.json");
+    });
+
+    // Redirect root to Scalar
+    app.MapGet("/", () => Results.Redirect("/orders/scalar/v1")).ExcludeFromDescription();
+    app.MapGet("/orders", () => Results.Redirect("/orders/scalar/v1")).ExcludeFromDescription();
+}
+
+// Prometheus metrics
+app.MapMetrics("/metrics");
 
 app.MapControllers();
 
