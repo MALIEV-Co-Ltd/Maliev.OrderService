@@ -1,23 +1,30 @@
+# syntax=docker/dockerfile:1.4
+# Multi-stage Docker build for Maliev.OrderService.Api  
+# Based on MALIEV Co. Ltd. standard .NET 10 microservice template
+
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy project files for restore
+# Copy nuget.config and project files
+COPY nuget.config ./
 COPY Maliev.OrderService.Api/Maliev.OrderService.Api.csproj Maliev.OrderService.Api/
 COPY Maliev.OrderService.Data/Maliev.OrderService.Data.csproj Maliev.OrderService.Data/
 
-# Restore dependencies (only production projects)
-WORKDIR /src/Maliev.OrderService.Api
-RUN dotnet restore
+# Restore with GitHub Packages authentication using BuildKit secrets
+RUN --mount=type=secret,id=nuget_username \
+  --mount=type=secret,id=nuget_password \
+  NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
+  NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
+  dotnet restore Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
 
 # Copy source code
-WORKDIR /src
 COPY Maliev.OrderService.Api/ Maliev.OrderService.Api/
 COPY Maliev.OrderService.Data/ Maliev.OrderService.Data/
 
 # Build and publish
 WORKDIR /src/Maliev.OrderService.Api
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

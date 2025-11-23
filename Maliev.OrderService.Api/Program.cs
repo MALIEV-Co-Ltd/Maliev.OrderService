@@ -11,8 +11,6 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Polly;
-using Polly.Extensions.Http;
 using Scalar.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
@@ -108,11 +106,7 @@ builder.Services.AddControllers();
 builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
-// External Service HttpClients with Retry Policies (3 attempts, exponential backoff)
-var retryPolicy = HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
-
+// External Service HttpClients with Standard Resilience Handler
 builder.Services.AddHttpClient<ICustomerServiceClient, CustomerServiceClient>((serviceProvider, client) =>
 {
     var config = serviceProvider.GetRequiredService<IConfiguration>();
@@ -121,7 +115,7 @@ builder.Services.AddHttpClient<ICustomerServiceClient, CustomerServiceClient>((s
 
     client.BaseAddress = new Uri(options.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
-}).AddPolicyHandler(retryPolicy);
+}).AddStandardResilienceHandler();
 
 builder.Services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>((serviceProvider, client) =>
 {
@@ -131,7 +125,7 @@ builder.Services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>((s
 
     client.BaseAddress = new Uri(options.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
-}).AddPolicyHandler(retryPolicy);
+}).AddStandardResilienceHandler();
 
 builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>((serviceProvider, client) =>
 {
@@ -141,7 +135,7 @@ builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>((ser
 
     client.BaseAddress = new Uri(options.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
-}).AddPolicyHandler(retryPolicy);
+}).AddStandardResilienceHandler();
 
 builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>((serviceProvider, client) =>
 {
@@ -151,7 +145,7 @@ builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>((servi
 
     client.BaseAddress = new Uri(options.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds); // Should be 300 for file uploads
-}).AddPolicyHandler(retryPolicy);
+}).AddStandardResilienceHandler();
 
 builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>((serviceProvider, client) =>
 {
@@ -161,7 +155,7 @@ builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>((servicePr
 
     client.BaseAddress = new Uri(options.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
-}).AddPolicyHandler(retryPolicy);
+}).AddStandardResilienceHandler();
 
 builder.Services.AddHttpClient<IEmployeeServiceClient, EmployeeServiceClient>((serviceProvider, client) =>
 {
@@ -171,7 +165,7 @@ builder.Services.AddHttpClient<IEmployeeServiceClient, EmployeeServiceClient>((s
 
     client.BaseAddress = new Uri(options.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
-}).AddPolicyHandler(retryPolicy);
+}).AddStandardResilienceHandler();
 
 builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceClient>((serviceProvider, client) =>
 {
@@ -181,7 +175,7 @@ builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceCl
 
     client.BaseAddress = new Uri(options.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
-}).AddPolicyHandler(retryPolicy);
+}).AddStandardResilienceHandler();
 
 // Business Services
 builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
@@ -364,28 +358,6 @@ var app = builder.Build();
 app.UsePathBase("/orders");
 
 // Middleware Pipeline (EXACT ORDER)
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseMiddleware<RequestLoggingMiddleware>();
-
-if (!app.Environment.IsProduction())
-{
-    app.MapOpenApi("/orders/openapi/{documentName}.json");
-    app.MapScalarApiReference(options =>
-    {
-        options
-            .WithTitle("Maliev Order Service API")
-            .WithTheme(Scalar.AspNetCore.ScalarTheme.Saturn)
-            .WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient)
-            .WithEndpointPrefix("/orders/scalar/{documentName}")
-            .WithOpenApiRoutePattern("/orders/openapi/{documentName}.json");
-    });
-
-    Log.Information("Scalar API documentation enabled at /orders/scalar/v1");
-}
-
-app.UseHttpsRedirection();
-app.UseCors();
-app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
