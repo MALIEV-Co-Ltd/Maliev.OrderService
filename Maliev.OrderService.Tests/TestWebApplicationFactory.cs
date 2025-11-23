@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Maliev.OrderService.Api.Services.External;
@@ -21,10 +22,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             // Remove the existing DbContext configuration
             services.RemoveAll<DbContextOptions<OrderDbContext>>();
 
-            // Use actual PostgreSQL database for testing
-            var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__OrderDbContext")
+            // Use IConfiguration to get connection string (supports User Secrets, env vars, appsettings)
+            var configuration = TestDatabaseFixture.BuildTestConfiguration();
+            var connectionString = configuration.GetConnectionString("OrderDbContext")
                 ?? throw new InvalidOperationException(
-                    "ConnectionStrings__OrderDbContext environment variable must be set for testing. " +
+                    "ConnectionStrings:OrderDbContext not found. Configure via User Secrets, environment variable, or appsettings.Testing.json. " +
                     "Example: Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=your_password;");
 
             services.AddDbContext<OrderDbContext>(options =>

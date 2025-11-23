@@ -32,6 +32,31 @@ C# / .NET 9.0: Follow standard conventions
 - Migrations: Applied manually via `dotnet ef database update` (not auto-applied on startup)
 - Testing: Uses actual PostgreSQL database (not in-memory) to validate real behavior including transactions and constraints
 
+### Test Configuration (IConfiguration Pattern)
+Tests use `IConfiguration` with the following hierarchy (later sources override earlier):
+1. `appsettings.Testing.json` (optional, checked into repo for defaults)
+2. User Secrets (`maliev-orderservice-tests`)
+3. Environment Variables
+
+**Setup via User Secrets** (recommended for local development):
+```bash
+cd Maliev.OrderService.Tests
+dotnet user-secrets set "ConnectionStrings:OrderDbContext" "Host=localhost;Port=5432;Database=order_app_db;Username=postgres;Password=postgres;"
+```
+
+**Setup via Environment Variable** (CI/CD):
+```bash
+export ConnectionStrings__OrderDbContext="Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=postgres;"
+```
+
+**Test Configuration Pattern**:
+```csharp
+// TestDatabaseFixture.BuildTestConfiguration() provides shared IConfiguration
+var configuration = TestDatabaseFixture.BuildTestConfiguration();
+var connectionString = configuration.GetConnectionString("OrderDbContext")
+    ?? throw new InvalidOperationException("ConnectionStrings:OrderDbContext not found");
+```
+
 ### 16-State Order Workflow
 **Primary Flow**: New → Reviewing → [Rejected|Reviewed] → Quoted → [Declined|Accepted|Expired] → [Paid|POIssued] → InProgress → Finished → Shipped
 **Exception Flows**: InProgress ↔ OnHold, Finished/Shipped → Reopen → InProgress, Any → Cancelled

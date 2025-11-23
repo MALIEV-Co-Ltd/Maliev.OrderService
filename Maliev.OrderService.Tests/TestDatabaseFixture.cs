@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace Maliev.OrderService.Tests;
@@ -11,9 +13,10 @@ public partial class TestDatabaseFixture : IDisposable
 
     public TestDatabaseFixture()
     {
-        _connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__OrderDbContext")
+        var configuration = BuildTestConfiguration();
+        _connectionString = configuration.GetConnectionString("OrderDbContext")
             ?? throw new InvalidOperationException(
-                "ConnectionStrings__OrderDbContext environment variable must be set for testing. " +
+                "ConnectionStrings:OrderDbContext not found. Configure via User Secrets, environment variable, or appsettings.Testing.json. " +
                 "Example: Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=your_password;");
 
         try
@@ -97,5 +100,20 @@ public partial class TestDatabaseFixture : IDisposable
         // Optional: Clean up all test data on disposal
         Cleanup();
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Builds IConfiguration for tests using the standard configuration hierarchy:
+    /// appsettings.Testing.json -> User Secrets -> Environment Variables
+    /// </summary>
+    public static IConfiguration BuildTestConfiguration()
+    {
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.Testing.json", optional: true)
+            .AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true)
+            .AddEnvironmentVariables();
+
+        return builder.Build();
     }
 }
