@@ -9,22 +9,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: test_db
-          POSTGRES_INITDB_ARGS: "--auth-host=trust"
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -34,67 +18,24 @@ jobs:
         with:
           dotnet-version: "10.x"
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+      - name: Switch to PackageReference for CI build
+        run: |
+          # Replace ProjectReference with PackageReference in all service csproj files
+          find . -name "*.csproj" -type f -exec sed -i 's|<ProjectReference Include=".*Maliev.Aspire.ServiceDefaults.*.csproj" />|<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="1.0.*" />|g' {} \;
+          echo "Switched to PackageReference for ServiceDefaults"
 
       - name: Restore dependencies
         run: dotnet restore Maliev.OrderService.sln
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Build
         run: dotnet build Maliev.OrderService.sln --no-restore
 
-      - name: Setup test database
-        run: |
-          # Wait for PostgreSQL to be ready
-          until pg_isready -h localhost -p 5432 -U postgres; do
-            echo "Waiting for PostgreSQL..."
-            sleep 2
-          done
-          # Configure PostgreSQL for better test performance (separate commands to avoid transaction wrapping)
-          psql -h localhost -p 5432 -U postgres -d test_db -c "ALTER SYSTEM SET fsync = off"
-          psql -h localhost -p 5432 -U postgres -d test_db -c "ALTER SYSTEM SET full_page_writes = off"
-          psql -h localhost -p 5432 -U postgres -d test_db -c "ALTER SYSTEM SET synchronous_commit = off"
-          psql -h localhost -p 5432 -U postgres -d test_db -c "ALTER SYSTEM SET checkpoint_completion_target = 0.9"
-          psql -h localhost -p 5432 -U postgres -d test_db -c "ALTER SYSTEM SET wal_buffers = '16MB'"
-          psql -h localhost -p 5432 -U postgres -d test_db -c "ALTER SYSTEM SET shared_buffers = '256MB'"
-          psql -h localhost -p 5432 -U postgres -d test_db -c "SELECT pg_reload_conf()"
-        env:
-          PGPASSWORD: postgres
-
       - name: Test
-        run: dotnet test Maliev.OrderService.sln --no-build --verbosity normal --logger trx --results-directory TestResults
+        run: dotnet test Maliev.OrderService.sln --no-build --verbosity normal
         working-directory: ${{ github.workspace }}
-        env:
-          ConnectionStrings__OrderDbContext: "Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=postgres;"
-          Jwt__SecurityKey: "test-signing-key-that-is-at-least-32-characters-long-for-testing-purposes"
-          Jwt__Issuer: "test-issuer"
-          Jwt__Audience: "test-audience"
-          ExternalServices__CustomerService__BaseUrl: "http://mock-customer-service"
-          ExternalServices__CustomerService__TimeoutSeconds: "180"
-          ExternalServices__MaterialService__BaseUrl: "http://mock-material-service"
-          ExternalServices__MaterialService__TimeoutSeconds: "180"
-          ExternalServices__PaymentService__BaseUrl: "http://mock-payment-service"
-          ExternalServices__PaymentService__TimeoutSeconds: "180"
-          ExternalServices__UploadService__BaseUrl: "http://mock-upload-service"
-          ExternalServices__UploadService__TimeoutSeconds: "300"
-          ExternalServices__AuthService__BaseUrl: "http://mock-auth-service"
-          ExternalServices__AuthService__TimeoutSeconds: "180"
-          ExternalServices__EmployeeService__BaseUrl: "http://mock-employee-service"
-          ExternalServices__EmployeeService__TimeoutSeconds: "180"
-          ExternalServices__NotificationService__BaseUrl: "http://mock-notification-service"
-          ExternalServices__NotificationService__TimeoutSeconds: "180"
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-production
-          path: TestResults/*.trx
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -106,14 +47,10 @@ jobs:
         with:
           project_id: maliev-website
 
-
       - name: Build and push Docker image
         run: |
           gcloud auth configure-docker asia-southeast1-docker.pkg.dev
-          NUGET_USERNAME=${{ github.actor }} NUGET_PASSWORD=${{ secrets.GITOPS_PAT }} docker build \
-            --secret id=nuget_username,env=NUGET_USERNAME \
-            --secret id=nuget_password,env=NUGET_PASSWORD \
-            -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-order-service:${{ github.sha }} -f Dockerfile .
+          NUGET_USERNAME=${{ github.actor }} NUGET_PASSWORD=${{ secrets.GITOPS_PAT }} docker build --secret id=nuget_username,env=NUGET_USERNAME --secret id=nuget_password,env=NUGET_PASSWORD -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-order-service:${{ github.sha }} -f Maliev.OrderService.Api/Dockerfile .
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-order-service:${{ github.sha }}
 
       - name: Checkout maliev-gitops repository
@@ -139,7 +76,7 @@ jobs:
           PR_BODY: |
             Automated deployment of order-service to production environment.
 
-            ⚠️ **PRODUCTION DEPLOYMENT** - Please review carefully before merging.
+            **PRODUCTION DEPLOYMENT** - Please review carefully before merging.
 
             Commit: ${{ github.sha }}
             Triggered by: ${{ github.actor }}
@@ -164,10 +101,4 @@ jobs:
           git push origin $BRANCH_NAME
 
           # Create pull request using GitHub CLI
-          gh pr create \
-            --title "Deploy order-service ${{ github.sha }} to production" \
-            --body "$PR_BODY" \
-            --base main \
-            --base main \
-            --head $BRANCH_NAME \
-            --repo MALIEV-Co-Ltd/maliev-gitops
+          gh pr create             --title "Deploy order-service ${{ github.sha }} to production"             --body "$PR_BODY"             --base main             --head $BRANCH_NAME             --repo MALIEV-Co-Ltd/maliev-gitops
