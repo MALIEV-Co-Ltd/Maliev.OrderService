@@ -1,6 +1,6 @@
-using AutoMapper;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
+using Maliev.OrderService.Api.Mapping;
 using Maliev.OrderService.Api.Services.External;
 using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
@@ -8,25 +8,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Api.Services.Business;
 
+/// <summary>
+/// Service for managing order files
+/// </summary>
 public partial class OrderFileService : IOrderFileService
 {
     private readonly OrderDbContext _context;
     private readonly IUploadServiceClient _uploadService;
-    private readonly IMapper _mapper;
     private readonly ILogger<OrderFileService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OrderFileService"/> class.
+    /// </summary>
+    /// <param name="context">The database context</param>
+    /// <param name="uploadService">The upload service client</param>
+    /// <param name="logger">The logger instance</param>
     public OrderFileService(
         OrderDbContext context,
         IUploadServiceClient uploadService,
-        IMapper mapper,
         ILogger<OrderFileService> logger)
     {
         _context = context;
         _uploadService = uploadService;
-        _mapper = mapper;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<List<OrderFileResponse>> GetOrderFilesAsync(string orderId, CancellationToken cancellationToken = default)
     {
         var files = await _context.OrderFiles
@@ -34,9 +41,10 @@ public partial class OrderFileService : IOrderFileService
             .OrderByDescending(f => f.UploadedAt)
             .ToListAsync(cancellationToken);
 
-        return _mapper.Map<List<OrderFileResponse>>(files);
+        return files.Select(f => f.ToOrderFileResponse()).ToList();
     }
 
+    /// <inheritdoc />
     public async Task<OrderFileResponse> UploadOrderFileAsync(
         string orderId,
         UploadOrderFileRequest request,
@@ -57,7 +65,7 @@ public partial class OrderFileService : IOrderFileService
         var uploadResult = await _uploadService.UploadFileAsync(objectPath, fileStream, "application/octet-stream", cancellationToken);
 
         // Create file record
-        var orderFile = _mapper.Map<OrderFile>(request);
+        var orderFile = request.ToOrderFile();
         orderFile.OrderId = orderId;
         orderFile.FileName = fileName;
         orderFile.ObjectPath = uploadResult.ObjectPath;
@@ -70,9 +78,10 @@ public partial class OrderFileService : IOrderFileService
         _context.OrderFiles.Add(orderFile);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return _mapper.Map<OrderFileResponse>(orderFile);
+        return orderFile.ToOrderFileResponse();
     }
 
+    /// <inheritdoc />
     public async Task<(Stream? FileStream, string FileName, string ContentType)> DownloadOrderFileAsync(
         string orderId,
         long fileId,
@@ -90,6 +99,7 @@ public partial class OrderFileService : IOrderFileService
         return (stream, file.FileName, file.FileType);
     }
 
+    /// <inheritdoc />
     public async Task<bool> DeleteOrderFileAsync(string orderId, long fileId, CancellationToken cancellationToken = default)
     {
         var file = await _context.OrderFiles

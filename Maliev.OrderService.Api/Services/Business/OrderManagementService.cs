@@ -1,26 +1,33 @@
 using System.Globalization;
-using AutoMapper;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
+using Maliev.OrderService.Api.Mapping;
 using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Api.Services.Business;
 
+/// <summary>
+/// Service for managing orders
+/// </summary>
 public partial class OrderManagementService : IOrderManagementService
 {
     private readonly OrderDbContext _context;
-    private readonly IMapper _mapper;
     private readonly ILogger<OrderManagementService> _logger;
 
-    public OrderManagementService(OrderDbContext context, IMapper mapper, ILogger<OrderManagementService> logger)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OrderManagementService"/> class.
+    /// </summary>
+    /// <param name="context">The database context</param>
+    /// <param name="logger">The logger instance</param>
+    public OrderManagementService(OrderDbContext context, ILogger<OrderManagementService> logger)
     {
         _context = context;
-        _mapper = mapper;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<OrderResponse?> GetOrderByIdAsync(string orderId, CancellationToken cancellationToken = default)
     {
         var order = await _context.Orders
@@ -34,9 +41,10 @@ public partial class OrderManagementService : IOrderManagementService
             .Include(o => o.DesignAttributes)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
 
-        return order != null ? _mapper.Map<OrderResponse>(order) : null;
+        return order?.ToOrderResponse();
     }
 
+    /// <inheritdoc />
     public async Task<PaginatedResponse<OrderResponse>> GetOrdersAsync(
         int page,
         int pageSize,
@@ -64,7 +72,7 @@ public partial class OrderManagementService : IOrderManagementService
 
         return new PaginatedResponse<OrderResponse>
         {
-            Items = _mapper.Map<List<OrderResponse>>(items),
+            Items = items.Select(o => o.ToOrderResponse()).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount,
@@ -72,6 +80,7 @@ public partial class OrderManagementService : IOrderManagementService
         };
     }
 
+    /// <inheritdoc />
     public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
     {
         // Check if there's already an active transaction (e.g., from batch operations)
@@ -85,7 +94,7 @@ public partial class OrderManagementService : IOrderManagementService
 
         try
         {
-            var order = _mapper.Map<Order>(request);
+            var order = request.ToOrder();
             order.OrderId = await GenerateOrderIdAsync(cancellationToken);
             order.CreatedBy = createdBy;
             order.UpdatedBy = createdBy;
@@ -113,7 +122,7 @@ public partial class OrderManagementService : IOrderManagementService
                 await transaction.CommitAsync(cancellationToken);
             }
 
-            return _mapper.Map<OrderResponse>(order);
+            return order.ToOrderResponse();
         }
         catch
         {
@@ -127,6 +136,7 @@ public partial class OrderManagementService : IOrderManagementService
         }
     }
 
+    /// <inheritdoc />
     public async Task<OrderResponse> UpdateOrderAsync(string orderId, UpdateOrderRequest request, string updatedBy, CancellationToken cancellationToken = default)
     {
         var order = await _context.Orders.FindAsync(new object[] { orderId }, cancellationToken);
@@ -151,15 +161,16 @@ public partial class OrderManagementService : IOrderManagementService
             throw new DbUpdateConcurrencyException("Order has been modified by another user");
         }
 
-        _mapper.Map(request, order);
+        order.UpdateOrder(request);
         order.UpdatedBy = updatedBy;
         order.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return _mapper.Map<OrderResponse>(order);
+        return order.ToOrderResponse();
     }
 
+    /// <inheritdoc />
     public async Task<bool> CancelOrderAsync(string orderId, string cancelledBy, string? reason = null, CancellationToken cancellationToken = default)
     {
         var order = await _context.Orders.FindAsync(new object[] { orderId }, cancellationToken);
