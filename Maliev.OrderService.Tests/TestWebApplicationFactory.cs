@@ -1,20 +1,74 @@
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Maliev.OrderService.Api.Services.External;
 using Maliev.OrderService.Data;
+using Microsoft.IdentityModel.Tokens;
 using Moq;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Security.Cryptography;
 
 namespace Maliev.OrderService.Tests;
 
-public class TestWebApplicationFactory : WebApplicationFactory<Program>
+/// <summary>
+/// Test web application factory for integration tests with Testcontainers
+/// Uses dynamic RSA keys for JWT authentication testing
+/// </summary>
+public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    private readonly TestDatabaseFixture _dbFixture = new();
+    private readonly RSA _testRsa;
+    private const string TestIssuer = "test-issuer";
+    private const string TestAudience = "test-audience";
+
+    private static readonly string[] EmployeeRoles = ["Employee"];
+    private static readonly string[] ManagerRoles = ["Manager"];
+    private static readonly string[] AdminRoles = ["Admin"];
+    private static readonly string[] CustomerRoles = ["Customer"];
+
+    public TestWebApplicationFactory()
+    {
+        // Generate ephemeral RSA key for test JWT tokens
+        _testRsa = RSA.Create(2048);
+    }
+
+    /// <summary>
+    /// Initializes the test database fixture
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        await _dbFixture.InitializeAsync();
+    }
+
+    /// <summary>
+    /// Disposes the test database fixture
+    /// </summary>
+    public new async Task DisposeAsync()
+    {
+        _testRsa.Dispose();
+        await _dbFixture.DisposeAsync();
+        await base.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Gets the connection string from the database fixture
+    /// </summary>
+    public string GetConnectionString() => _dbFixture.GetConnectionString();
+
+    /// <summary>
+    /// Creates a database context for testing
+    /// </summary>
+    public OrderDbContext CreateDbContext() => _dbFixture.CreateDbContext();
+
+    /// <summary>
+    /// Cleans up test data between tests
+    /// </summary>
+    public async Task CleanupAsync() => await _dbFixture.CleanupAsync();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureServices(services =>
@@ -22,21 +76,29 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             // Remove the existing DbContext configuration
             services.RemoveAll<DbContextOptions<OrderDbContext>>();
 
-            // Use IConfiguration to get connection string (supports User Secrets, env vars, appsettings)
-            var configuration = TestDatabaseFixture.BuildTestConfiguration();
-            var connectionString = configuration.GetConnectionString("OrderDbContext")
-                ?? throw new InvalidOperationException(
-                    "ConnectionStrings:OrderDbContext not found. Configure via User Secrets, environment variable, or appsettings.Testing.json. " +
-                    "Example: Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=your_password;");
+            // Use the Testcontainers connection string
+            var connectionString = _dbFixture.GetConnectionString();
 
             services.AddDbContext<OrderDbContext>(options =>
             {
                 options.UseNpgsql(connectionString);
             });
 
-            // Mock authentication for testing
-            services.AddAuthentication("Test")
-                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
+            // PostConfigure JWT Bearer options to use our test RSA key
+            services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = TestIssuer,
+                    ValidAudience = TestAudience,
+                    IssuerSigningKey = new RsaSecurityKey(_testRsa),
+                    ClockSkew = TimeSpan.Zero // No clock skew for tests
+                };
+            });
 
             // Mock external service clients
             MockExternalServices(services);
@@ -149,36 +211,94 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
         context.SaveChanges();
     }
-}
 
-// Test authentication handler for integration tests
-public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
-{
-    public TestAuthHandler(
-        Microsoft.Extensions.Options.IOptionsMonitor<AuthenticationSchemeOptions> options,
-        Microsoft.Extensions.Logging.ILoggerFactory logger,
-        System.Text.Encodings.Web.UrlEncoder encoder)
-        : base(options, logger, encoder)
+    /// <summary>
+    /// Creates a test JWT token with specified claims for integration testing.
+    /// </summary>
+    /// <param name="userId">User ID claim</param>
+    /// <param name="roles">User roles</param>
+    /// <param name="additionalClaims">Additional claims to include</param>
+    /// <returns>JWT token string</returns>
+    public string CreateTestJwtToken(string userId = "test-user", string[]? roles = null, Dictionary<string, string>? additionalClaims = null)
     {
-    }
-
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-    {
-        // Create claims for test user (Admin with all permissions)
-        // Uses standard ASP.NET Core Identity claims
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, "test-user-id"),
-            new Claim(ClaimTypes.Name, "test-user"),
-            new Claim(ClaimTypes.Email, "test-user@example.com"),
-            new Claim(ClaimTypes.Role, "Admin"),
-            new Claim("userType", "employee")
+            new(ClaimTypes.NameIdentifier, userId),
+            new(JwtRegisteredClaimNames.Sub, userId),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("userType", "employee") // Default claim for order service authorization
         };
 
-        var identity = new ClaimsIdentity(claims, "Test");
-        var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, "Test");
+        // Add roles
+        roles ??= new[] { "Admin" };
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        // Add additional claims
+        if (additionalClaims != null)
+        {
+            foreach (var (key, value) in additionalClaims)
+            {
+                claims.Add(new Claim(key, value));
+            }
+        }
+
+        var credentials = new SigningCredentials(
+            new RsaSecurityKey(_testRsa),
+            SecurityAlgorithms.RsaSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: TestIssuer,
+            audience: TestAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    /// <summary>
+    /// Creates HTTP client with JWT Bearer token authentication (Admin role by default)
+    /// </summary>
+    public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null, Dictionary<string, string>? additionalClaims = null)
+    {
+        var client = CreateClient();
+        var token = CreateTestJwtToken(userId, roles, additionalClaims);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
+    /// <summary>
+    /// Creates HTTP client with Employee role
+    /// </summary>
+    public HttpClient CreateEmployeeClient(string userId = "test-employee")
+    {
+        return CreateAuthenticatedClient(userId, EmployeeRoles, new Dictionary<string, string> { ["userType"] = "employee" });
+    }
+
+    /// <summary>
+    /// Creates HTTP client with Manager role
+    /// </summary>
+    public HttpClient CreateManagerClient(string userId = "test-manager")
+    {
+        return CreateAuthenticatedClient(userId, ManagerRoles, new Dictionary<string, string> { ["userType"] = "employee" });
+    }
+
+    /// <summary>
+    /// Creates HTTP client with Admin role
+    /// </summary>
+    public HttpClient CreateAdminClient(string userId = "test-admin")
+    {
+        return CreateAuthenticatedClient(userId, AdminRoles, new Dictionary<string, string> { ["userType"] = "employee" });
+    }
+
+    /// <summary>
+    /// Creates HTTP client with Customer role
+    /// </summary>
+    public HttpClient CreateCustomerClient(string customerId = "test-customer")
+    {
+        return CreateAuthenticatedClient(customerId, CustomerRoles, new Dictionary<string, string> { ["userType"] = "customer" });
     }
 }

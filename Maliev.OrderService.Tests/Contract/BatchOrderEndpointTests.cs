@@ -1,4 +1,3 @@
-using FluentAssertions;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -11,7 +10,7 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
 
     public BatchOrderEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAdminClient();
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/orders/v1/orders/batch", batchRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PutAsJsonAsync("/orders/v1/orders/batch", batchRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -82,6 +81,6 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/orders/v1/orders/batch/cancel", orderIds);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -11,7 +10,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
 
     public FileEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAdminClient();
     }
 
     [Fact]
@@ -23,7 +22,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.GetAsync("/orders/v1/orders/ORD-2025-00001/files");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -52,7 +51,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsync($"/orders/v1/orders/{orderId}/files", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]
@@ -86,7 +85,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.GetAsync($"/orders/v1/orders/{orderId}/files/{fileId}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -120,6 +119,6 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.DeleteAsync($"/orders/v1/orders/{orderId}/files/{fileId}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -11,7 +10,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
 
     public IntegrationScenarioTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAdminClient();
     }
 
     [Fact]
@@ -34,9 +33,9 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/orders/v1/orders", orderRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().NotBeEmpty();
+        Assert.NotEmpty(content);
         // Should verify NDA validation was called
     }
 
@@ -67,7 +66,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync($"/orders/v1/orders/{orderId}/statuses", statusRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         // Internal notes should be encrypted
         // Customer notes should be visible to customer
         // Status history should be recorded
@@ -88,7 +87,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PutAsJsonAsync("/orders/v1/orders/batch", batchRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         // All updates should be rolled back due to one failure
         // Error should indicate which item failed (index 1)
     }
@@ -108,7 +107,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsync("/orders/v1/orders/ORD-2025-00001/files", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         // Should reject files exceeding 100MB limit
         // Error message should indicate size limit
     }
@@ -139,7 +138,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync($"/orders/v1/orders/{orderId}/cancel", cancelRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         // Should calculate partial charge via Payment Service
         // Should transition status to Cancelled
         // Should trigger notification to customer
@@ -174,7 +173,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
 
         // Act - First update
         var response1 = await _client.PutAsJsonAsync($"/orders/v1/orders/{orderId}", updateRequest1);
-        response1.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
 
         // Get the updated version from response1
         var updatedOrder1 = await response1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -192,7 +191,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         // Assert - In-memory DB limitation: conflict detection doesn't work properly
         // With real PostgreSQL, this would return 409 Conflict
         // For now, we just verify the update completes (even though it shouldn't in production)
-        response2.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Conflict);
+        Assert.True(response2.StatusCode == HttpStatusCode.OK || response2.StatusCode == HttpStatusCode.Conflict);
     }
 
     [Fact]
@@ -217,7 +216,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert - Currently expects OK since no authorization middleware
         // TODO: Change to HttpStatusCode.Forbidden when RBAC is implemented
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -235,13 +234,13 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
 
         // Act
         var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", orderRequest);
-        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var getResponse = await _client.GetAsync(createResponse.Headers.Location);
         var content = await getResponse.Content.ReadAsStringAsync();
 
         // Assert
-        content.Should().NotBeEmpty();
+        Assert.NotEmpty(content);
         // materialName should be cached from Material Service
         // materialCacheUpdatedAt should be set to current time
         // Subsequent reads within 24 hours should use cached name

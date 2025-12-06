@@ -3,51 +3,55 @@ using Microsoft.Extensions.Configuration;
 using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
 using System.Reflection;
-using System.Text.RegularExpressions;
+using Testcontainers.PostgreSql;
 
 namespace Maliev.OrderService.Tests;
 
-public partial class TestDatabaseFixture : IDisposable
+/// <summary>
+/// Test database fixture using Testcontainers for isolated PostgreSQL testing
+/// </summary>
+public class TestDatabaseFixture : IAsyncLifetime
 {
-    private readonly string _connectionString;
+    private PostgreSqlContainer? _postgresContainer;
+    private string _connectionString = string.Empty;
 
-    public TestDatabaseFixture()
+    /// <summary>
+    /// Initializes the test database container
+    /// </summary>
+    public async Task InitializeAsync()
     {
-        var configuration = BuildTestConfiguration();
-        _connectionString = configuration.GetConnectionString("OrderDbContext")
-            ?? throw new InvalidOperationException(
-                "ConnectionStrings:OrderDbContext not found. Configure via User Secrets, environment variable, or appsettings.Testing.json. " +
-                "Example: Host=localhost;Port=5432;Database=test_db;Username=postgres;Password=your_password;");
+        _postgresContainer = new PostgreSqlBuilder()
+            .WithImage("postgres:18")
+            .WithDatabase("order_test_db")
+            .WithUsername("postgres")
+            .WithPassword("test_password")
+            .Build();
 
-        try
-        {
-            // Apply migrations to ensure database schema is up to date
-            using var context = CreateDbContext();
-            context.Database.Migrate();
+        await _postgresContainer.StartAsync();
+        _connectionString = _postgresContainer.GetConnectionString();
 
-            // Seed required reference data
-            SeedReferenceData(context);
-        }
-        catch (Exception ex)
+        // Apply migrations to create database schema
+        using var context = CreateDbContext();
+        await context.Database.MigrateAsync();
+
+        // Seed required reference data
+        SeedReferenceData(context);
+    }
+
+    /// <summary>
+    /// Disposes the test database container
+    /// </summary>
+    public async Task DisposeAsync()
+    {
+        if (_postgresContainer != null)
         {
-            throw new InvalidOperationException(
-                $"Failed to connect to PostgreSQL for testing. Please ensure:\n" +
-                $"1. PostgreSQL is running on the configured host/port\n" +
-                $"2. The test_db database exists (or can be created)\n" +
-                $"3. The connection string is correct\n" +
-                $"Connection string (password hidden): {HidePassword(_connectionString)}\n" +
-                $"Original error: {ex.Message}", ex);
+            await _postgresContainer.DisposeAsync();
         }
     }
 
-    [GeneratedRegex(@"Password=[^;]+", RegexOptions.IgnoreCase)]
-    private static partial Regex PasswordRegex();
-
-    private static string HidePassword(string connectionString)
-    {
-        return PasswordRegex().Replace(connectionString, "Password=***");
-    }
-
+    /// <summary>
+    /// Creates a new database context connected to the test container
+    /// </summary>
     public OrderDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<OrderDbContext>()
@@ -57,6 +61,14 @@ public partial class TestDatabaseFixture : IDisposable
         return new OrderDbContext(options);
     }
 
+    /// <summary>
+    /// Gets the connection string for the test database
+    /// </summary>
+    public string GetConnectionString() => _connectionString;
+
+    /// <summary>
+    /// Seeds required reference data for tests
+    /// </summary>
     private static void SeedReferenceData(OrderDbContext context)
     {
         // Seed service categories if they don't exist
@@ -81,33 +93,64 @@ public partial class TestDatabaseFixture : IDisposable
         context.SaveChanges();
     }
 
-    public void Cleanup()
+    /// <summary>
+    /// Cleans up test data between tests (but keeps reference data)
+    /// </summary>
+    public async Task CleanupAsync()
     {
-        // Clean up test data between tests (but keep reference data)
-        using var context = CreateDbContext();
+        // Force garbage collection and clear connection pools
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
 
-        // Remove all orders and related data (cascading delete handles related entities)
-        context.Orders.RemoveRange(context.Orders);
-        context.OrderStatuses.RemoveRange(context.OrderStatuses);
-        context.OrderFiles.RemoveRange(context.OrderFiles);
-        context.OrderNotes.RemoveRange(context.OrderNotes);
+        for (int i = 0; i < 3; i++)
+        {
+            Npgsql.NpgsqlConnection.ClearAllPools();
+            await Task.Delay(200);
+        }
 
-        context.SaveChanges();
-    }
+        await using var context = CreateDbContext();
 
-    public void Dispose()
-    {
-        // Optional: Clean up all test data on disposal
-        Cleanup();
-        GC.SuppressFinalize(this);
+        // Terminate any active connections
+        await context.Database.ExecuteSqlRawAsync(@"
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+            AND pid <> pg_backend_pid()
+            AND state IN ('idle in transaction', 'active');
+        ");
+
+        await Task.Delay(100);
+
+        // Truncate tables (keeping reference data)
+        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE order_files CASCADE");
+        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE order_notes CASCADE");
+        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE order_statuses CASCADE");
+        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE orders CASCADE");
+        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE audit_logs CASCADE");
+
+        context.ChangeTracker.Clear();
+        await context.Database.CloseConnectionAsync();
+
+        Npgsql.NpgsqlConnection.ClearAllPools();
     }
 
     /// <summary>
-    /// Builds IConfiguration for tests using the standard configuration hierarchy:
-    /// appsettings.Testing.json -> User Secrets -> Environment Variables
+    /// Legacy method for compatibility - cleanup synchronously
+    /// </summary>
+    public void Cleanup()
+    {
+        CleanupAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Builds IConfiguration for tests (for backward compatibility)
+    /// Returns a configuration that uses the Testcontainers connection string
     /// </summary>
     public static IConfiguration BuildTestConfiguration()
     {
+        // This method is kept for backward compatibility but is not used
+        // when Testcontainers is active
         var builder = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.Testing.json", optional: true)

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -11,7 +10,7 @@ public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
 
     public NotesEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAdminClient();
     }
 
     [Fact]
@@ -33,7 +32,7 @@ public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.GetAsync($"/orders/v1/orders/{orderId}/notes");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -61,6 +60,6 @@ public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync($"/orders/v1/orders/{orderId}/notes", noteRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 }

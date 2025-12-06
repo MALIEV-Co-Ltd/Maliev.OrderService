@@ -1,4 +1,3 @@
-using FluentAssertions;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -11,7 +10,7 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
 
     public OrderEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAdminClient();
     }
 
     [Fact]
@@ -23,9 +22,9 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.GetAsync("/orders/v1/orders");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().NotBeEmpty();
+        Assert.NotEmpty(content);
     }
 
     [Fact]
@@ -45,9 +44,9 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().NotBeEmpty();
+        Assert.NotEmpty(content);
     }
 
     [Fact]
@@ -62,18 +61,18 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         };
 
         var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
-        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+        var orderId = createdOrder.GetProperty("orderId").GetString()!;
 
         // Act
         var response = await _client.GetAsync($"/orders/v1/orders/{orderId}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain(orderId);
+        Assert.Contains(orderId, content);
     }
 
     [Fact]
@@ -102,7 +101,7 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PutAsJsonAsync($"/orders/v1/orders/{orderId}", updateRequest);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -124,6 +123,6 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.DeleteAsync($"/orders/v1/orders/{orderId}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }
