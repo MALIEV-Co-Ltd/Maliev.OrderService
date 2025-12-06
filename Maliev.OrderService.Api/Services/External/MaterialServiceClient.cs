@@ -3,6 +3,9 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Maliev.OrderService.Api.Services.External;
 
+/// <summary>
+/// Client for interacting with the external Material Service
+/// </summary>
 public partial class MaterialServiceClient : IMaterialServiceClient
 {
     private readonly HttpClient _httpClient;
@@ -10,6 +13,12 @@ public partial class MaterialServiceClient : IMaterialServiceClient
     private readonly ILogger<MaterialServiceClient> _logger;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(24);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MaterialServiceClient"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client</param>
+    /// <param name="cache">The memory cache</param>
+    /// <param name="logger">The logger instance</param>
     public MaterialServiceClient(HttpClient httpClient, IMemoryCache cache, ILogger<MaterialServiceClient> logger)
     {
         _httpClient = httpClient;
@@ -17,6 +26,7 @@ public partial class MaterialServiceClient : IMaterialServiceClient
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<string?> GetMaterialNameAsync(int materialId, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"material_{materialId}";
@@ -47,6 +57,7 @@ public partial class MaterialServiceClient : IMaterialServiceClient
         }
     }
 
+    /// <inheritdoc />
     public async Task<string?> GetColorNameAsync(int colorId, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"color_{colorId}";
@@ -77,6 +88,7 @@ public partial class MaterialServiceClient : IMaterialServiceClient
         }
     }
 
+    /// <inheritdoc />
     public async Task<string?> GetSurfaceFinishingNameAsync(int surfaceFinishingId, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"surface_{surfaceFinishingId}";

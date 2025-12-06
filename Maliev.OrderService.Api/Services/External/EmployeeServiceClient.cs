@@ -2,17 +2,26 @@ using System.Net.Http.Json;
 
 namespace Maliev.OrderService.Api.Services.External;
 
+/// <summary>
+/// Client for interacting with the external Employee Service
+/// </summary>
 public partial class EmployeeServiceClient : IEmployeeServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<EmployeeServiceClient> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EmployeeServiceClient"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client</param>
+    /// <param name="logger">The logger instance</param>
     public EmployeeServiceClient(HttpClient httpClient, ILogger<EmployeeServiceClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<EmployeeDetailsDto?> GetEmployeeDetailsAsync(string employeeId, CancellationToken cancellationToken = default)
     {
         try
@@ -29,6 +38,7 @@ public partial class EmployeeServiceClient : IEmployeeServiceClient
         }
     }
 
+    /// <inheritdoc />
     public async Task<List<DepartmentDto>> GetDepartmentsAsync(CancellationToken cancellationToken = default)
     {
         try

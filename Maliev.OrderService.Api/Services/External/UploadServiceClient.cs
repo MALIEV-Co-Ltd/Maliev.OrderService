@@ -2,17 +2,26 @@ using System.Net.Http.Json;
 
 namespace Maliev.OrderService.Api.Services.External;
 
+/// <summary>
+/// Client for interacting with the external Upload Service
+/// </summary>
 public partial class UploadServiceClient : IUploadServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<UploadServiceClient> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UploadServiceClient"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client</param>
+    /// <param name="logger">The logger instance</param>
     public UploadServiceClient(HttpClient httpClient, ILogger<UploadServiceClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<UploadFileResult> UploadFileAsync(string objectPath, Stream fileStream, string contentType, CancellationToken cancellationToken = default)
     {
         try
@@ -36,6 +45,7 @@ public partial class UploadServiceClient : IUploadServiceClient
         }
     }
 
+    /// <inheritdoc />
     public async Task<Stream?> DownloadFileAsync(string objectPath, CancellationToken cancellationToken = default)
     {
         try
@@ -52,6 +62,7 @@ public partial class UploadServiceClient : IUploadServiceClient
         }
     }
 
+    /// <inheritdoc />
     public async Task<bool> DeleteFileAsync(string objectPath, CancellationToken cancellationToken = default)
     {
         try

@@ -2,17 +2,26 @@ using System.Net.Http.Json;
 
 namespace Maliev.OrderService.Api.Services.External;
 
+/// <summary>
+/// Client for interacting with the external Payment Service
+/// </summary>
 public partial class PaymentServiceClient : IPaymentServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<PaymentServiceClient> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PaymentServiceClient"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client</param>
+    /// <param name="logger">The logger instance</param>
     public PaymentServiceClient(HttpClient httpClient, ILogger<PaymentServiceClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<PaymentStatusDto?> GetPaymentStatusAsync(string paymentId, CancellationToken cancellationToken = default)
     {
         try
@@ -29,6 +38,7 @@ public partial class PaymentServiceClient : IPaymentServiceClient
         }
     }
 
+    /// <inheritdoc />
     public async Task<decimal> CalculatePartialChargeAsync(string orderId, string status, CancellationToken cancellationToken = default)
     {
         try
