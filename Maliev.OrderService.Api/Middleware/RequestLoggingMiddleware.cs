@@ -1,71 +1,86 @@
 using System.Diagnostics;
 
-namespace Maliev.OrderService.Api.Middleware;
-
-public partial class RequestLoggingMiddleware
+namespace Maliev.OrderService.Api.Middleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<RequestLoggingMiddleware> _logger;
-
-    public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)
+    /// <summary>
+    /// Middleware for logging HTTP requests and responses
+    /// </summary>
+    /// <param name="next">The next delegate in the pipeline</param>
+    /// <param name="logger">The logger instance</param>
+    public partial class RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)
     {
-        _next = next;
-        _logger = logger;
-    }
-
-    public async Task InvokeAsync(HttpContext context)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        var requestPath = context.Request.Path;
-        var requestMethod = context.Request.Method;
-
-        try
+        /// <summary>
+        /// Invokes the middleware
+        /// </summary>
+        /// <param name="context">The HTTP context</param>
+        /// <returns>A task representing the asynchronous operation</returns>
+        public async Task InvokeAsync(HttpContext context)
         {
-            await _next(context);
-            stopwatch.Stop();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            PathString requestPath = context.Request.Path;
+            string requestMethod = context.Request.Method;
 
-            Log.RequestCompleted(
-                _logger,
-                requestMethod,
-                requestPath,
-                context.Response.StatusCode,
-                stopwatch.ElapsedMilliseconds);
+            try
+            {
+                await next(context);
+                stopwatch.Stop();
+
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    int statusCode = context.Response.StatusCode;
+                    long elapsedMs = stopwatch.ElapsedMilliseconds;
+                    string path = requestPath.Value ?? string.Empty;
+
+                    Log.RequestCompleted(
+                        logger,
+                        requestMethod,
+                        path,
+                        statusCode,
+                        elapsedMs);
+                }
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+
+                if (logger.IsEnabled(LogLevel.Error))
+                {
+                    long elapsedMs = stopwatch.ElapsedMilliseconds;
+                    string path = requestPath.Value ?? string.Empty;
+
+                    Log.RequestFailed(
+                        logger,
+                        requestMethod,
+                        path,
+                        elapsedMs,
+                        ex);
+                }
+
+                throw;
+            }
         }
-        catch (Exception ex)
+
+        private static partial class Log
         {
-            stopwatch.Stop();
+            [LoggerMessage(
+                Level = LogLevel.Information,
+                Message = "{Method} {Path} responded {StatusCode} in {ElapsedMs}ms")]
+            public static partial void RequestCompleted(
+                ILogger logger,
+                string method,
+                string path,
+                int statusCode,
+                long elapsedMs);
 
-            Log.RequestFailed(
-                _logger,
-                requestMethod,
-                requestPath,
-                stopwatch.ElapsedMilliseconds,
-                ex);
-
-            throw;
+            [LoggerMessage(
+                Level = LogLevel.Error,
+                Message = "{Method} {Path} failed after {ElapsedMs}ms")]
+            public static partial void RequestFailed(
+                ILogger logger,
+                string method,
+                string path,
+                long elapsedMs,
+                Exception ex);
         }
-    }
-
-    private static partial class Log
-    {
-        [LoggerMessage(
-            Level = LogLevel.Information,
-            Message = "{Method} {Path} responded {StatusCode} in {ElapsedMs}ms")]
-        public static partial void RequestCompleted(
-            ILogger logger,
-            string method,
-            string path,
-            int statusCode,
-            long elapsedMs);
-
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            Message = "{Method} {Path} failed after {ElapsedMs}ms")]
-        public static partial void RequestFailed(
-            ILogger logger,
-            string method,
-            string path,
-            long elapsedMs,
-            Exception ex);
     }
 }

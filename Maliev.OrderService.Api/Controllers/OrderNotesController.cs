@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using FluentValidation;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.Services.Business;
 using Microsoft.AspNetCore.Authorization;
@@ -8,37 +7,46 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Maliev.OrderService.Api.Controllers;
 
+/// <summary>
+/// Controller for managing order notes and comments
+/// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("v{version:apiVersion}/orders/{orderId}/notes")]
+[Route("orders/v{version:apiVersion}/orders/{orderId}/notes")]
 [Authorize]
 [EnableRateLimiting("general")]
 public class OrderNotesController : ControllerBase
 {
     private readonly IOrderNoteService _noteService;
-    private readonly IValidator<CreateOrderNoteRequest> _validator;
     private readonly ILogger<OrderNotesController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OrderNotesController"/> class
+    /// </summary>
     public OrderNotesController(
         IOrderNoteService noteService,
-        IValidator<CreateOrderNoteRequest> validator,
         ILogger<OrderNotesController> logger)
     {
         _noteService = noteService;
-        _validator = validator;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Create a new note for an order
+    /// </summary>
+    /// <param name="orderId">The order ID</param>
+    /// <param name="request">The note creation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The created note or error if order not found</returns>
     [HttpPost]
     public async Task<IActionResult> CreateOrderNote(
         string orderId,
         [FromBody] CreateOrderNoteRequest request,
         CancellationToken cancellationToken = default)
     {
-        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
+        if (!ModelState.IsValid)
         {
-            return BadRequest(validationResult.Errors);
+            return BadRequest(ModelState);
         }
 
         try

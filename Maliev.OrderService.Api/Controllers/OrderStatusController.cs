@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using FluentValidation;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.Services.Business;
 using Microsoft.AspNetCore.Authorization;
@@ -8,37 +7,46 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Maliev.OrderService.Api.Controllers;
 
+/// <summary>
+/// Controller for managing order status transitions
+/// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("v{version:apiVersion}/orders/{orderId}/statuses")]
+[Route("orders/v{version:apiVersion}/orders/{orderId}/statuses")]
 [Authorize(Policy = "EmployeeOrHigher")]
 [EnableRateLimiting("general")]
 public class OrderStatusController : ControllerBase
 {
     private readonly IOrderStatusService _statusService;
-    private readonly IValidator<CreateOrderStatusRequest> _validator;
     private readonly ILogger<OrderStatusController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OrderStatusController"/> class
+    /// </summary>
     public OrderStatusController(
         IOrderStatusService statusService,
-        IValidator<CreateOrderStatusRequest> validator,
         ILogger<OrderStatusController> logger)
     {
         _statusService = statusService;
-        _validator = validator;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Create a new status entry for an order
+    /// </summary>
+    /// <param name="orderId">The order ID</param>
+    /// <param name="request">The status creation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The created status or error if order not found</returns>
     [HttpPost]
     public async Task<IActionResult> CreateOrderStatus(
         string orderId,
         [FromBody] CreateOrderStatusRequest request,
         CancellationToken cancellationToken = default)
     {
-        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
+        if (!ModelState.IsValid)
         {
-            return BadRequest(validationResult.Errors);
+            return BadRequest(ModelState);
         }
 
         try

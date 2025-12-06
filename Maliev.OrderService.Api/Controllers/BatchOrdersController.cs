@@ -1,57 +1,65 @@
 using Asp.Versioning;
-using FluentValidation;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Maliev.OrderService.Api.DTOs.Response;
+using System.ComponentModel.DataAnnotations;
 
 namespace Maliev.OrderService.Api.Controllers;
 
+/// <summary>
+/// Controller for batch operations on orders
+/// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("v{version:apiVersion}/orders/batch")]
+[Route("orders/v{version:apiVersion}/orders/batch")]
 [Authorize(Policy = "EmployeeOrHigher")]
 [EnableRateLimiting("batch")]
 public partial class BatchOrdersController : ControllerBase
 {
     private readonly IOrderManagementService _orderService;
     private readonly OrderDbContext _context;
-    private readonly IValidator<CreateOrderRequest> _createValidator;
-    private readonly IValidator<UpdateOrderRequest> _updateValidator;
     private readonly ILogger<BatchOrdersController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BatchOrdersController"/> class
+    /// </summary>
     public BatchOrdersController(
         IOrderManagementService orderService,
         OrderDbContext context,
-        IValidator<CreateOrderRequest> createValidator,
-        IValidator<UpdateOrderRequest> updateValidator,
         ILogger<BatchOrdersController> logger)
     {
         _orderService = orderService;
         _context = context;
-        _createValidator = createValidator;
-        _updateValidator = updateValidator;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Create multiple orders in a single transaction
+    /// </summary>
+    /// <param name="requests">Array of order creation requests</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Array of created orders or error if any validation fails</returns>
     [HttpPost]
     public async Task<IActionResult> CreateBatchOrders(
         [FromBody] CreateOrderRequest[] requests,
         CancellationToken cancellationToken = default)
     {
-        // Validate all requests first
+        // Validate all requests first using DataAnnotations
         for (int i = 0; i < requests.Length; i++)
         {
-            var validationResult = await _createValidator.ValidateAsync(requests[i], cancellationToken);
-            if (!validationResult.IsValid)
+            var validationContext = new ValidationContext(requests[i]);
+            var validationResults = new List<ValidationResult>();
+            if (!Validator.TryValidateObject(requests[i], validationContext, validationResults, true))
             {
-                return BadRequest(new
+                return BadRequest(new BatchValidationErrorResponse
                 {
-                    message = $"Validation failed for item at index {i}",
-                    errors = validationResult.Errors,
-                    itemIndex = i
+                    Message = $"Validation failed for item at index {i}",
+                    Errors = validationResults.Select(r => new { ErrorMessage = r.ErrorMessage, MemberNames = r.MemberNames }).ToList(),
+                    ItemIndex = i
                 });
             }
         }
@@ -76,16 +84,22 @@ public partial class BatchOrdersController : ControllerBase
         {
             await transaction.RollbackAsync(cancellationToken);
             Log.BatchOrderCreationFailed(_logger, ex);
-            return StatusCode(500, new { message = "Batch order creation failed", error = ex.Message });
+            return StatusCode(500, new ErrorMessageResponse { Message = "Batch order creation failed", Error = ex.Message });
         }
     }
 
+    /// <summary>
+    /// Update multiple orders in a single transaction
+    /// </summary>
+    /// <param name="requests">Array of order update requests</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Array of updated orders or error if any validation/concurrency fails</returns>
     [HttpPut]
     public async Task<IActionResult> UpdateBatchOrders(
         [FromBody] BatchUpdateOrderRequest[] requests,
         CancellationToken cancellationToken = default)
     {
-        // Validate all requests first
+        // Validate all requests first using DataAnnotations
         for (int i = 0; i < requests.Length; i++)
         {
             var updateRequest = new UpdateOrderRequest
@@ -94,14 +108,15 @@ public partial class BatchOrdersController : ControllerBase
                 AssignedEmployeeId = requests[i].AssignedEmployeeId
             };
 
-            var validationResult = await _updateValidator.ValidateAsync(updateRequest, cancellationToken);
-            if (!validationResult.IsValid)
+            var validationContext = new ValidationContext(updateRequest);
+            var validationResults = new List<ValidationResult>();
+            if (!Validator.TryValidateObject(updateRequest, validationContext, validationResults, true))
             {
-                return BadRequest(new
+                return BadRequest(new BatchValidationErrorResponse
                 {
-                    message = $"Validation failed for item at index {i}",
-                    errors = validationResult.Errors,
-                    itemIndex = i
+                    Message = $"Validation failed for item at index {i}",
+                    Errors = validationResults.Select(r => new { ErrorMessage = r.ErrorMessage, MemberNames = r.MemberNames }).ToList(),
+                    ItemIndex = i
                 });
             }
         }
@@ -132,22 +147,28 @@ public partial class BatchOrdersController : ControllerBase
         {
             await transaction.RollbackAsync(cancellationToken);
             Log.BatchOrderUpdateFailed(_logger, ex);
-            return BadRequest(new { message = "Batch order update failed", error = ex.Message });
+            return BadRequest(new ErrorMessageResponse { Message = "Batch order update failed", Error = ex.Message });
         }
         catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
         {
             await transaction.RollbackAsync(cancellationToken);
             Log.BatchUpdateConcurrencyConflict(_logger, ex);
-            return BadRequest(new { message = "One or more orders have been modified by another user", error = ex.Message });
+            return BadRequest(new ErrorMessageResponse { Message = "One or more orders have been modified by another user", Error = ex.Message });
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync(cancellationToken);
             Log.BatchOrderUpdateFailed(_logger, ex);
-            return StatusCode(500, new { message = "Batch order update failed", error = ex.Message });
+            return StatusCode(500, new ErrorMessageResponse { Message = "Batch order update failed", Error = ex.Message });
         }
     }
 
+    /// <summary>
+    /// Cancel multiple orders in a single transaction
+    /// </summary>
+    /// <param name="orderIds">Array of order IDs to cancel</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Success message with cancellation results or error if any order not found</returns>
     [HttpPost("cancel")]
     public async Task<IActionResult> CancelBatchOrders(
         [FromBody] string[] orderIds,
@@ -155,7 +176,7 @@ public partial class BatchOrdersController : ControllerBase
     {
         if (orderIds == null || orderIds.Length == 0)
         {
-            return BadRequest(new { message = "Order IDs are required" });
+            return BadRequest(new ErrorMessageResponse { Message = "Order IDs are required" });
         }
 
         // Use transaction for all-or-nothing
@@ -171,19 +192,19 @@ public partial class BatchOrdersController : ControllerBase
                 if (!result)
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    return NotFound(new { message = $"Order {orderId} not found" });
+                    return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
                 }
                 results.Add(new { orderId, cancelled = true });
             }
 
             await transaction.CommitAsync(cancellationToken);
-            return Ok(new { message = $"{orderIds.Length} orders cancelled successfully", results });
+            return Ok(new SuccessBatchCancellationResponse { Message = $"{orderIds.Length} orders cancelled successfully", Results = results });
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync(cancellationToken);
             Log.BatchOrderCancellationFailed(_logger, ex);
-            return StatusCode(500, new { message = "Batch order cancellation failed", error = ex.Message });
+            return StatusCode(500, new ErrorMessageResponse { Message = "Batch order cancellation failed", Error = ex.Message });
         }
     }
 
@@ -201,12 +222,4 @@ public partial class BatchOrdersController : ControllerBase
         [LoggerMessage(EventId = 4, Level = LogLevel.Error, Message = "Batch order cancellation failed, transaction rolled back")]
         public static partial void BatchOrderCancellationFailed(ILogger logger, Exception ex);
     }
-}
-
-// DTO for batch update request
-public class BatchUpdateOrderRequest
-{
-    public required string OrderId { get; set; }
-    public required string Version { get; set; }
-    public string? AssignedEmployeeId { get; set; }
 }
