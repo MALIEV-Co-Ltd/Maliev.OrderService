@@ -25,7 +25,7 @@ namespace Maliev.OrderService.Api.Middleware
                 await next(context);
                 stopwatch.Stop();
 
-                if (logger.IsEnabled(LogLevel.Information))
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
                     int statusCode = context.Response.StatusCode;
                     long elapsedMs = stopwatch.ElapsedMilliseconds;
@@ -63,7 +63,7 @@ namespace Maliev.OrderService.Api.Middleware
         private static partial class Log
         {
             [LoggerMessage(
-                Level = LogLevel.Information,
+                Level = LogLevel.Debug,
                 Message = "{Method} {Path} responded {StatusCode} in {ElapsedMs}ms")]
             public static partial void RequestCompleted(
                 ILogger logger,
