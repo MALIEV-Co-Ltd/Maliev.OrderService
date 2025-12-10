@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Maliev.OrderService.Api.DTOs.Response;
+using Maliev.OrderService.Api.Extensions;
+using System.Security.Claims; // Needed for RBAC checks
 
 namespace Maliev.OrderService.Api.Controllers;
 
@@ -77,6 +79,17 @@ public class OrdersController : ControllerBase
             return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
         }
 
+        // RBAC Check: Customers can only view their own orders
+        var userType = User.GetUserType();
+        if (string.Equals(userType, "customer", StringComparison.OrdinalIgnoreCase))
+        {
+            var userId = User.GetUserId();
+            if (order.CustomerId != userId)
+            {
+                return Forbid();
+            }
+        }
+
         return Ok(order);
     }
 
@@ -94,7 +107,7 @@ public class OrdersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var createdBy = "system"; // TODO: Get from user context after authentication
+        var createdBy = User.GetUserId();
         var order = await _orderService.CreateOrderAsync(request, createdBy, cancellationToken);
 
         return CreatedAtAction(nameof(GetOrderById), new { orderId = order.OrderId }, order);
@@ -120,7 +133,7 @@ public class OrdersController : ControllerBase
 
         try
         {
-            var updatedBy = "system"; // TODO: Get from user context
+            var updatedBy = User.GetUserId();
             var order = await _orderService.UpdateOrderAsync(orderId, request, updatedBy, cancellationToken);
             return Ok(order);
         }
@@ -143,7 +156,7 @@ public class OrdersController : ControllerBase
     [HttpDelete("{orderId}")]
     public async Task<IActionResult> CancelOrder(string orderId, CancellationToken cancellationToken = default)
     {
-        var cancelledBy = "system"; // TODO: Get from user context
+        var cancelledBy = User.GetUserId();
         var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
 
         if (!result)
@@ -167,7 +180,7 @@ public class OrdersController : ControllerBase
         [FromBody] CancelOrderRequest request,
         CancellationToken cancellationToken = default)
     {
-        var cancelledBy = "system"; // TODO: Get from user context
+        var cancelledBy = User.GetUserId();
         var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, request.CancellationReason, cancellationToken);
 
         if (!result)

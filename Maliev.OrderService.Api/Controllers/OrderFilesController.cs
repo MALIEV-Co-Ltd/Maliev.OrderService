@@ -4,6 +4,7 @@ using Maliev.OrderService.Api.Services.Business;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Maliev.OrderService.Api.Extensions;
 
 namespace Maliev.OrderService.Api.Controllers;
 
@@ -63,7 +64,7 @@ public class OrderFilesController : ControllerBase
 
         try
         {
-            var uploadedBy = "system"; // TODO: Get from user context
+            var uploadedBy = User.GetUserId();
             await using var stream = file.OpenReadStream();
             var uploadedFile = await _fileService.UploadOrderFileAsync(
                 orderId,

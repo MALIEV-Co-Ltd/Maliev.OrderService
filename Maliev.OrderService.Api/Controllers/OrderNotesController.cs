@@ -4,6 +4,7 @@ using Maliev.OrderService.Api.Services.Business;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Maliev.OrderService.Api.Extensions;
 
 namespace Maliev.OrderService.Api.Controllers;
 
@@ -51,7 +52,7 @@ public class OrderNotesController : ControllerBase
 
         try
         {
-            var createdBy = "system"; // TODO: Get from user context
+            var createdBy = User.GetUserId();
             var note = await _noteService.CreateOrderNoteAsync(orderId, request, createdBy, cancellationToken);
             return CreatedAtRoute(new { orderId }, note);
         }

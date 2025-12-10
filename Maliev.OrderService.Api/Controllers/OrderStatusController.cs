@@ -4,6 +4,7 @@ using Maliev.OrderService.Api.Services.Business;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Maliev.OrderService.Api.Extensions;
 
 namespace Maliev.OrderService.Api.Controllers;
 
@@ -51,7 +52,7 @@ public class OrderStatusController : ControllerBase
 
         try
         {
-            var updatedBy = "system"; // TODO: Get from user context
+            var updatedBy = User.GetUserId();
             var status = await _statusService.CreateOrderStatusAsync(orderId, request, updatedBy, cancellationToken);
             return CreatedAtRoute(new { orderId }, status);
         }
