@@ -21,7 +21,7 @@ public class TestDatabaseFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18")
+            .WithImage("postgres:18-alpine")
             .WithDatabase("order_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
