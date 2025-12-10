@@ -84,56 +84,31 @@ public partial class OrderManagementService : IOrderManagementService
     public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
     {
         // Check if there's already an active transaction (e.g., from batch operations)
-        var existingTransaction = _context.Database.CurrentTransaction;
-        var shouldManageTransaction = existingTransaction == null;
+        // If so, we just participate in it via the Context
+        
+        var order = request.ToOrder();
+        order.OrderId = await GenerateOrderIdAsync(cancellationToken);
+        order.CreatedBy = createdBy;
+        order.UpdatedBy = createdBy;
+        order.CreatedAt = DateTime.UtcNow;
+        order.UpdatedAt = DateTime.UtcNow;
+        // Note: Version (RowVersion) is database-generated, do not set manually
 
-        // Use transaction for atomic creation of Order and initial OrderStatus (only if not in a batch)
-        var transaction = shouldManageTransaction
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
+        _context.Orders.Add(order);
 
-        try
+        // Create initial status
+        var initialStatus = new OrderStatus
         {
-            var order = request.ToOrder();
-            order.OrderId = await GenerateOrderIdAsync(cancellationToken);
-            order.CreatedBy = createdBy;
-            order.UpdatedBy = createdBy;
-            order.CreatedAt = DateTime.UtcNow;
-            order.UpdatedAt = DateTime.UtcNow;
-            // Note: Version (RowVersion) is database-generated, do not set manually
+            OrderId = order.OrderId,
+            Status = "New",
+            UpdatedBy = createdBy,
+            Timestamp = DateTime.UtcNow
+        };
+        _context.OrderStatuses.Add(initialStatus);
 
-            _context.Orders.Add(order);
+        await _context.SaveChangesAsync(cancellationToken);
 
-            // Create initial status
-            var initialStatus = new OrderStatus
-            {
-                OrderId = order.OrderId,
-                Status = "New",
-                UpdatedBy = createdBy,
-                Timestamp = DateTime.UtcNow
-            };
-            _context.OrderStatuses.Add(initialStatus);
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            // Only commit if we created the transaction
-            if (shouldManageTransaction && transaction != null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-
-            return order.ToOrderResponse();
-        }
-        catch
-        {
-            // Only rollback if we created the transaction (outer transaction will handle rollback otherwise)
-            // Transaction automatically rolls back on exception via Dispose
-            throw;
-        }
-        finally
-        {
-            transaction?.Dispose();
-        }
+        return order.ToOrderResponse();
     }
 
     /// <inheritdoc />

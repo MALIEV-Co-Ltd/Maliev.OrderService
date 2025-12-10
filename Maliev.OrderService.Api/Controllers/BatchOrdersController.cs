@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Maliev.OrderService.Api.DTOs.Response;
 using System.ComponentModel.DataAnnotations;
+using Maliev.OrderService.Api.Extensions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Api.Controllers;
 
@@ -64,28 +66,34 @@ public partial class BatchOrdersController : ControllerBase
             }
         }
 
-        // Use transaction for all-or-nothing
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-        try
+        // Use execution strategy for retry logic with transactions
+        var strategy = _context.Database.CreateExecutionStrategy();
+        
+        return await strategy.ExecuteAsync(async () =>
         {
-            var results = new List<object>();
-            var createdBy = "system"; // TODO: Get from user context
-
-            foreach (var request in requests)
+            // Use transaction for all-or-nothing
+            using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                var order = await _orderService.CreateOrderAsync(request, createdBy, cancellationToken);
-                results.Add(order);
-            }
+                var results = new List<object>();
+                var createdBy = User.GetUserId();
 
-            await transaction.CommitAsync(cancellationToken);
-            return Created("/v1/orders/batch", results);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            Log.BatchOrderCreationFailed(_logger, ex);
-            return StatusCode(500, new ErrorMessageResponse { Message = "Batch order creation failed", Error = ex.Message });
-        }
+                foreach (var request in requests)
+                {
+                    var order = await _orderService.CreateOrderAsync(request, createdBy, cancellationToken);
+                    results.Add(order);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return Created("/v1/orders/batch", results);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                Log.BatchOrderCreationFailed(_logger, ex);
+                return StatusCode(500, new ErrorMessageResponse { Message = "Batch order creation failed", Error = ex.Message });
+            }
+        });
     }
 
     /// <summary>
@@ -121,46 +129,52 @@ public partial class BatchOrdersController : ControllerBase
             }
         }
 
-        // Use transaction for all-or-nothing
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            var results = new List<object>();
-            var updatedBy = "system"; // TODO: Get from user context
+        // Use execution strategy for retry logic with transactions
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-            foreach (var request in requests)
+        return await strategy.ExecuteAsync(async () =>
+        {
+            // Use transaction for all-or-nothing
+            using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                var updateRequest = new UpdateOrderRequest
+                var results = new List<object>();
+                var updatedBy = User.GetUserId();
+
+                foreach (var request in requests)
                 {
-                    Version = request.Version,
-                    AssignedEmployeeId = request.AssignedEmployeeId
-                };
+                    var updateRequest = new UpdateOrderRequest
+                    {
+                        Version = request.Version,
+                        AssignedEmployeeId = request.AssignedEmployeeId
+                    };
 
-                var order = await _orderService.UpdateOrderAsync(request.OrderId, updateRequest, updatedBy, cancellationToken);
-                results.Add(order);
+                    var order = await _orderService.UpdateOrderAsync(request.OrderId, updateRequest, updatedBy, cancellationToken);
+                    results.Add(order);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return Ok(results);
             }
-
-            await transaction.CommitAsync(cancellationToken);
-            return Ok(results);
-        }
-        catch (InvalidOperationException ex)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            Log.BatchOrderUpdateFailed(_logger, ex);
-            return BadRequest(new ErrorMessageResponse { Message = "Batch order update failed", Error = ex.Message });
-        }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            Log.BatchUpdateConcurrencyConflict(_logger, ex);
-            return BadRequest(new ErrorMessageResponse { Message = "One or more orders have been modified by another user", Error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            Log.BatchOrderUpdateFailed(_logger, ex);
-            return StatusCode(500, new ErrorMessageResponse { Message = "Batch order update failed", Error = ex.Message });
-        }
+            catch (InvalidOperationException ex)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                Log.BatchOrderUpdateFailed(_logger, ex);
+                return BadRequest(new ErrorMessageResponse { Message = "Batch order update failed", Error = ex.Message });
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                Log.BatchUpdateConcurrencyConflict(_logger, ex);
+                return BadRequest(new ErrorMessageResponse { Message = "One or more orders have been modified by another user", Error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                Log.BatchOrderUpdateFailed(_logger, ex);
+                return StatusCode(500, new ErrorMessageResponse { Message = "Batch order update failed", Error = ex.Message });
+            }
+        });
     }
 
     /// <summary>
@@ -179,33 +193,39 @@ public partial class BatchOrdersController : ControllerBase
             return BadRequest(new ErrorMessageResponse { Message = "Order IDs are required" });
         }
 
-        // Use transaction for all-or-nothing
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            var cancelledBy = "system"; // TODO: Get from user context
-            var results = new List<object>();
+        // Use execution strategy for retry logic with transactions
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-            foreach (var orderId in orderIds)
+        return await strategy.ExecuteAsync(async () =>
+        {
+            // Use transaction for all-or-nothing
+            using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
-                if (!result)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
-                }
-                results.Add(new { orderId, cancelled = true });
-            }
+                var cancelledBy = User.GetUserId();
+                var results = new List<object>();
 
-            await transaction.CommitAsync(cancellationToken);
-            return Ok(new SuccessBatchCancellationResponse { Message = $"{orderIds.Length} orders cancelled successfully", Results = results });
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            Log.BatchOrderCancellationFailed(_logger, ex);
-            return StatusCode(500, new ErrorMessageResponse { Message = "Batch order cancellation failed", Error = ex.Message });
-        }
+                foreach (var orderId in orderIds)
+                {
+                    var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
+                    if (!result)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
+                    }
+                    results.Add(new { orderId, cancelled = true });
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return Ok(new SuccessBatchCancellationResponse { Message = $"{orderIds.Length} orders cancelled successfully", Results = results });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                Log.BatchOrderCancellationFailed(_logger, ex);
+                return StatusCode(500, new ErrorMessageResponse { Message = "Batch order cancellation failed", Error = ex.Message });
+            }
+        });
     }
 
     private static partial class Log
