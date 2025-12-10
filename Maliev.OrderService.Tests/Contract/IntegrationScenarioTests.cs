@@ -7,9 +7,11 @@ namespace Maliev.OrderService.Tests.Contract;
 public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
+    private readonly TestWebApplicationFactory _factory;
 
     public IntegrationScenarioTests(TestWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateAdminClient();
     }
 
@@ -197,9 +199,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
     [Fact]
     public async Task Scenario7_RBAC_ContextBasedAuthorization()
     {
-        // Arrange - Create an order first
-        // NOTE: This test expects 200 OK since RBAC authorization is not yet implemented
-        // When implemented, should return 403 Forbidden for unauthorized access
+        // Arrange - Create an order for Customer 1
         var createRequest = new
         {
             customerId = "CUST-001",
@@ -207,16 +207,17 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
+        // Admin creates order for CUST-001
         var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        // Act - Access the order (without proper authorization context)
-        var response = await _client.GetAsync($"/orders/v1/orders/{orderId}");
+        // Act - Different customer tries to access the order
+        var hackerClient = _factory.CreateCustomerClient(customerId: "HACKER-001");
+        var response = await hackerClient.GetAsync($"/orders/v1/orders/{orderId}");
 
-        // Assert - Currently expects OK since no authorization middleware
-        // TODO: Change to HttpStatusCode.Forbidden when RBAC is implemented
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Assert - Should be Forbidden
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

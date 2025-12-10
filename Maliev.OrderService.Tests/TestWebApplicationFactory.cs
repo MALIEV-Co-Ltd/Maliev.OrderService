@@ -71,6 +71,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Provide the connection string to configuration so Program.cs startup checks pass
+        builder.UseSetting("ConnectionStrings:OrderDbContext", _dbFixture.GetConnectionString());
+
         builder.ConfigureServices(services =>
         {
             // Remove the existing DbContext configuration
@@ -225,9 +228,14 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
         {
             new(ClaimTypes.NameIdentifier, userId),
             new(JwtRegisteredClaimNames.Sub, userId),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new("userType", "employee") // Default claim for order service authorization
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        // Add default userType if not provided in additional claims
+        if (additionalClaims == null || !additionalClaims.ContainsKey("userType"))
+        {
+            claims.Add(new("userType", "employee"));
+        }
 
         // Add roles
         roles ??= new[] { "Admin" };
