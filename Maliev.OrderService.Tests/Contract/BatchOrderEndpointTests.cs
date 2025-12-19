@@ -8,9 +8,11 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
+    private static readonly string[] AdminRoles = { "Admin" };
+
     public BatchOrderEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateAdminClient();
+        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
     }
 
     [Fact]
@@ -24,7 +26,7 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/orders/v1/orders/batch", batchRequest);
+        var response = await _client.PostAsJsonAsync("/order/v1/orders/batch", batchRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -37,12 +39,12 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
         var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 
-        var createResponse1 = await _client.PostAsJsonAsync("/orders/v1/orders", order1Request);
+        var createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
         var createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId1 = createdOrder1.GetProperty("orderId").GetString();
         var version1 = createdOrder1.GetProperty("version").GetString();
 
-        var createResponse2 = await _client.PostAsJsonAsync("/orders/v1/orders", order2Request);
+        var createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
         var createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId2 = createdOrder2.GetProperty("orderId").GetString();
         var version2 = createdOrder2.GetProperty("version").GetString();
@@ -54,7 +56,7 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync("/orders/v1/orders/batch", batchRequest);
+        var response = await _client.PutAsJsonAsync("/order/v1/orders/batch", batchRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -67,18 +69,18 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
         var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 
-        var createResponse1 = await _client.PostAsJsonAsync("/orders/v1/orders", order1Request);
+        var createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
         var createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId1 = createdOrder1.GetProperty("orderId").GetString();
 
-        var createResponse2 = await _client.PostAsJsonAsync("/orders/v1/orders", order2Request);
+        var createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
         var createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId2 = createdOrder2.GetProperty("orderId").GetString();
 
         var orderIds = new[] { orderId1, orderId2 };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/orders/v1/orders/batch/cancel", orderIds);
+        var response = await _client.PostAsJsonAsync("/order/v1/orders/batch/cancel", orderIds);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

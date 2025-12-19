@@ -9,10 +9,13 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
     private readonly HttpClient _client;
     private readonly TestWebApplicationFactory _factory;
 
+    private static readonly string[] AdminRoles = { "Admin" };
+    private static readonly string[] CustomerRoles = { "customer" };
+
     public IntegrationScenarioTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
-        _client = factory.CreateAdminClient();
+        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
     }
 
     [Fact]
@@ -32,7 +35,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/orders/v1/orders", orderRequest);
+        var response = await _client.PostAsJsonAsync("/order/v1/orders", orderRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -52,7 +55,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
@@ -65,7 +68,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync($"/orders/v1/orders/{orderId}/statuses", statusRequest);
+        var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", statusRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -86,7 +89,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync("/orders/v1/orders/batch", batchRequest);
+        var response = await _client.PutAsJsonAsync("/order/v1/orders/batch", batchRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -106,7 +109,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         content.Add(new StringContent("CAD"), "fileCategory");
 
         // Act
-        var response = await _client.PostAsync("/orders/v1/orders/ORD-2025-00001/files", content);
+        var response = await _client.PostAsync("/order/v1/orders/ORD-2025-00001/files", content);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -125,7 +128,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
@@ -137,7 +140,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync($"/orders/v1/orders/{orderId}/cancel", cancelRequest);
+        var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/cancel", cancelRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -162,7 +165,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
         var version = createdOrder.GetProperty("version").GetString();
@@ -174,7 +177,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act - First update
-        var response1 = await _client.PutAsJsonAsync($"/orders/v1/orders/{orderId}", updateRequest1);
+        var response1 = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest1);
         Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
 
         // Get the updated version from response1
@@ -188,7 +191,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
             assignedEmployeeId = "EMP-002"
         };
 
-        var response2 = await _client.PutAsJsonAsync($"/orders/v1/orders/{orderId}", updateRequest2);
+        var response2 = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest2);
 
         // Assert - In-memory DB limitation: conflict detection doesn't work properly
         // With real PostgreSQL, this would return 409 Conflict
@@ -208,13 +211,16 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Admin creates order for CUST-001
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
         // Act - Different customer tries to access the order
-        var hackerClient = _factory.CreateCustomerClient(customerId: "HACKER-001");
-        var response = await hackerClient.GetAsync($"/orders/v1/orders/{orderId}");
+        var additionalClaims = new Dictionary<string, string> { { "userType", "customer" } };
+        var hackerToken = _factory.CreateTestJwtToken("HACKER-001", CustomerRoles, additionalClaims);
+        var hackerClient = _factory.CreateClient();
+        hackerClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {hackerToken}");
+        var response = await hackerClient.GetAsync($"/order/v1/orders/{orderId}");
 
         // Assert - Should be Forbidden
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -234,7 +240,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", orderRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", orderRequest);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var getResponse = await _client.GetAsync(createResponse.Headers.Location);

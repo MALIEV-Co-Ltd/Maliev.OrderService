@@ -8,9 +8,11 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
+    private static readonly string[] AdminRoles = { "Admin" };
+
     public FileEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateAdminClient();
+        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
     }
 
     [Fact]
@@ -19,7 +21,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         // Arrange - This test will FAIL until GET /orders/{orderId}/files endpoint is implemented
 
         // Act
-        var response = await _client.GetAsync("/orders/v1/orders/ORD-2025-00001/files");
+        var response = await _client.GetAsync("/order/v1/orders/ORD-2025-00001/files");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -36,7 +38,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
@@ -48,7 +50,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         content.Add(new StringContent("CAD"), "FileCategory");
 
         // Act
-        var response = await _client.PostAsync($"/orders/v1/orders/{orderId}/files", content);
+        var response = await _client.PostAsync($"/order/v1/orders/{orderId}/files", content);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -65,7 +67,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
@@ -77,12 +79,12 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         uploadContent.Add(new StringContent("Input"), "FileRole");
         uploadContent.Add(new StringContent("CAD"), "FileCategory");
 
-        var uploadResponse = await _client.PostAsync($"/orders/v1/orders/{orderId}/files", uploadContent);
+        var uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
         var uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var fileId = uploadedFile.GetProperty("fileId").GetInt64();
 
         // Act
-        var response = await _client.GetAsync($"/orders/v1/orders/{orderId}/files/{fileId}");
+        var response = await _client.GetAsync($"/order/v1/orders/{orderId}/files/{fileId}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -99,7 +101,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
@@ -111,12 +113,12 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
         uploadContent.Add(new StringContent("Input"), "FileRole");
         uploadContent.Add(new StringContent("CAD"), "FileCategory");
 
-        var uploadResponse = await _client.PostAsync($"/orders/v1/orders/{orderId}/files", uploadContent);
+        var uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
         var uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var fileId = uploadedFile.GetProperty("fileId").GetInt64();
 
         // Act
-        var response = await _client.DeleteAsync($"/orders/v1/orders/{orderId}/files/{fileId}");
+        var response = await _client.DeleteAsync($"/order/v1/orders/{orderId}/files/{fileId}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

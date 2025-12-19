@@ -8,9 +8,11 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
+    private static readonly string[] AdminRoles = { "Admin" };
+
     public OrderEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateAdminClient();
+        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
     }
 
     [Fact]
@@ -19,7 +21,7 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         // Arrange - This test will FAIL until GET /orders endpoint is implemented
 
         // Act
-        var response = await _client.GetAsync("/orders/v1/orders");
+        var response = await _client.GetAsync("/order/v1/orders");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -41,7 +43,7 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var response = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -60,14 +62,14 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString()!;
 
         // Act
-        var response = await _client.GetAsync($"/orders/v1/orders/{orderId}");
+        var response = await _client.GetAsync($"/order/v1/orders/{orderId}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -86,7 +88,7 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
         var version = createdOrder.GetProperty("version").GetString();
@@ -98,7 +100,7 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/orders/v1/orders/{orderId}", updateRequest);
+        var response = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -115,12 +117,12 @@ public class OrderEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
         // Act
-        var response = await _client.DeleteAsync($"/orders/v1/orders/{orderId}");
+        var response = await _client.DeleteAsync($"/order/v1/orders/{orderId}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

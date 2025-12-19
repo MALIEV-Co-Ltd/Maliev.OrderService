@@ -4,16 +4,22 @@ using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
 using System.Reflection;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
+using Testcontainers.RabbitMq;
 
 namespace Maliev.OrderService.Tests;
 
 /// <summary>
-/// Test database fixture using Testcontainers for isolated PostgreSQL testing
+/// Test database fixture using Testcontainers for isolated PostgreSQL, Redis, and RabbitMQ testing
 /// </summary>
 public class TestDatabaseFixture : IAsyncLifetime
 {
     private PostgreSqlContainer? _postgresContainer;
+    private RedisContainer? _redisContainer;
+    private RabbitMqContainer? _rabbitmqContainer;
     private string _connectionString = string.Empty;
+    private string _redisConnectionString = string.Empty;
+    private string _rabbitmqConnectionString = string.Empty;
 
     /// <summary>
     /// Initializes the test database container
@@ -27,8 +33,30 @@ public class TestDatabaseFixture : IAsyncLifetime
             .WithPassword("test_password")
             .Build();
 
-        await _postgresContainer.StartAsync();
+        _redisContainer = new RedisBuilder()
+            .WithImage("redis:7-alpine")
+            .Build();
+
+        _rabbitmqContainer = new RabbitMqBuilder()
+            .WithImage("rabbitmq:4.2.1-alpine")
+            .Build();
+
+        // Start all containers in parallel
+        await Task.WhenAll(
+            _postgresContainer.StartAsync(),
+            _redisContainer.StartAsync(),
+            _rabbitmqContainer.StartAsync()
+        );
+
         _connectionString = _postgresContainer.GetConnectionString();
+        _redisConnectionString = _redisContainer.GetConnectionString();
+        _rabbitmqConnectionString = _rabbitmqContainer.GetConnectionString();
+
+        // Wait for Redis to be ready
+        using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisConnectionString))
+        {
+            await connection.GetDatabase().PingAsync();
+        }
 
         // Apply migrations to create database schema
         using var context = CreateDbContext();
@@ -46,6 +74,14 @@ public class TestDatabaseFixture : IAsyncLifetime
         if (_postgresContainer != null)
         {
             await _postgresContainer.DisposeAsync();
+        }
+        if (_redisContainer != null)
+        {
+            await _redisContainer.DisposeAsync();
+        }
+        if (_rabbitmqContainer != null)
+        {
+            await _rabbitmqContainer.DisposeAsync();
         }
     }
 
@@ -65,6 +101,16 @@ public class TestDatabaseFixture : IAsyncLifetime
     /// Gets the connection string for the test database
     /// </summary>
     public string GetConnectionString() => _connectionString;
+
+    /// <summary>
+    /// Gets the Redis connection string
+    /// </summary>
+    public string GetRedisConnectionString() => _redisConnectionString;
+
+    /// <summary>
+    /// Gets the RabbitMQ connection string
+    /// </summary>
+    public string GetRabbitMqConnectionString() => _rabbitmqConnectionString;
 
     /// <summary>
     /// Seeds required reference data for tests

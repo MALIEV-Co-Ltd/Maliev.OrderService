@@ -8,9 +8,11 @@ public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
+    private static readonly string[] AdminRoles = { "Admin" };
+
     public NotesEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateAdminClient();
+        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
     }
 
     [Fact]
@@ -24,12 +26,12 @@ public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
         // Act
-        var response = await _client.GetAsync($"/orders/v1/orders/{orderId}/notes");
+        var response = await _client.GetAsync($"/order/v1/orders/{orderId}/notes");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -46,7 +48,7 @@ public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
             serviceCategoryId = 1
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/orders/v1/orders", createRequest);
+        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
         var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         var orderId = createdOrder.GetProperty("orderId").GetString();
 
@@ -57,7 +59,7 @@ public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync($"/orders/v1/orders/{orderId}/notes", noteRequest);
+        var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/notes", noteRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
