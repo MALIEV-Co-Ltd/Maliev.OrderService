@@ -13,9 +13,8 @@ namespace Maliev.OrderService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("orders/v{version:apiVersion}/orders/{orderId}/notes")]
-[Authorize]
-[EnableRateLimiting("general")]
+[Route("order/v{version:apiVersion}/orders/{orderId}/notes")]
+[Produces("application/json")]
 public class OrderNotesController : ControllerBase
 {
     private readonly IOrderNoteService _noteService;

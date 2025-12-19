@@ -13,7 +13,7 @@ namespace Maliev.OrderService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("orders/v{version:apiVersion}/orders/{orderId}/files")]
+[Route("order/v{version:apiVersion}/orders/{orderId}/files")]
 [Authorize]
 [EnableRateLimiting("general")]
 public class OrderFilesController : ControllerBase

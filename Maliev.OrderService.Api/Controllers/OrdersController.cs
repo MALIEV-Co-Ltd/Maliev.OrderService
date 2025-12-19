@@ -15,7 +15,7 @@ namespace Maliev.OrderService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("orders/v{version:apiVersion}/orders")]
+[Route("order/v{version:apiVersion}/orders")]
 [Authorize]
 [EnableRateLimiting("general")]
 public class OrdersController : ControllerBase

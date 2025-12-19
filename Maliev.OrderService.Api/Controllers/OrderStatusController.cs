@@ -13,9 +13,8 @@ namespace Maliev.OrderService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("orders/v{version:apiVersion}/orders/{orderId}/statuses")]
-[Authorize(Policy = "EmployeeOrHigher")]
-[EnableRateLimiting("general")]
+[Route("order/v{version:apiVersion}/orders/{orderId}/statuses")]
+[Produces("application/json")]
 public class OrderStatusController : ControllerBase
 {
     private readonly IOrderStatusService _statusService;

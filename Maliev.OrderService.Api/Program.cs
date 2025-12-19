@@ -11,9 +11,9 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
-builder.AddServiceMeters("orders"); // Register service meters for OpenTelemetry business metrics
+builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
 
-builder.AddRedisDistributedCache(instanceName: "Order:"); // Redis with in-memory fallback
+builder.AddRedisDistributedCache(instanceName: "order:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
 builder.AddPostgresDbContext<OrderDbContext>(connectionStringName: "OrderDbContext"); // PostgreSQL with retry logic
 
@@ -156,10 +156,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map Aspire default endpoints (/health, /alive, /metrics)
-app.MapDefaultEndpoints(servicePrefix: "orders");
+app.MapDefaultEndpoints(servicePrefix: "order");
 
 // Map OpenAPI and Scalar documentation (dev/staging only)
-app.MapApiDocumentation(servicePrefix: "orders");
+app.MapApiDocumentation(servicePrefix: "order");
 
 Log.ServiceStarted(logger);
 await app.RunAsync();

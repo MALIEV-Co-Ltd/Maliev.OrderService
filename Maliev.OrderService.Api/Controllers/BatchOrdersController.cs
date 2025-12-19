@@ -17,7 +17,7 @@ namespace Maliev.OrderService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("orders/v{version:apiVersion}/orders/batch")]
+[Route("order/v{version:apiVersion}/orders/batch")]
 [Authorize(Policy = "EmployeeOrHigher")]
 [EnableRateLimiting("batch")]
 public partial class BatchOrdersController : ControllerBase
