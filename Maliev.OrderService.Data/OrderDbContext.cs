@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Maliev.Aspire.ServiceDefaults.Database;
 using Maliev.OrderService.Data.Models;
 using Maliev.OrderService.Data.Configurations;
 
@@ -43,5 +44,8 @@ public class OrderDbContext : DbContext
         modelBuilder.ApplyConfiguration(new OrderSheetMetalAttributesConfiguration());
         modelBuilder.ApplyConfiguration(new Order3DScanningAttributesConfiguration());
         modelBuilder.ApplyConfiguration(new Order3DDesignAttributesConfiguration());
+
+        // Apply PostgreSQL snake_case naming convention globally
+        SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
     }
 }

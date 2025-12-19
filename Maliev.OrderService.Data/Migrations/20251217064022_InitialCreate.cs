@@ -1,4 +1,5 @@
-﻿using System;
+﻿#pragma warning disable CA1861 // Avoid constant arrays as arguments
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -25,7 +26,7 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_notification_subscriptions", x => x.subscription_id);
+                    table.PrimaryKey("pk_notification_subscriptions", x => x.subscription_id);
                 });
 
             migrationBuilder.CreateTable(
@@ -40,7 +41,7 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_service_categories", x => x.category_id);
+                    table.PrimaryKey("pk_service_categories", x => x.category_id);
                 });
 
             migrationBuilder.CreateTable(
@@ -56,9 +57,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_process_types", x => x.process_type_id);
+                    table.PrimaryKey("pk_process_types", x => x.process_type_id);
                     table.ForeignKey(
-                        name: "FK_process_types_service_categories_service_category_id",
+                        name: "fk_process_types_service_categories_service_category_id",
                         column: x => x.service_category_id,
                         principalTable: "service_categories",
                         principalColumn: "category_id",
@@ -94,7 +95,7 @@ namespace Maliev.OrderService.Data.Migrations
                     assigned_employee_id = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     department_id = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     requirements = table.Column<string>(type: "text", nullable: true),
-                    version = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false),
+                    version = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false, defaultValueSql: "'\\x0000000000000000'::bytea"),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
                     created_by = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
@@ -102,15 +103,15 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_orders", x => x.order_id);
+                    table.PrimaryKey("pk_orders", x => x.order_id);
                     table.ForeignKey(
-                        name: "FK_orders_process_types_process_type_id",
+                        name: "fk_orders_process_types_process_type_id",
                         column: x => x.process_type_id,
                         principalTable: "process_types",
                         principalColumn: "process_type_id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_orders_service_categories_service_category_id",
+                        name: "fk_orders_service_categories_service_category_id",
                         column: x => x.service_category_id,
                         principalTable: "service_categories",
                         principalColumn: "category_id",
@@ -133,9 +134,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_audit_logs", x => x.audit_id);
+                    table.PrimaryKey("pk_audit_logs", x => x.audit_id);
                     table.ForeignKey(
-                        name: "FK_audit_logs_orders_order_id",
+                        name: "fk_audit_logs_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -154,9 +155,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_3d_design_attributes", x => x.order_id);
+                    table.PrimaryKey("pk_order_3d_design_attributes", x => x.order_id);
                     table.ForeignKey(
-                        name: "FK_order_3d_design_attributes_orders_order_id",
+                        name: "fk_order_3d_design_attributes_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -175,9 +176,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_3d_printing_attributes", x => x.order_id);
+                    table.PrimaryKey("pk_order_3d_printing_attributes", x => x.order_id);
                     table.ForeignKey(
-                        name: "FK_order_3d_printing_attributes_orders_order_id",
+                        name: "fk_order_3d_printing_attributes_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -196,9 +197,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_3d_scanning_attributes", x => x.order_id);
+                    table.PrimaryKey("pk_order_3d_scanning_attributes", x => x.order_id);
                     table.ForeignKey(
-                        name: "FK_order_3d_scanning_attributes_orders_order_id",
+                        name: "fk_order_3d_scanning_attributes_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -217,9 +218,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_cnc_machining_attributes", x => x.order_id);
+                    table.PrimaryKey("pk_order_cnc_machining_attributes", x => x.order_id);
                     table.ForeignKey(
-                        name: "FK_order_cnc_machining_attributes_orders_order_id",
+                        name: "fk_order_cnc_machining_attributes_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -247,9 +248,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_files", x => x.file_id);
+                    table.PrimaryKey("pk_order_files", x => x.file_id);
                     table.ForeignKey(
-                        name: "FK_order_files_orders_order_id",
+                        name: "fk_order_files_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -270,9 +271,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_notes", x => x.note_id);
+                    table.PrimaryKey("pk_order_notes", x => x.note_id);
                     table.ForeignKey(
-                        name: "FK_order_notes_orders_order_id",
+                        name: "fk_order_notes_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -292,9 +293,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_sheet_metal_attributes", x => x.order_id);
+                    table.PrimaryKey("pk_order_sheet_metal_attributes", x => x.order_id);
                     table.ForeignKey(
-                        name: "FK_order_sheet_metal_attributes_orders_order_id",
+                        name: "fk_order_sheet_metal_attributes_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -316,9 +317,9 @@ namespace Maliev.OrderService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_order_statuses", x => x.status_id);
+                    table.PrimaryKey("pk_order_statuses", x => x.status_id);
                     table.ForeignKey(
-                        name: "FK_order_statuses_orders_order_id",
+                        name: "fk_order_statuses_orders_order_id",
                         column: x => x.order_id,
                         principalTable: "orders",
                         principalColumn: "order_id",
@@ -326,147 +327,145 @@ namespace Maliev.OrderService.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AuditLog_Action",
+                name: "ix__audit_log__action",
                 table: "audit_logs",
                 column: "action");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AuditLog_OrderId",
+                name: "ix__audit_log__order_id",
                 table: "audit_logs",
                 column: "order_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AuditLog_PerformedAt",
+                name: "ix__audit_log__performed_at",
                 table: "audit_logs",
                 column: "performed_at");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AuditLog_PerformedBy",
+                name: "ix__audit_log__performed_by",
                 table: "audit_logs",
                 column: "performed_by");
 
             migrationBuilder.CreateIndex(
-                name: "IX_NotificationSubscription_CustomerId",
+                name: "ix__notification_subscription__customer_id",
                 table: "notification_subscriptions",
                 column: "customer_id",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderCncMachiningAttributes_Tolerance",
+                name: "ix__order_cnc_machining_attributes__tolerance",
                 table: "order_cnc_machining_attributes",
                 column: "tolerance");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderFile_DeletedAt",
+                name: "ix__order_file__deleted_at",
                 table: "order_files",
                 column: "deleted_at");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderFile_FileCategory",
+                name: "ix__order_file__file_category",
                 table: "order_files",
                 column: "file_category");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderFile_FileRole",
+                name: "ix__order_file__file_role",
                 table: "order_files",
                 column: "file_role");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderFile_ObjectPath",
+                name: "ix__order_file__object_path",
                 table: "order_files",
                 column: "object_path",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderFile_OrderId",
+                name: "ix__order_file__order_id",
                 table: "order_files",
                 column: "order_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderNote_CreatedAt",
+                name: "ix__order_note__created_at",
                 table: "order_notes",
                 column: "created_at");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderNote_CreatedBy",
+                name: "ix__order_note__created_by",
                 table: "order_notes",
                 column: "created_by");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderNote_NoteType",
+                name: "ix__order_note__note_type",
                 table: "order_notes",
                 column: "note_type");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderNote_OrderId",
+                name: "ix__order_note__order_id",
                 table: "order_notes",
                 column: "order_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Order_AssignedEmployeeId",
+                name: "ix__order__assigned_employee_id",
                 table: "orders",
                 column: "assigned_employee_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Order_CreatedAt",
+                name: "ix__order__created_at",
                 table: "orders",
                 column: "created_at");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Order_CustomerId",
+                name: "ix__order__customer_id",
                 table: "orders",
                 column: "customer_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Order_DepartmentId",
+                name: "ix__order__department_id",
                 table: "orders",
                 column: "department_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Order_MaterialId",
+                name: "ix__order__material_id",
                 table: "orders",
                 column: "material_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Order_PaymentId",
+                name: "ix__order__payment_id",
                 table: "orders",
                 column: "payment_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Order_ProcessTypeId",
+                name: "ix__order__process_type_id",
                 table: "orders",
                 column: "process_type_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_orders_service_category_id",
+                name: "ix_orders_service_category_id",
                 table: "orders",
                 column: "service_category_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderStatus_OrderId",
+                name: "ix__order_status__order_id",
                 table: "order_statuses",
                 column: "order_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderStatus_Status",
+                name: "ix__order_status__status",
                 table: "order_statuses",
                 column: "status");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderStatus_Timestamp",
+                name: "ix__order_status__timestamp",
                 table: "order_statuses",
                 column: "timestamp");
 
-#pragma warning disable CA1861 // Avoid constant arrays as arguments
             migrationBuilder.CreateIndex(
-                name: "IX_ProcessType_ServiceCategoryId_Name",
+                name: "ix__process_type__service_category_id__name",
                 table: "process_types",
                 columns: new[] { "service_category_id", "name" },
                 unique: true);
-#pragma warning restore CA1861
 
             migrationBuilder.CreateIndex(
-                name: "IX_ServiceCategory_Name",
+                name: "ix__service_category__name",
                 table: "service_categories",
                 column: "name",
                 unique: true);

@@ -12,15 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.OrderService.Data.Migrations
 {
     [DbContext(typeof(OrderDbContext))]
-    [Migration("20251004124710_AddVersionDefault")]
-    partial class AddVersionDefault
+    [Migration("20251217064022_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.9")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -74,19 +74,20 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("performed_by");
 
-                    b.HasKey("AuditId");
+                    b.HasKey("AuditId")
+                        .HasName("pk_audit_logs");
 
                     b.HasIndex("Action")
-                        .HasDatabaseName("IX_AuditLog_Action");
+                        .HasDatabaseName("ix__audit_log__action");
 
                     b.HasIndex("OrderId")
-                        .HasDatabaseName("IX_AuditLog_OrderId");
+                        .HasDatabaseName("ix__audit_log__order_id");
 
                     b.HasIndex("PerformedAt")
-                        .HasDatabaseName("IX_AuditLog_PerformedAt");
+                        .HasDatabaseName("ix__audit_log__performed_at");
 
                     b.HasIndex("PerformedBy")
-                        .HasDatabaseName("IX_AuditLog_PerformedBy");
+                        .HasDatabaseName("ix__audit_log__performed_by");
 
                     b.ToTable("audit_logs", (string)null);
                 });
@@ -125,11 +126,12 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.HasKey("SubscriptionId");
+                    b.HasKey("SubscriptionId")
+                        .HasName("pk_notification_subscriptions");
 
                     b.HasIndex("CustomerId")
                         .IsUnique()
-                        .HasDatabaseName("IX_NotificationSubscription_CustomerId");
+                        .HasDatabaseName("ix__notification_subscription__customer_id");
 
                     b.ToTable("notification_subscriptions", (string)null);
                 });
@@ -287,32 +289,35 @@ namespace Maliev.OrderService.Data.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea")
-                        .HasColumnName("version");
+                        .HasColumnName("version")
+                        .HasDefaultValueSql("'\\x0000000000000000'::bytea");
 
-                    b.HasKey("OrderId");
+                    b.HasKey("OrderId")
+                        .HasName("pk_orders");
 
                     b.HasIndex("AssignedEmployeeId")
-                        .HasDatabaseName("IX_Order_AssignedEmployeeId");
+                        .HasDatabaseName("ix__order__assigned_employee_id");
 
                     b.HasIndex("CreatedAt")
-                        .HasDatabaseName("IX_Order_CreatedAt");
+                        .HasDatabaseName("ix__order__created_at");
 
                     b.HasIndex("CustomerId")
-                        .HasDatabaseName("IX_Order_CustomerId");
+                        .HasDatabaseName("ix__order__customer_id");
 
                     b.HasIndex("DepartmentId")
-                        .HasDatabaseName("IX_Order_DepartmentId");
+                        .HasDatabaseName("ix__order__department_id");
 
                     b.HasIndex("MaterialId")
-                        .HasDatabaseName("IX_Order_MaterialId");
+                        .HasDatabaseName("ix__order__material_id");
 
                     b.HasIndex("PaymentId")
-                        .HasDatabaseName("IX_Order_PaymentId");
+                        .HasDatabaseName("ix__order__payment_id");
 
                     b.HasIndex("ProcessTypeId")
-                        .HasDatabaseName("IX_Order_ProcessTypeId");
+                        .HasDatabaseName("ix__order__process_type_id");
 
-                    b.HasIndex("ServiceCategoryId");
+                    b.HasIndex("ServiceCategoryId")
+                        .HasDatabaseName("ix_orders_service_category_id");
 
                     b.ToTable("orders", (string)null);
                 });
@@ -345,7 +350,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasDefaultValue(2)
                         .HasColumnName("revision_rounds");
 
-                    b.HasKey("OrderId");
+                    b.HasKey("OrderId")
+                        .HasName("pk_order_3d_design_attributes");
 
                     b.ToTable("order_3d_design_attributes", (string)null);
                 });
@@ -380,7 +386,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("thread_tap_required");
 
-                    b.HasKey("OrderId");
+                    b.HasKey("OrderId")
+                        .HasName("pk_order_3d_printing_attributes");
 
                     b.ToTable("order_3d_printing_attributes", (string)null);
                 });
@@ -412,7 +419,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("scan_location");
 
-                    b.HasKey("OrderId");
+                    b.HasKey("OrderId")
+                        .HasName("pk_order_3d_scanning_attributes");
 
                     b.ToTable("order_3d_scanning_attributes", (string)null);
                 });
@@ -445,10 +453,11 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("tolerance");
 
-                    b.HasKey("OrderId");
+                    b.HasKey("OrderId")
+                        .HasName("pk_order_cnc_machining_attributes");
 
                     b.HasIndex("Tolerance")
-                        .HasDatabaseName("IX_OrderCncMachiningAttributes_Tolerance");
+                        .HasDatabaseName("ix__order_cnc_machining_attributes__tolerance");
 
                     b.ToTable("order_cnc_machining_attributes", (string)null);
                 });
@@ -531,23 +540,24 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("uploaded_by");
 
-                    b.HasKey("FileId");
+                    b.HasKey("FileId")
+                        .HasName("pk_order_files");
 
                     b.HasIndex("DeletedAt")
-                        .HasDatabaseName("IX_OrderFile_DeletedAt");
+                        .HasDatabaseName("ix__order_file__deleted_at");
 
                     b.HasIndex("FileCategory")
-                        .HasDatabaseName("IX_OrderFile_FileCategory");
+                        .HasDatabaseName("ix__order_file__file_category");
 
                     b.HasIndex("FileRole")
-                        .HasDatabaseName("IX_OrderFile_FileRole");
+                        .HasDatabaseName("ix__order_file__file_role");
 
                     b.HasIndex("ObjectPath")
                         .IsUnique()
-                        .HasDatabaseName("IX_OrderFile_ObjectPath");
+                        .HasDatabaseName("ix__order_file__object_path");
 
                     b.HasIndex("OrderId")
-                        .HasDatabaseName("IX_OrderFile_OrderId");
+                        .HasDatabaseName("ix__order_file__order_id");
 
                     b.ToTable("order_files", (string)null);
                 });
@@ -590,19 +600,20 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("order_id");
 
-                    b.HasKey("NoteId");
+                    b.HasKey("NoteId")
+                        .HasName("pk_order_notes");
 
                     b.HasIndex("CreatedAt")
-                        .HasDatabaseName("IX_OrderNote_CreatedAt");
+                        .HasDatabaseName("ix__order_note__created_at");
 
                     b.HasIndex("CreatedBy")
-                        .HasDatabaseName("IX_OrderNote_CreatedBy");
+                        .HasDatabaseName("ix__order_note__created_by");
 
                     b.HasIndex("NoteType")
-                        .HasDatabaseName("IX_OrderNote_NoteType");
+                        .HasDatabaseName("ix__order_note__note_type");
 
                     b.HasIndex("OrderId")
-                        .HasDatabaseName("IX_OrderNote_OrderId");
+                        .HasDatabaseName("ix__order_note__order_id");
 
                     b.ToTable("order_notes", (string)null);
                 });
@@ -639,7 +650,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("welding_required");
 
-                    b.HasKey("OrderId");
+                    b.HasKey("OrderId")
+                        .HasName("pk_order_sheet_metal_attributes");
 
                     b.ToTable("order_sheet_metal_attributes", (string)null);
                 });
@@ -685,16 +697,17 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("updated_by");
 
-                    b.HasKey("StatusId");
+                    b.HasKey("StatusId")
+                        .HasName("pk_order_statuses");
 
                     b.HasIndex("OrderId")
-                        .HasDatabaseName("IX_OrderStatus_OrderId");
+                        .HasDatabaseName("ix__order_status__order_id");
 
                     b.HasIndex("Status")
-                        .HasDatabaseName("IX_OrderStatus_Status");
+                        .HasDatabaseName("ix__order_status__status");
 
                     b.HasIndex("Timestamp")
-                        .HasDatabaseName("IX_OrderStatus_Timestamp");
+                        .HasDatabaseName("ix__order_status__timestamp");
 
                     b.ToTable("order_statuses", (string)null);
                 });
@@ -728,11 +741,12 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("service_category_id");
 
-                    b.HasKey("ProcessTypeId");
+                    b.HasKey("ProcessTypeId")
+                        .HasName("pk_process_types");
 
                     b.HasIndex("ServiceCategoryId", "Name")
                         .IsUnique()
-                        .HasDatabaseName("IX_ProcessType_ServiceCategoryId_Name");
+                        .HasDatabaseName("ix__process_type__service_category_id__name");
 
                     b.ToTable("process_types", (string)null);
                 });
@@ -762,11 +776,12 @@ namespace Maliev.OrderService.Data.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.HasKey("CategoryId");
+                    b.HasKey("CategoryId")
+                        .HasName("pk_service_categories");
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("IX_ServiceCategory_Name");
+                        .HasDatabaseName("ix__service_category__name");
 
                     b.ToTable("service_categories", (string)null);
                 });
@@ -777,7 +792,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithMany("AuditLogs")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_audit_logs_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -787,13 +803,15 @@ namespace Maliev.OrderService.Data.Migrations
                     b.HasOne("Maliev.OrderService.Data.Models.ProcessType", "ProcessType")
                         .WithMany("Orders")
                         .HasForeignKey("ProcessTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_orders_process_types_process_type_id");
 
                     b.HasOne("Maliev.OrderService.Data.Models.ServiceCategory", "ServiceCategory")
                         .WithMany("Orders")
                         .HasForeignKey("ServiceCategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_service_categories_service_category_id");
 
                     b.Navigation("ProcessType");
 
@@ -806,7 +824,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithOne("DesignAttributes")
                         .HasForeignKey("Maliev.OrderService.Data.Models.Order3DDesignAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_3d_design_attributes_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -817,7 +836,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithOne("PrintingAttributes")
                         .HasForeignKey("Maliev.OrderService.Data.Models.Order3DPrintingAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_3d_printing_attributes_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -828,7 +848,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithOne("ScanningAttributes")
                         .HasForeignKey("Maliev.OrderService.Data.Models.Order3DScanningAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_3d_scanning_attributes_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -839,7 +860,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithOne("CncAttributes")
                         .HasForeignKey("Maliev.OrderService.Data.Models.OrderCncMachiningAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_cnc_machining_attributes_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -850,7 +872,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithMany("OrderFiles")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_files_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -861,7 +884,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithMany("OrderNotes")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_notes_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -872,7 +896,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithOne("SheetMetalAttributes")
                         .HasForeignKey("Maliev.OrderService.Data.Models.OrderSheetMetalAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_sheet_metal_attributes_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -883,7 +908,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithMany("OrderStatuses")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_order_statuses_orders_order_id");
 
                     b.Navigation("Order");
                 });
@@ -894,7 +920,8 @@ namespace Maliev.OrderService.Data.Migrations
                         .WithMany("ProcessTypes")
                         .HasForeignKey("ServiceCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_process_types_service_categories_service_category_id");
 
                     b.Navigation("ServiceCategory");
                 });
