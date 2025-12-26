@@ -1,3 +1,4 @@
+using Maliev.OrderService.Api.Authorization;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -12,7 +13,7 @@ public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
 
     public FileEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
+        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
     }
 
     [Fact]

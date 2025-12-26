@@ -1,4 +1,5 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.Collections.Concurrent;
+using System.IdentityModel.Tokens.Jwt;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
@@ -15,6 +16,8 @@ using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
 using Xunit;
+using Maliev.OrderService.Api.Services.External;
+using Moq;
 
 namespace Maliev.OrderService.Tests.Testing;
 
@@ -33,6 +36,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     private readonly RabbitMqContainer _rabbitmqContainer;
     private readonly RSA _testRsa;
     private bool _containersStarted;
+    
+    // Store permissions for test users
+    private readonly ConcurrentDictionary<string, IEnumerable<string>> _userPermissions = new();
 
     /// <summary>
     /// Override this property if your DbContext connection string has a different name.
@@ -127,11 +133,29 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Set configuration directly into the WebHost configuration that Program.cs reads.
+        builder.UseSetting($"ConnectionStrings:{DbConnectionStringName}", _postgresContainer.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:redis", _redisContainer.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:rabbitmq", _rabbitmqContainer.GetConnectionString());
+        builder.UseSetting("Features:PermissionBasedAuthEnabled", "true");
+
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Service:Name"] = "OrderService",
+                ["Service:Version"] = "1.0.0-test"
+            });
+        });
+
         builder.ConfigureTestServices(services =>
         {
             // Configure JWT Bearer authentication with test RSA key
             services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
             {
+                // Disable claim type mapping to keep original claim names like "sub" instead of URIs
+                options.MapInboundClaims = false;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -141,7 +165,37 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                     ValidIssuer = "test-issuer",
                     ValidAudience = "test-audience",
                     IssuerSigningKey = new RsaSecurityKey(_testRsa),
-                    ClockSkew = TimeSpan.Zero // No clock skew for tests
+                    ClockSkew = TimeSpan.Zero, // No clock skew for tests
+                    NameClaimType = JwtRegisteredClaimNames.Sub,
+                    RoleClaimType = "role"
+                };
+
+                // Add event to transform claims after token validation
+                options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+                {
+                    OnTokenValidated = context =>
+                    {
+                        if (context.Principal?.Identity is ClaimsIdentity identity)
+                        {
+                            // Add ClaimTypes.NameIdentifier claim from "sub"
+                            var subClaim = identity.FindFirst(JwtRegisteredClaimNames.Sub);
+                            if (subClaim != null && !identity.HasClaim(c => c.Type == ClaimTypes.NameIdentifier))
+                            {
+                                identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, subClaim.Value));
+                            }
+
+                            // Add ClaimTypes.Role claims from "role"
+                            var roleClaims = identity.FindAll("role").ToList();
+                            foreach (var roleClaim in roleClaims)
+                            {
+                                if (!identity.HasClaim(c => c.Type == ClaimTypes.Role && c.Value == roleClaim.Value))
+                                {
+                                    identity.AddClaim(new Claim(ClaimTypes.Role, roleClaim.Value));
+                                }
+                            }
+                        }
+                        return Task.CompletedTask;
+                    }
                 };
             });
 
@@ -154,6 +208,22 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
             // Allow derived classes to add additional test services
             ConfigureAdditionalServices(services);
+
+            // T010: Update factory to support permission-based token generation
+            // Remove the real IAM client before adding the mock
+            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IIamServiceClient));
+            if (descriptor != null)
+            {
+                services.Remove(descriptor);
+            }
+
+            // Mock IIamServiceClient to return permissions from our dictionary
+            var mockIamClient = new Mock<IIamServiceClient>();
+            mockIamClient.Setup(x => x.GetUserPermissionsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string userId, CancellationToken _) => 
+                    _userPermissions.TryGetValue(userId, out var perms) ? perms : Enumerable.Empty<string>());
+            
+            services.AddScoped(_ => mockIamClient.Object);
         });
     }
 
@@ -272,12 +342,19 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// <param name="userId">User ID to include in token</param>
     /// <param name="roles">Roles to include in token claims</param>
     /// <param name="additionalClaims">Additional claims to include</param>
+    /// <param name="permissions">Permissions to assign to this user via IIamServiceClient mock</param>
     /// <returns>JWT token string</returns>
     public string CreateTestJwtToken(
         string userId = "test-user",
         string[]? roles = null,
-        Dictionary<string, string>? additionalClaims = null)
+        Dictionary<string, string>? additionalClaims = null,
+        IEnumerable<string>? permissions = null)
     {
+        if (permissions != null)
+        {
+            _userPermissions[userId] = permissions;
+        }
+
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId),
@@ -288,15 +365,15 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             foreach (var role in roles)
             {
-                claims.Add(new Claim(ClaimTypes.Role, role));
+                claims.Add(new Claim("role", role));
             }
         }
 
-        if (additionalClaims != null)
+        if (permissions != null)
         {
-            foreach (var (key, value) in additionalClaims)
+            foreach (var permission in permissions)
             {
-                claims.Add(new Claim(key, value));
+                claims.Add(new Claim("permissions", permission));
             }
         }
 
@@ -326,11 +403,14 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
 
     /// <summary>
-    /// Creates an HTTP client with authenticated user and specified roles.
+    /// Creates an HTTP client with authenticated user and specified roles/permissions.
     /// </summary>
-    public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null)
+    public HttpClient CreateAuthenticatedClient(
+        string userId = "test-user", 
+        string[]? roles = null, 
+        IEnumerable<string>? permissions = null)
     {
-        var token = CreateTestJwtToken(userId, roles);
+        var token = CreateTestJwtToken(userId, roles, permissions: permissions);
         var client = CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
         return client;
