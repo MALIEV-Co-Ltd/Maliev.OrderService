@@ -1,92 +1,85 @@
-using System.Net.Http.Json;
-
-namespace Maliev.OrderService.Api.Services.External;
-
-/// <summary>
-/// Client for interacting with the external Upload Service
-/// </summary>
-public partial class UploadServiceClient : IUploadServiceClient
+namespace Maliev.OrderService.Api.Services.External
 {
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<UploadServiceClient> _logger;
-
     /// <summary>
-    /// Initializes a new instance of the <see cref="UploadServiceClient"/> class.
+    /// Client for interacting with the external Upload Service
     /// </summary>
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="UploadServiceClient"/> class.
+    /// </remarks>
     /// <param name="httpClient">The HTTP client</param>
     /// <param name="logger">The logger instance</param>
-    public UploadServiceClient(HttpClient httpClient, ILogger<UploadServiceClient> logger)
+    public partial class UploadServiceClient(HttpClient httpClient, ILogger<UploadServiceClient> logger) : IUploadServiceClient
     {
-        _httpClient = httpClient;
-        _logger = logger;
-    }
+        private readonly HttpClient _httpClient = httpClient;
+        private readonly ILogger<UploadServiceClient> _logger = logger;
 
-    /// <inheritdoc />
-    public async Task<UploadFileResult> UploadFileAsync(string objectPath, Stream fileStream, string contentType, CancellationToken cancellationToken = default)
-    {
-        try
+        /// <inheritdoc />
+        public async Task<UploadFileResult> UploadFileAsync(string objectPath, Stream fileStream, string contentType, CancellationToken cancellationToken = default)
         {
-            using var content = new MultipartFormDataContent();
-            var streamContent = new StreamContent(fileStream);
-            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-            content.Add(streamContent, "file", objectPath);
-            content.Add(new StringContent(objectPath), "objectPath");
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                var streamContent = new StreamContent(fileStream);
+                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+                content.Add(streamContent, "file", objectPath);
+                content.Add(new StringContent(objectPath), "objectPath");
 
-            var response = await _httpClient.PostAsync("/api/v1/files/upload", content, cancellationToken);
-            response.EnsureSuccessStatusCode();
+                HttpResponseMessage response = await _httpClient.PostAsync("/api/v1/files/upload", content, cancellationToken);
+                _ = response.EnsureSuccessStatusCode();
 
-            var result = await response.Content.ReadFromJsonAsync<UploadFileResult>(cancellationToken: cancellationToken);
-            return result ?? throw new InvalidOperationException("Upload service returned null result");
+                UploadFileResult? result = await response.Content.ReadFromJsonAsync<UploadFileResult>(cancellationToken: cancellationToken);
+                return result ?? throw new InvalidOperationException("Upload service returned null result");
+            }
+            catch (HttpRequestException ex)
+            {
+                Log.FailedToUploadFile(_logger, objectPath, ex);
+                throw;
+            }
         }
-        catch (HttpRequestException ex)
+
+        /// <inheritdoc />
+        public async Task<Stream?> DownloadFileAsync(string objectPath, CancellationToken cancellationToken = default)
         {
-            Log.FailedToUploadFile(_logger, objectPath, ex);
-            throw;
-        }
-    }
+            try
+            {
+                HttpResponseMessage response = await _httpClient.GetAsync($"/api/v1/files/download?objectPath={Uri.EscapeDataString(objectPath)}", cancellationToken);
+                _ = response.EnsureSuccessStatusCode();
 
-    /// <inheritdoc />
-    public async Task<Stream?> DownloadFileAsync(string objectPath, CancellationToken cancellationToken = default)
-    {
-        try
+                return await response.Content.ReadAsStreamAsync(cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                Log.FailedToDownloadFile(_logger, objectPath, ex);
+                return null;
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task<bool> DeleteFileAsync(string objectPath, CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.GetAsync($"/api/v1/files/download?objectPath={Uri.EscapeDataString(objectPath)}", cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            return await response.Content.ReadAsStreamAsync(cancellationToken);
+            try
+            {
+                HttpResponseMessage response = await _httpClient.DeleteAsync($"/api/v1/files?objectPath={Uri.EscapeDataString(objectPath)}", cancellationToken);
+                _ = response.EnsureSuccessStatusCode();
+                return true;
+            }
+            catch (HttpRequestException ex)
+            {
+                Log.FailedToDeleteFile(_logger, objectPath, ex);
+                return false;
+            }
         }
-        catch (HttpRequestException ex)
+
+        private static partial class Log
         {
-            Log.FailedToDownloadFile(_logger, objectPath, ex);
-            return null;
+            [LoggerMessage(Level = LogLevel.Error, Message = "Failed to upload file to {ObjectPath}")]
+            public static partial void FailedToUploadFile(ILogger logger, string objectPath, Exception ex);
+
+            [LoggerMessage(Level = LogLevel.Error, Message = "Failed to download file from {ObjectPath}")]
+            public static partial void FailedToDownloadFile(ILogger logger, string objectPath, Exception ex);
+
+            [LoggerMessage(Level = LogLevel.Error, Message = "Failed to delete file at {ObjectPath}")]
+            public static partial void FailedToDeleteFile(ILogger logger, string objectPath, Exception ex);
         }
-    }
-
-    /// <inheritdoc />
-    public async Task<bool> DeleteFileAsync(string objectPath, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await _httpClient.DeleteAsync($"/api/v1/files?objectPath={Uri.EscapeDataString(objectPath)}", cancellationToken);
-            response.EnsureSuccessStatusCode();
-            return true;
-        }
-        catch (HttpRequestException ex)
-        {
-            Log.FailedToDeleteFile(_logger, objectPath, ex);
-            return false;
-        }
-    }
-
-    private static partial class Log
-    {
-        [LoggerMessage(Level = LogLevel.Error, Message = "Failed to upload file to {ObjectPath}")]
-        public static partial void FailedToUploadFile(ILogger logger, string objectPath, Exception ex);
-
-        [LoggerMessage(Level = LogLevel.Error, Message = "Failed to download file from {ObjectPath}")]
-        public static partial void FailedToDownloadFile(ILogger logger, string objectPath, Exception ex);
-
-        [LoggerMessage(Level = LogLevel.Error, Message = "Failed to delete file at {ObjectPath}")]
-        public static partial void FailedToDeleteFile(ILogger logger, string objectPath, Exception ex);
     }
 }

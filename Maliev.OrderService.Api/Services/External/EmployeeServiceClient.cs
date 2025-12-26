@@ -1,67 +1,60 @@
-using System.Net.Http.Json;
-
-namespace Maliev.OrderService.Api.Services.External;
-
-/// <summary>
-/// Client for interacting with the external Employee Service
-/// </summary>
-public partial class EmployeeServiceClient : IEmployeeServiceClient
+namespace Maliev.OrderService.Api.Services.External
 {
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<EmployeeServiceClient> _logger;
-
     /// <summary>
-    /// Initializes a new instance of the <see cref="EmployeeServiceClient"/> class.
+    /// Client for interacting with the external Employee Service
     /// </summary>
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="EmployeeServiceClient"/> class.
+    /// </remarks>
     /// <param name="httpClient">The HTTP client</param>
     /// <param name="logger">The logger instance</param>
-    public EmployeeServiceClient(HttpClient httpClient, ILogger<EmployeeServiceClient> logger)
+    public partial class EmployeeServiceClient(HttpClient httpClient, ILogger<EmployeeServiceClient> logger) : IEmployeeServiceClient
     {
-        _httpClient = httpClient;
-        _logger = logger;
-    }
+        private readonly HttpClient _httpClient = httpClient;
+        private readonly ILogger<EmployeeServiceClient> _logger = logger;
 
-    /// <inheritdoc />
-    public async Task<EmployeeDetailsDto?> GetEmployeeDetailsAsync(string employeeId, CancellationToken cancellationToken = default)
-    {
-        try
+        /// <inheritdoc />
+        public async Task<EmployeeDetailsDto?> GetEmployeeDetailsAsync(string employeeId, CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.GetAsync($"/api/v1/employees/{employeeId}", cancellationToken);
-            response.EnsureSuccessStatusCode();
+            try
+            {
+                HttpResponseMessage response = await _httpClient.GetAsync($"/api/v1/employees/{employeeId}", cancellationToken);
+                _ = response.EnsureSuccessStatusCode();
 
-            return await response.Content.ReadFromJsonAsync<EmployeeDetailsDto>(cancellationToken: cancellationToken);
+                return await response.Content.ReadFromJsonAsync<EmployeeDetailsDto>(cancellationToken: cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                Log.FailedToGetEmployeeDetails(_logger, employeeId, ex);
+                return null;
+            }
         }
-        catch (HttpRequestException ex)
+
+        /// <inheritdoc />
+        public async Task<List<DepartmentDto>> GetDepartmentsAsync(CancellationToken cancellationToken = default)
         {
-            Log.FailedToGetEmployeeDetails(_logger, employeeId, ex);
-            return null;
-        }
-    }
+            try
+            {
+                HttpResponseMessage response = await _httpClient.GetAsync("/api/v1/departments", cancellationToken);
+                _ = response.EnsureSuccessStatusCode();
 
-    /// <inheritdoc />
-    public async Task<List<DepartmentDto>> GetDepartmentsAsync(CancellationToken cancellationToken = default)
-    {
-        try
+                List<DepartmentDto>? departments = await response.Content.ReadFromJsonAsync<List<DepartmentDto>>(cancellationToken: cancellationToken);
+                return departments ?? [];
+            }
+            catch (HttpRequestException ex)
+            {
+                Log.FailedToGetDepartments(_logger, ex);
+                return [];
+            }
+        }
+
+        private static partial class Log
         {
-            var response = await _httpClient.GetAsync("/api/v1/departments", cancellationToken);
-            response.EnsureSuccessStatusCode();
+            [LoggerMessage(Level = LogLevel.Error, Message = "Failed to get employee details for {EmployeeId}")]
+            public static partial void FailedToGetEmployeeDetails(ILogger logger, string employeeId, Exception ex);
 
-            var departments = await response.Content.ReadFromJsonAsync<List<DepartmentDto>>(cancellationToken: cancellationToken);
-            return departments ?? new List<DepartmentDto>();
+            [LoggerMessage(Level = LogLevel.Error, Message = "Failed to get departments list")]
+            public static partial void FailedToGetDepartments(ILogger logger, Exception ex);
         }
-        catch (HttpRequestException ex)
-        {
-            Log.FailedToGetDepartments(_logger, ex);
-            return new List<DepartmentDto>();
-        }
-    }
-
-    private static partial class Log
-    {
-        [LoggerMessage(Level = LogLevel.Error, Message = "Failed to get employee details for {EmployeeId}")]
-        public static partial void FailedToGetEmployeeDetails(ILogger logger, string employeeId, Exception ex);
-
-        [LoggerMessage(Level = LogLevel.Error, Message = "Failed to get departments list")]
-        public static partial void FailedToGetDepartments(ILogger logger, Exception ex);
     }
 }

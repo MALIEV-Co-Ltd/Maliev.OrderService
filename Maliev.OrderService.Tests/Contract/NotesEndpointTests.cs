@@ -1,68 +1,65 @@
 using Maliev.OrderService.Api.Authorization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
-namespace Maliev.OrderService.Tests.Contract;
-
-[Collection("Database")]
-public class NotesEndpointTests : IClassFixture<TestWebApplicationFactory>
+namespace Maliev.OrderService.Tests.Contract
 {
-    private readonly HttpClient _client;
-
-    private static readonly string[] AdminRoles = { "Admin" };
-
-    public NotesEndpointTests(TestWebApplicationFactory factory)
+    [Collection("Database")]
+    public class NotesEndpointTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
     {
-        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
-    }
+        private readonly HttpClient _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
 
-    [Fact]
-    public async Task GET_OrderNotes_Returns_NotesList()
-    {
-        // Arrange - Create an order first
-        var createRequest = new
+        private static readonly string[] AdminRoles = ["Admin"];
+
+        [Fact]
+        public async Task GET_OrderNotes_Returns_NotesList()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - Create an order first
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        // Act
-        var response = await _client.GetAsync($"/order/v1/orders/{orderId}/notes");
+            // Act
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/notes");
 
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
 
-    [Fact]
-    public async Task POST_OrderNote_Creates_Note_With_RBAC()
-    {
-        // Arrange - Create an order first
-        var createRequest = new
+        [Fact]
+        public async Task POST_OrderNote_Creates_Note_With_RBAC()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - Create an order first
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        var noteRequest = new
-        {
-            NoteType = "customer",  // Fixed: proper case
-            NoteText = "Customer note text"  // Fixed: proper case
-        };
+            var noteRequest = new
+            {
+                NoteType = "customer",  // Fixed: proper case
+                NoteText = "Customer note text"  // Fixed: proper case
+            };
 
-        // Act
-        var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/notes", noteRequest);
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/notes", noteRequest);
 
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            // Assert
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
     }
 }

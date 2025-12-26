@@ -11,71 +11,67 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
 
-namespace Maliev.OrderService.Tests.Performance;
-
-public class AuthorizationPerformanceTests
+namespace Maliev.OrderService.Tests.Performance
 {
-    private readonly ITestOutputHelper _output;
-
-    public AuthorizationPerformanceTests(ITestOutputHelper output)
+    public class AuthorizationPerformanceTests(ITestOutputHelper output)
     {
-        _output = output;
-    }
+        private readonly ITestOutputHelper _output = output;
 
-    [Fact]
-    public async Task AuthorizationCheck_Latency_ShouldBeBelow50ms()
-    {
-        // Arrange
-        var userId = "test-user-perf";
-        var permission = OrderPermissions.OrdersRead;
-        var permissions = new List<string> { permission };
-        var cachedData = JsonSerializer.Serialize(permissions);
-
-        var mockIamClient = new Mock<IIamServiceClient>();
-        var mockCache = new Mock<IDistributedCache>();
-        var mockMeterFactory = new Mock<IMeterFactory>();
-        using var meter = new Meter("TestMeter");
-        var mockConfiguration = new Mock<IConfiguration>();
-        var mockLogger = new Mock<ILogger<PermissionAuthorizationHandler>>();
-
-        mockMeterFactory.Setup(m => m.Create(It.IsAny<MeterOptions>())).Returns(meter);
-        
-        // Setup cache hit
-        mockCache.Setup(c => c.GetAsync($"user_permissions:{userId}", default))
-            .ReturnsAsync(System.Text.Encoding.UTF8.GetBytes(cachedData));
-
-        var handler = new PermissionAuthorizationHandler(
-            mockIamClient.Object,
-            mockCache.Object,
-            mockMeterFactory.Object,
-            mockConfiguration.Object,
-            mockLogger.Object);
-
-        var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        [Fact]
+        public async Task AuthorizationCheck_Latency_ShouldBeBelow50ms()
         {
-            new Claim(ClaimTypes.NameIdentifier, userId)
-        }, "TestAuth"));
+            // Arrange
+            var userId = "test-user-perf";
+            var permission = OrderPermissions.OrdersRead;
+            var permissions = new List<string> { permission };
+            var cachedData = JsonSerializer.Serialize(permissions);
 
-        var requirement = new PermissionRequirement(permission);
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
+            var mockIamClient = new Mock<IIamServiceClient>();
+            var mockCache = new Mock<IDistributedCache>();
+            var mockMeterFactory = new Mock<IMeterFactory>();
+            using var meter = new Meter("TestMeter");
+            var mockConfiguration = new Mock<IConfiguration>();
+            var mockLogger = new Mock<ILogger<PermissionAuthorizationHandler>>();
 
-        // Warm up
-        await handler.HandleAsync(context);
+            _ = mockMeterFactory.Setup(m => m.Create(It.IsAny<MeterOptions>())).Returns(meter);
 
-        // Act
-        int iterations = 1000;
-        var sw = Stopwatch.StartNew();
-        for (int i = 0; i < iterations; i++)
-        {
-            var testContext = new AuthorizationHandlerContext(new[] { requirement }, user, null);
-            await handler.HandleAsync(testContext);
+            // Setup cache hit
+            _ = mockCache.Setup(c => c.GetAsync($"user_permissions:{userId}", default))
+                .ReturnsAsync(System.Text.Encoding.UTF8.GetBytes(cachedData));
+
+            var handler = new PermissionAuthorizationHandler(
+                mockIamClient.Object,
+                mockCache.Object,
+                mockMeterFactory.Object,
+                mockConfiguration.Object,
+                mockLogger.Object);
+
+            var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId)
+            }, "TestAuth"));
+
+            var requirement = new PermissionRequirement(permission);
+            var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
+
+            // Warm up
+            await handler.HandleAsync(context);
+
+            // Act
+            int iterations = 1000;
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < iterations; i++)
+            {
+                var testContext = new AuthorizationHandlerContext(new[] { requirement }, user, null);
+                await handler.HandleAsync(testContext);
+            }
+            sw.Stop();
+
+            var averageLatency = sw.Elapsed.TotalMilliseconds / iterations;
+            _output.WriteLine($"Average Authorization Latency (Warm Cache): {averageLatency:F4} ms");
+
+            // Assert
+            Assert.True(averageLatency < 50, $"Average latency {averageLatency}ms exceeded 50ms limit");
         }
-        sw.Stop();
-
-        var averageLatency = sw.Elapsed.TotalMilliseconds / iterations;
-        _output.WriteLine($"Average Authorization Latency (Warm Cache): {averageLatency:F4} ms");
-
-        // Assert
-        Assert.True(averageLatency < 50, $"Average latency {averageLatency}ms exceeded 50ms limit");
     }
 }
