@@ -1,3 +1,4 @@
+using Maliev.OrderService.Api.Authorization;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -15,7 +16,7 @@ public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
     public IntegrationScenarioTests(TestWebApplicationFactory factory)
     {
         _factory = factory;
-        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
+        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
     }
 
     [Fact]

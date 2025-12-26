@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Maliev.OrderService.Api.Authorization;
 
 namespace Maliev.OrderService.Tests.Contract;
 
@@ -12,7 +13,10 @@ public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
 
     public BatchOrderEndpointTests(TestWebApplicationFactory factory)
     {
-        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles);
+        _client = factory.CreateAuthenticatedClient(
+            "test-admin",
+            AdminRoles,
+            permissions: OrderPermissions.All);
     }
 
     [Fact]

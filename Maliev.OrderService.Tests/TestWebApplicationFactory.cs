@@ -17,7 +17,7 @@ public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, Ord
         base.ConfigureEnvironmentVariables();
 
         // Set dummy URL for UploadService to prevent constructor injection failures
-        Environment.SetEnvironmentVariable("ExternalServices__UploadService__BaseUrl", "http://localhost:5003");
+        Environment.SetEnvironmentVariable("UploadService__BaseUrl", "http://localhost:5003");
     }
 
     protected override void ConfigureAdditionalServices(IServiceCollection services)
