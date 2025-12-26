@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Maliev.OrderService.Api.Extensions;
 
+using Maliev.OrderService.Api.Authorization;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+
 namespace Maliev.OrderService.Api.Controllers;
 
 /// <summary>
@@ -41,6 +44,7 @@ public class OrderFilesController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The uploaded file metadata</returns>
     [HttpPost]
+    [RequirePermission(OrderPermissions.OrdersUpdate)]
     public async Task<IActionResult> UploadOrderFile(
         string orderId,
         [FromForm] UploadOrderFileRequest request,
@@ -90,6 +94,7 @@ public class OrderFilesController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The file stream or 404 if not found</returns>
     [HttpGet("{fileId}")]
+    [RequirePermission(OrderPermissions.OrdersRead)]
     public async Task<IActionResult> DownloadOrderFile(
         string orderId,
         long fileId,
@@ -113,6 +118,7 @@ public class OrderFilesController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Success message or 404 if not found</returns>
     [HttpDelete("{fileId}")]
+    [RequirePermission(OrderPermissions.OrdersUpdate)]
     public async Task<IActionResult> DeleteOrderFile(
         string orderId,
         long fileId,

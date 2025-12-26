@@ -3,11 +3,14 @@ using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Data;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Maliev.OrderService.Api.DTOs.Response;
 using System.ComponentModel.DataAnnotations;
 using Maliev.OrderService.Api.Extensions;
+using Maliev.OrderService.Api.Authorization;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Api.Controllers;
@@ -17,9 +20,11 @@ namespace Maliev.OrderService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
+[Authorize]
 [Route("order/v{version:apiVersion}/orders/batch")]
-[Authorize(Policy = "EmployeeOrHigher")]
 [EnableRateLimiting("batch")]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType(StatusCodes.Status403Forbidden)]
 public partial class BatchOrdersController : ControllerBase
 {
     private readonly IOrderManagementService _orderService;
@@ -46,6 +51,7 @@ public partial class BatchOrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Array of created orders or error if any validation fails</returns>
     [HttpPost]
+    [RequirePermission(OrderPermissions.OrdersCreate)]
     public async Task<IActionResult> CreateBatchOrders(
         [FromBody] CreateOrderRequest[] requests,
         CancellationToken cancellationToken = default)
@@ -68,7 +74,7 @@ public partial class BatchOrdersController : ControllerBase
 
         // Use execution strategy for retry logic with transactions
         var strategy = _context.Database.CreateExecutionStrategy();
-        
+
         return await strategy.ExecuteAsync(async () =>
         {
             // Use transaction for all-or-nothing
@@ -85,7 +91,7 @@ public partial class BatchOrdersController : ControllerBase
                 }
 
                 await transaction.CommitAsync(cancellationToken);
-                return Created("/v1/orders/batch", results);
+                return Created(Request.Path, new { Message = $"{requests.Length} orders created successfully", Results = results });
             }
             catch (Exception ex)
             {
@@ -103,6 +109,7 @@ public partial class BatchOrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Array of updated orders or error if any validation/concurrency fails</returns>
     [HttpPut]
+    [RequirePermission(OrderPermissions.OrdersUpdate)]
     public async Task<IActionResult> UpdateBatchOrders(
         [FromBody] BatchUpdateOrderRequest[] requests,
         CancellationToken cancellationToken = default)
@@ -113,7 +120,10 @@ public partial class BatchOrdersController : ControllerBase
             var updateRequest = new UpdateOrderRequest
             {
                 Version = requests[i].Version,
-                AssignedEmployeeId = requests[i].AssignedEmployeeId
+                AssignedEmployeeId = requests[i].AssignedEmployeeId,
+                Requirements = requests[i].Requirements,
+                OrderedQuantity = requests[i].OrderedQuantity,
+                DepartmentId = requests[i].DepartmentId
             };
 
             var validationContext = new ValidationContext(updateRequest);
@@ -146,7 +156,10 @@ public partial class BatchOrdersController : ControllerBase
                     var updateRequest = new UpdateOrderRequest
                     {
                         Version = request.Version,
-                        AssignedEmployeeId = request.AssignedEmployeeId
+                        AssignedEmployeeId = request.AssignedEmployeeId,
+                        Requirements = request.Requirements,
+                        OrderedQuantity = request.OrderedQuantity,
+                        DepartmentId = request.DepartmentId
                     };
 
                     var order = await _orderService.UpdateOrderAsync(request.OrderId, updateRequest, updatedBy, cancellationToken);
@@ -154,7 +167,7 @@ public partial class BatchOrdersController : ControllerBase
                 }
 
                 await transaction.CommitAsync(cancellationToken);
-                return Ok(results);
+                return Ok(new { Message = $"{requests.Length} orders updated successfully", Results = results });
             }
             catch (InvalidOperationException ex)
             {
@@ -184,6 +197,7 @@ public partial class BatchOrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Success message with cancellation results or error if any order not found</returns>
     [HttpPost("cancel")]
+    [RequirePermission(OrderPermissions.OrdersCancel)]
     public async Task<IActionResult> CancelBatchOrders(
         [FromBody] string[] orderIds,
         CancellationToken cancellationToken = default)

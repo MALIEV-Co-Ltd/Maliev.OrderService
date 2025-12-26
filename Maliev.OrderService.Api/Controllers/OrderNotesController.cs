@@ -1,3 +1,5 @@
+using Maliev.OrderService.Api.Authorization;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Asp.Versioning;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.Services.Business;
@@ -39,6 +41,7 @@ public class OrderNotesController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The created note or error if order not found</returns>
     [HttpPost]
+    [RequirePermission(OrderPermissions.OrdersUpdate)]
     public async Task<IActionResult> CreateOrderNote(
         string orderId,
         [FromBody] CreateOrderNoteRequest request,

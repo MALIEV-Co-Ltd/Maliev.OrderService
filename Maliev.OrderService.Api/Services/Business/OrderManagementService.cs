@@ -83,32 +83,48 @@ public partial class OrderManagementService : IOrderManagementService
     /// <inheritdoc />
     public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
     {
-        // Check if there's already an active transaction (e.g., from batch operations)
-        // If so, we just participate in it via the Context
-        
-        var order = request.ToOrder();
-        order.OrderId = await GenerateOrderIdAsync(cancellationToken);
-        order.CreatedBy = createdBy;
-        order.UpdatedBy = createdBy;
-        order.CreatedAt = DateTime.UtcNow;
-        order.UpdatedAt = DateTime.UtcNow;
-        // Note: Version (RowVersion) is database-generated, do not set manually
+        const int maxRetries = 3;
+        int retryCount = 0;
 
-        _context.Orders.Add(order);
-
-        // Create initial status
-        var initialStatus = new OrderStatus
+        while (true)
         {
-            OrderId = order.OrderId,
-            Status = "New",
-            UpdatedBy = createdBy,
-            Timestamp = DateTime.UtcNow
-        };
-        _context.OrderStatuses.Add(initialStatus);
+            try
+            {
+                var order = request.ToOrder();
+                order.OrderId = await GenerateOrderIdAsync(cancellationToken);
+                order.CreatedBy = createdBy;
+                order.UpdatedBy = createdBy;
+                order.CreatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(cancellationToken);
+                _context.Orders.Add(order);
 
-        return order.ToOrderResponse();
+                var initialStatus = new OrderStatus
+                {
+                    OrderId = order.OrderId,
+                    Status = "New",
+                    UpdatedBy = createdBy,
+                    Timestamp = DateTime.UtcNow
+                };
+                _context.OrderStatuses.Add(initialStatus);
+
+                await _context.SaveChangesAsync(cancellationToken);
+
+                return order.ToOrderResponse();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" } && retryCount < maxRetries)
+            {
+                // Unique constraint violation - likely a race condition in GenerateOrderIdAsync
+                retryCount++;
+                Log.RaceConditionDetected(_logger, retryCount, maxRetries);
+                
+                // Clear the tracker to avoid issues with the failed entity
+                _context.ChangeTracker.Clear();
+                
+                // Small random delay to desynchronize
+                await Task.Delay(Random.Shared.Next(10, 50), cancellationToken);
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -190,6 +206,7 @@ public partial class OrderManagementService : IOrderManagementService
 
     private static partial class Log
     {
-        // LoggerMessage delegates can be added here as needed
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Race condition detected during OrderId generation. Retrying {RetryCount}/{MaxRetries}...")]
+        public static partial void RaceConditionDetected(ILogger logger, int retryCount, int maxRetries);
     }
 }

@@ -8,6 +8,9 @@ using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
 using System.Security.Claims; // Needed for RBAC checks
 
+using Maliev.OrderService.Api.Authorization;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+
 namespace Maliev.OrderService.Api.Controllers;
 
 /// <summary>
@@ -16,14 +19,14 @@ namespace Maliev.OrderService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("order/v{version:apiVersion}/orders")]
-[Authorize]
 [EnableRateLimiting("general")]
-public class OrdersController : ControllerBase
+public partial class OrdersController : ControllerBase
 {
     private readonly IOrderManagementService _orderService;
     private readonly IOrderStatusService _statusService;
     private readonly IOrderFileService _fileService;
     private readonly IOrderNoteService _noteService;
+    private readonly IAuthorizationService _authorizationService; // Added
     private readonly ILogger<OrdersController> _logger;
 
     /// <summary>
@@ -34,12 +37,14 @@ public class OrdersController : ControllerBase
         IOrderStatusService statusService,
         IOrderFileService fileService,
         IOrderNoteService noteService,
+        IAuthorizationService authorizationService,
         ILogger<OrdersController> logger)
     {
         _orderService = orderService;
         _statusService = statusService;
         _fileService = fileService;
         _noteService = noteService;
+        _authorizationService = authorizationService;
         _logger = logger;
     }
 
@@ -53,6 +58,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>A paginated list of orders</returns>
     [HttpGet]
+    [RequirePermission(OrderPermissions.OrdersRead)]
     public async Task<IActionResult> GetOrders(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -71,6 +77,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The order details or 404 if not found</returns>
     [HttpGet("{orderId}")]
+    [RequirePermission(OrderPermissions.OrdersRead)]
     public async Task<IActionResult> GetOrderById(string orderId, CancellationToken cancellationToken = default)
     {
         var order = await _orderService.GetOrderByIdAsync(orderId, cancellationToken);
@@ -79,13 +86,14 @@ public class OrdersController : ControllerBase
             return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
         }
 
-        // RBAC Check: Customers can only view their own orders
-        var userType = User.GetUserType();
-        if (string.Equals(userType, "customer", StringComparison.OrdinalIgnoreCase))
+        // Ownership Check: roles.order.creator can only view their own orders
+        var roles = User.GetRoles();
+        if (roles.Contains("roles.order.creator", StringComparer.OrdinalIgnoreCase))
         {
             var userId = User.GetUserId();
             if (order.CustomerId != userId)
             {
+                Log.UnauthorizedOrderAccess(_logger, userId, orderId);
                 return Forbid();
             }
         }
@@ -100,6 +108,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The created order</returns>
     [HttpPost]
+    [RequirePermission(OrderPermissions.OrdersCreate)]
     public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest request, CancellationToken cancellationToken = default)
     {
         if (!ModelState.IsValid)
@@ -121,6 +130,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The updated order or error if not found/conflict</returns>
     [HttpPut("{orderId}")]
+    [RequirePermission(OrderPermissions.OrdersUpdate)]
     public async Task<IActionResult> UpdateOrder(
         string orderId,
         [FromBody] UpdateOrderRequest request,
@@ -129,6 +139,17 @@ public class OrdersController : ControllerBase
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
+        }
+
+        // Field-level check: Pricing updates require higher permissions
+        if (request.QuotedAmount.HasValue || !string.IsNullOrEmpty(request.QuoteCurrency))
+        {
+            if (!(await _authorizationService.AuthorizeAsync(User, "Permission:" + OrderPermissions.OrdersApprove)).Succeeded)
+            {
+                var userId = User.GetUserId();
+                Log.UnauthorizedPricingUpdate(_logger, userId, orderId);
+                return Forbid();
+            }
         }
 
         try
@@ -154,6 +175,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Success message or 404 if not found</returns>
     [HttpDelete("{orderId}")]
+    [RequirePermission(OrderPermissions.OrdersCancel)]
     public async Task<IActionResult> CancelOrder(string orderId, CancellationToken cancellationToken = default)
     {
         var cancelledBy = User.GetUserId();
@@ -175,6 +197,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Success message with reason or 404 if not found</returns>
     [HttpPost("{orderId}/cancel")]
+    [RequirePermission(OrderPermissions.OrdersCancel)]
     public async Task<IActionResult> CancelOrderWithReason(
         string orderId,
         [FromBody] CancelOrderRequest request,
@@ -198,6 +221,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of order statuses</returns>
     [HttpGet("{orderId}/statuses")]
+    [RequirePermission(OrderPermissions.OrdersRead)]
     public async Task<IActionResult> GetOrderStatuses(string orderId, CancellationToken cancellationToken = default)
     {
         var statuses = await _statusService.GetOrderStatusHistoryAsync(orderId, cancellationToken);
@@ -211,6 +235,7 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of order files</returns>
     [HttpGet("{orderId}/files")]
+    [RequirePermission(OrderPermissions.OrdersRead)]
     public async Task<IActionResult> GetOrderFiles(string orderId, CancellationToken cancellationToken = default)
     {
         var files = await _fileService.GetOrderFilesAsync(orderId, cancellationToken);
@@ -224,9 +249,19 @@ public class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of order notes</returns>
     [HttpGet("{orderId}/notes")]
+    [RequirePermission(OrderPermissions.OrdersRead)]
     public async Task<IActionResult> GetOrderNotes(string orderId, CancellationToken cancellationToken = default)
     {
         var notes = await _noteService.GetOrderNotesAsync(orderId, cancellationToken);
         return Ok(notes);
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Warning, Message = "User {UserId} attempted to access unauthorized order {OrderId}")]
+        public static partial void UnauthorizedOrderAccess(ILogger logger, string userId, string orderId);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "User {UserId} attempted unauthorized pricing update for order {OrderId}")]
+        public static partial void UnauthorizedPricingUpdate(ILogger logger, string userId, string orderId);
     }
 }

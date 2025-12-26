@@ -1,5 +1,8 @@
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
+using Maliev.OrderService.Api.Services; // Added
+using Maliev.OrderService.Api.Authorization; // Added
+using Maliev.Aspire.ServiceDefaults; // Added
 using Maliev.OrderService.Data;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -11,11 +14,15 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+builder.AddStandardMiddleware(options =>
+{
+    options.EnableRequestLogging = true;
+});
 builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
 
 builder.AddRedisDistributedCache(instanceName: "order:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
-builder.AddPostgresDbContext<OrderDbContext>(connectionStringName: "OrderDbContext"); // PostgreSQL with retry logic
+builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
 // --- API Configuration ---
 builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
@@ -23,59 +30,33 @@ builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
 // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
 builder.AddJwtAuthentication();
+builder.Services.AddPermissionAuthorization();
+
+// Add specific policies
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("Admin", policy => 
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim("role", "admin");
+    });
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
 {
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddOpenApi("v1", options =>
-    {
-        options.AddDocumentTransformer((document, context, cancellationToken) =>
-        {
-            document.Info.Title = "MALIEV Order Service API";
-            document.Info.Version = "v1";
-            document.Info.Description = "Sales order processing service. Manages order lifecycle from creation to fulfillment, batch order operations, status history tracking, file attachments, internal notes, and cancellation with reason tracking.";
-            return Task.CompletedTask;
-        });
-    });
+    builder.AddStandardOpenApi(
+        title: "MALIEV Order Service API",
+        description: "Sales order processing service. Manages order lifecycle from creation to fulfillment, batch order operations, status history tracking, file attachments, internal notes, and cancellation with reason tracking.");
 }
 
 builder.Services.AddControllers();
 // External Service HttpClients with Standard Resilience Handler
-builder.Services.Configure<Maliev.OrderService.Api.Configuration.ExternalServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:CustomerService"));
-builder.Services.AddHttpClient<ICustomerServiceClient, CustomerServiceClient>()
-    .AddStandardResilienceHandler();
-
-builder.Services.Configure<Maliev.OrderService.Api.Configuration.ExternalServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:MaterialService"));
-builder.Services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>()
-    .AddStandardResilienceHandler();
-
-builder.Services.Configure<Maliev.OrderService.Api.Configuration.ExternalServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:PaymentService"));
-builder.Services.AddHttpClient<IPaymentServiceClient, PaymentServiceClient>()
-    .AddStandardResilienceHandler();
-
-builder.Services.Configure<Maliev.OrderService.Api.Configuration.ExternalServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:UploadService"));
-builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>()
-    .AddStandardResilienceHandler();
-
-builder.Services.Configure<Maliev.OrderService.Api.Configuration.ExternalServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:AuthService"));
-builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>()
-    .AddStandardResilienceHandler();
-
-builder.Services.Configure<Maliev.OrderService.Api.Configuration.ExternalServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:EmployeeService"));
-builder.Services.AddHttpClient<IEmployeeServiceClient, EmployeeServiceClient>()
-    .AddStandardResilienceHandler();
-
-builder.Services.Configure<Maliev.OrderService.Api.Configuration.ExternalServiceOptions>(
-    builder.Configuration.GetSection("ExternalServices:NotificationService"));
-builder.Services.AddHttpClient<INotificationServiceClient, NotificationServiceClient>()
-    .AddStandardResilienceHandler();
+builder.AddServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService");
+builder.AddServiceClient<IMaterialServiceClient, MaterialServiceClient>("MaterialService");
+builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
+builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadService");
+builder.AddServiceClient<IAuthServiceClient, AuthServiceClient>("AuthService");
+builder.AddServiceClient<IEmployeeServiceClient, EmployeeServiceClient>("EmployeeService");
+builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
 
 // Business Services
 builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
@@ -116,18 +97,6 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// Authorization Policies
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("Customer", policy => policy.RequireClaim("userType", "customer"))
-    .AddPolicy("Employee", policy => policy.RequireClaim("userType", "employee"))
-    .AddPolicy("Manager", policy => policy.RequireClaim(System.Security.Claims.ClaimTypes.Role, "Manager"))
-    .AddPolicy("Admin", policy => policy.RequireClaim(System.Security.Claims.ClaimTypes.Role, "Admin"))
-    .AddPolicy("EmployeeOrHigher", policy =>
-        policy.RequireAssertion(context =>
-            context.User.HasClaim("userType", "employee") ||
-            context.User.HasClaim(System.Security.Claims.ClaimTypes.Role, "Manager") ||
-            context.User.HasClaim(System.Security.Claims.ClaimTypes.Role, "Admin")));
-
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
@@ -146,6 +115,8 @@ if (!app.Environment.IsEnvironment("Testing"))
 }
 
 // Middleware Pipeline
+app.UseStandardMiddleware();
+
 app.UseHttpsRedirection();
 app.UseCors();
 
