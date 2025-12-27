@@ -1,13 +1,11 @@
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
-using Maliev.OrderService.Api.Services; // Added
-using Maliev.OrderService.Api.Authorization; // Added
 using Maliev.Aspire.ServiceDefaults; // Added
 using Maliev.OrderService.Data;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // --- Secrets & Configuration ---
 builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
@@ -34,16 +32,16 @@ builder.Services.AddPermissionAuthorization();
 
 // Add specific policies
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("Admin", policy => 
+    .AddPolicy("Admin", policy =>
     {
-        policy.RequireAuthenticatedUser();
-        policy.RequireClaim("role", "admin");
+        _ = policy.RequireAuthenticatedUser();
+        _ = policy.RequireClaim("role", "admin");
     });
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
 {
-    builder.AddStandardOpenApi(
+    _ = builder.AddStandardOpenApi(
         title: "MALIEV Order Service API",
         description: "Sales order processing service. Manages order lifecycle from creation to fulfillment, batch order operations, status history tracking, file attachments, internal notes, and cancellation with reason tracking.");
 }
@@ -68,7 +66,7 @@ builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
 builder.Services.AddRateLimiter(options =>
 {
     // General endpoints: 100 requests per minute per IP
-    options.AddFixedWindowLimiter("general", limiterOptions =>
+    _ = options.AddFixedWindowLimiter("general", limiterOptions =>
     {
         limiterOptions.PermitLimit = 100;
         limiterOptions.Window = TimeSpan.FromMinutes(1);
@@ -77,7 +75,7 @@ builder.Services.AddRateLimiter(options =>
     });
 
     // Batch operations: 10 requests per minute per IP (more restrictive)
-    options.AddSlidingWindowLimiter("batch", limiterOptions =>
+    _ = options.AddSlidingWindowLimiter("batch", limiterOptions =>
     {
         limiterOptions.PermitLimit = 10;
         limiterOptions.Window = TimeSpan.FromMinutes(1);
@@ -92,13 +90,13 @@ builder.Services.AddRateLimiter(options =>
         await context.HttpContext.Response.WriteAsJsonAsync(new
         {
             error = "Too many requests. Please try again later.",
-            retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter) ? retryAfter.TotalSeconds : 60
+            retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter) ? retryAfter.TotalSeconds : 60
         }, cancellationToken);
     };
 });
 
-var app = builder.Build();
-var logger = app.Services.GetRequiredService<ILogger<Program>>();
+WebApplication app = builder.Build();
+ILogger<Program> logger = app.Services.GetRequiredService<ILogger<Program>>();
 
 // Run database migrations on startup (skip in Testing environment)
 if (!app.Environment.IsEnvironment("Testing"))

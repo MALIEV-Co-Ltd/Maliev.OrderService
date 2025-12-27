@@ -6,88 +6,89 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 
-namespace Maliev.OrderService.Tests;
-
-public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, OrderDbContext>
+namespace Maliev.OrderService.Tests
 {
-    private bool _seeded;
-
-    protected override void ConfigureEnvironmentVariables()
+    public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, OrderDbContext>
     {
-        base.ConfigureEnvironmentVariables();
+        private bool _seeded;
 
-        // Set dummy URL for UploadService to prevent constructor injection failures
-        Environment.SetEnvironmentVariable("UploadService__BaseUrl", "http://localhost:5003");
-    }
-
-    protected override void ConfigureAdditionalServices(IServiceCollection services)
-    {
-        base.ConfigureAdditionalServices(services);
-
-        // Remove existing UploadServiceClient registration
-        var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IUploadServiceClient));
-        if (descriptor != null)
+        protected override void ConfigureEnvironmentVariables()
         {
-            services.Remove(descriptor);
+            base.ConfigureEnvironmentVariables();
+
+            // Set dummy URL for UploadService to prevent constructor injection failures
+            Environment.SetEnvironmentVariable("UploadService__BaseUrl", "http://localhost:5003");
         }
 
-        // Mock UploadServiceClient
-        var mockUploadService = new Mock<IUploadServiceClient>();
+        protected override void ConfigureAdditionalServices(IServiceCollection services)
+        {
+            base.ConfigureAdditionalServices(services);
 
-        mockUploadService.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string objectPath, Stream fileStream, string contentType, CancellationToken ct) => new UploadFileResult
+            // Remove existing UploadServiceClient registration
+            ServiceDescriptor? descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IUploadServiceClient));
+            if (descriptor != null)
             {
-                ObjectPath = objectPath,
-                FileSizeBytes = fileStream.Length,
-                ContentType = contentType,
-                UploadedAt = DateTime.UtcNow
-            });
+                _ = services.Remove(descriptor);
+            }
 
-        mockUploadService.Setup(x => x.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            // Mock UploadServiceClient
+            var mockUploadService = new Mock<IUploadServiceClient>();
 
-        mockUploadService.Setup(x => x.DownloadFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MemoryStream(new byte[] { 1, 2, 3 }));
+            _ = mockUploadService.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string objectPath, Stream fileStream, string contentType, CancellationToken ct) => new UploadFileResult
+                {
+                    ObjectPath = objectPath,
+                    FileSizeBytes = fileStream.Length,
+                    ContentType = contentType,
+                    UploadedAt = DateTime.UtcNow
+                });
 
-        services.AddScoped(_ => mockUploadService.Object);
-    }
+            _ = mockUploadService.Setup(x => x.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
 
-    protected override IHost CreateHost(IHostBuilder builder)
-    {
-        var host = base.CreateHost(builder);
+            _ = mockUploadService.Setup(x => x.DownloadFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new MemoryStream([1, 2, 3]));
 
-        if (!_seeded)
-        {
-            SeedReferenceData();
-            _seeded = true;
+            _ = services.AddScoped(_ => mockUploadService.Object);
         }
 
-        return host;
-    }
-
-    private void SeedReferenceData()
-    {
-        using var context = CreateDbContext();
-
-        // Seed service categories if they don't exist
-        if (!context.ServiceCategories.Any(sc => sc.CategoryId == 1))
+        protected override IHost CreateHost(IHostBuilder builder)
         {
-            context.ServiceCategories.AddRange(
-                new ServiceCategory { CategoryId = 1, Name = "3D Printing", Description = "3D Printing services", IsActive = true },
-                new ServiceCategory { CategoryId = 2, Name = "CNC Machining", Description = "CNC services", IsActive = true }
-            );
+            IHost host = base.CreateHost(builder);
+
+            if (!_seeded)
+            {
+                SeedReferenceData();
+                _seeded = true;
+            }
+
+            return host;
         }
 
-        // Seed process types if they don't exist
-        if (!context.ProcessTypes.Any(pt => pt.ProcessTypeId == 1))
+        private void SeedReferenceData()
         {
-            context.ProcessTypes.AddRange(
-                new ProcessType { ProcessTypeId = 1, Name = "FDM", ServiceCategoryId = 1, Description = "Fused Deposition Modeling", IsActive = true },
-                new ProcessType { ProcessTypeId = 2, Name = "SLA", ServiceCategoryId = 1, Description = "Stereolithography", IsActive = true },
-                new ProcessType { ProcessTypeId = 7, Name = "Laser Cutting", ServiceCategoryId = 2, Description = "Laser cutting process", IsActive = true }
-            );
-        }
+            using OrderDbContext context = CreateDbContext();
 
-        context.SaveChanges();
+            // Seed service categories if they don't exist
+            if (!context.ServiceCategories.Any(sc => sc.CategoryId == 1))
+            {
+                context.ServiceCategories.AddRange(
+                    new ServiceCategory { CategoryId = 1, Name = "3D Printing", Description = "3D Printing services", IsActive = true },
+                    new ServiceCategory { CategoryId = 2, Name = "CNC Machining", Description = "CNC services", IsActive = true }
+                );
+            }
+
+            // Seed process types if they don't exist
+            if (!context.ProcessTypes.Any(pt => pt.ProcessTypeId == 1))
+            {
+                context.ProcessTypes.AddRange(
+                    new ProcessType { ProcessTypeId = 1, Name = "FDM", ServiceCategoryId = 1, Description = "Fused Deposition Modeling", IsActive = true },
+                    new ProcessType { ProcessTypeId = 2, Name = "SLA", ServiceCategoryId = 1, Description = "Stereolithography", IsActive = true },
+                    new ProcessType { ProcessTypeId = 7, Name = "Laser Cutting", ServiceCategoryId = 2, Description = "Laser cutting process", IsActive = true }
+                );
+            }
+
+            _ = context.SaveChanges();
+        }
     }
 }

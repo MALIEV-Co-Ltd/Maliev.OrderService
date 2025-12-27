@@ -1,68 +1,63 @@
 using System.Net;
 using Maliev.OrderService.Api.Authorization;
+using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
-using Maliev.OrderService.Tests.Testing;
-using Microsoft.EntityFrameworkCore;
 
-namespace Maliev.OrderService.Tests.Contract;
-
-[Collection("Database")]
-public class AdminAccessTests : IClassFixture<TestWebApplicationFactory>
+namespace Maliev.OrderService.Tests.Contract
 {
-    private readonly TestWebApplicationFactory _factory;
-    private static readonly string[] AdminRoles = { "admin" };
-
-    public AdminAccessTests(TestWebApplicationFactory factory)
+    [Collection("Database")]
+    public class AdminAccessTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
     {
-        _factory = factory;
-    }
+        private readonly TestWebApplicationFactory _factory = factory;
+        private static readonly string[] AdminRoles = ["admin"];
 
-    [Fact]
-    public async Task Admin_CanDeleteOrder()
-    {
-        // Arrange
-        // Admin role should grant delete access
-        var client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles, permissions: new[] { OrderPermissions.OrdersCancel });
-
-        var orderId = await CreateTestOrderAsync();
-
-        // Act
-        var response = await client.DeleteAsync($"/order/v1/orders/{orderId}");
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Admin_CanAccessReports()
-    {
-        // Arrange
-        var client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles);
-
-        // Act
-        var response = await client.GetAsync("/order/v1/reports/sales");
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    private async Task<string> CreateTestOrderAsync()
-    {
-        using var context = _factory.CreateDbContext();
-        var order = new Order
+        [Fact]
+        public async Task Admin_CanDeleteOrder()
         {
-            OrderId = Guid.NewGuid().ToString(),
-            CustomerId = "CUST-001",
-            CustomerType = "Customer",
-            ServiceCategoryId = 1,
-            ProcessTypeId = 1,
-            CreatedAt = DateTime.UtcNow,
-            Version = Guid.NewGuid().ToByteArray(),
-            CreatedBy = "system",
-            UpdatedBy = "system"
-        };
-        context.Orders.Add(order);
-        await context.SaveChangesAsync();
-        return order.OrderId;
+            // Arrange
+            // Admin role should grant delete access
+            HttpClient client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles, permissions: new[] { OrderPermissions.OrdersCancel });
+
+            var orderId = await CreateTestOrderAsync();
+
+            // Act
+            HttpResponseMessage response = await client.DeleteAsync($"/order/v1/orders/{orderId}");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Admin_CanAccessReports()
+        {
+            // Arrange
+            HttpClient client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles);
+
+            // Act
+            HttpResponseMessage response = await client.GetAsync("/order/v1/reports/sales");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        private async Task<string> CreateTestOrderAsync()
+        {
+            using OrderDbContext context = _factory.CreateDbContext();
+            var order = new Order
+            {
+                OrderId = Guid.NewGuid().ToString(),
+                CustomerId = "CUST-001",
+                CustomerType = "Customer",
+                ServiceCategoryId = 1,
+                ProcessTypeId = 1,
+                CreatedAt = DateTime.UtcNow,
+                Version = Guid.NewGuid().ToByteArray(),
+                CreatedBy = "system",
+                UpdatedBy = "system"
+            };
+            _ = context.Orders.Add(order);
+            _ = await context.SaveChangesAsync();
+            return order.OrderId;
+        }
     }
 }

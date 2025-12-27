@@ -1,257 +1,253 @@
 using Maliev.OrderService.Api.Authorization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
-namespace Maliev.OrderService.Tests.Contract;
-
-[Collection("Database")]
-public class IntegrationScenarioTests : IClassFixture<TestWebApplicationFactory>
+namespace Maliev.OrderService.Tests.Contract
 {
-    private readonly HttpClient _client;
-    private readonly TestWebApplicationFactory _factory;
-
-    private static readonly string[] AdminRoles = { "Admin" };
-    private static readonly string[] CustomerRoles = { "customer" };
-
-    public IntegrationScenarioTests(TestWebApplicationFactory factory)
+    [Collection("Database")]
+    public class IntegrationScenarioTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
     {
-        _factory = factory;
-        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
-    }
+        private readonly HttpClient _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
+        private readonly TestWebApplicationFactory _factory = factory;
 
-    [Fact]
-    public async Task Scenario1_CustomerCreatesConfidentialOrder_AutoNDA()
-    {
-        // Arrange - This test will FAIL until full implementation is complete
-        // Customer creates confidential 3D printing order
-        // System should auto-trigger NDA validation with Customer Service
-        var orderRequest = new
+        private static readonly string[] AdminRoles = ["Admin"];
+        private static readonly string[] CustomerRoles = ["customer"];
+
+        [Fact]
+        public async Task Scenario1_CustomerCreatesConfidentialOrder_AutoNDA()
         {
-            customerId = "CUST-12345",
-            customerType = "Customer",
-            serviceCategoryId = 1, // 3D Printing
-            processTypeId = 1, // FDM
-            isConfidential = true,
-            orderedQuantity = 5
-        };
+            // Arrange - This test will FAIL until full implementation is complete
+            // Customer creates confidential 3D printing order
+            // System should auto-trigger NDA validation with Customer Service
+            var orderRequest = new
+            {
+                customerId = "CUST-12345",
+                customerType = "Customer",
+                serviceCategoryId = 1, // 3D Printing
+                processTypeId = 1, // FDM
+                isConfidential = true,
+                orderedQuantity = 5
+            };
 
-        // Act
-        var response = await _client.PostAsJsonAsync("/order/v1/orders", orderRequest);
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders", orderRequest);
 
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var content = await response.Content.ReadAsStringAsync();
-        Assert.NotEmpty(content);
-        // Should verify NDA validation was called
-    }
+            // Assert
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.NotEmpty(content);
+            // Should verify NDA validation was called
+        }
 
-    [Fact]
-    public async Task Scenario2_EmployeeUpdatesStatus_WithDualNotes()
-    {
-        // Arrange - Create an order first
-        var createRequest = new
+        [Fact]
+        public async Task Scenario2_EmployeeUpdatesStatus_WithDualNotes()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - Create an order first
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        // Employee updates order status with both internal and customer notes
-        var statusRequest = new
+            // Employee updates order status with both internal and customer notes
+            var statusRequest = new
+            {
+                Status = "Reviewing",  // Fixed: proper case
+                InternalNotes = "Technical issues found with CAD file, contact customer",  // Fixed: proper case
+                CustomerNotes = "We're reviewing your order and will contact you shortly"  // Fixed: proper case
+            };
+
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", statusRequest);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            // Internal notes should be encrypted
+            // Customer notes should be visible to customer
+            // Status history should be recorded
+        }
+
+        [Fact]
+        public async Task Scenario3_BatchOperation_AllOrNothingRollback()
         {
-            Status = "Reviewing",  // Fixed: proper case
-            InternalNotes = "Technical issues found with CAD file, contact customer",  // Fixed: proper case
-            CustomerNotes = "We're reviewing your order and will contact you shortly"  // Fixed: proper case
-        };
+            // Arrange - This test will FAIL until batch operations with transactions are implemented
+            var batchRequest = new[]
+            {
+                new { orderId = "ORD-2025-00001", version = "ABC123", assignedEmployeeId = "EMP-001" },
+                new { orderId = "ORD-2025-00002", version = "INVALID", assignedEmployeeId = "EMP-002" }, // Invalid version
+                new { orderId = "ORD-2025-00003", version = "XYZ789", assignedEmployeeId = "EMP-003" }
+            };
 
-        // Act
-        var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", statusRequest);
+            // Act
+            HttpResponseMessage response = await _client.PutAsJsonAsync("/order/v1/orders/batch", batchRequest);
 
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        // Internal notes should be encrypted
-        // Customer notes should be visible to customer
-        // Status history should be recorded
-    }
+            // Assert
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            // All updates should be rolled back due to one failure
+            // Error should indicate which item failed (index 1)
+        }
 
-    [Fact]
-    public async Task Scenario3_BatchOperation_AllOrNothingRollback()
-    {
-        // Arrange - This test will FAIL until batch operations with transactions are implemented
-        var batchRequest = new[]
+        [Fact]
+        public async Task Scenario4_FileUpload_WithRetryAndSizeValidation()
         {
-            new { orderId = "ORD-2025-00001", version = "ABC123", assignedEmployeeId = "EMP-001" },
-            new { orderId = "ORD-2025-00002", version = "INVALID", assignedEmployeeId = "EMP-002" }, // Invalid version
-            new { orderId = "ORD-2025-00003", version = "XYZ789", assignedEmployeeId = "EMP-003" }
-        };
+            // Arrange - This test will FAIL until file upload with Upload Service integration is implemented
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(new byte[150 * 1024 * 1024]); // 150MB - exceeds 100MB limit
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Add(fileContent, "file", "large-file.stl");
+            content.Add(new StringContent("Input"), "fileRole");
+            content.Add(new StringContent("CAD"), "fileCategory");
 
-        // Act
-        var response = await _client.PutAsJsonAsync("/order/v1/orders/batch", batchRequest);
+            // Act
+            HttpResponseMessage response = await _client.PostAsync("/order/v1/orders/ORD-2025-00001/files", content);
 
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        // All updates should be rolled back due to one failure
-        // Error should indicate which item failed (index 1)
-    }
+            // Assert
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            // Should reject files exceeding 100MB limit
+            // Error message should indicate size limit
+        }
 
-    [Fact]
-    public async Task Scenario4_FileUpload_WithRetryAndSizeValidation()
-    {
-        // Arrange - This test will FAIL until file upload with Upload Service integration is implemented
-        using var content = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(new byte[150 * 1024 * 1024]); // 150MB - exceeds 100MB limit
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-        content.Add(fileContent, "file", "large-file.stl");
-        content.Add(new StringContent("Input"), "fileRole");
-        content.Add(new StringContent("CAD"), "fileCategory");
-
-        // Act
-        var response = await _client.PostAsync("/order/v1/orders/ORD-2025-00001/files", content);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        // Should reject files exceeding 100MB limit
-        // Error message should indicate size limit
-    }
-
-    [Fact]
-    public async Task Scenario5_OrderCancellation_WithPartialCharge()
-    {
-        // Arrange - Create an order first
-        var createRequest = new
+        [Fact]
+        public async Task Scenario5_OrderCancellation_WithPartialCharge()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - Create an order first
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        // Order in InProgress status should trigger partial charge calculation
-        var cancelRequest = new
+            // Order in InProgress status should trigger partial charge calculation
+            var cancelRequest = new
+            {
+                CancellationReason = "Customer changed requirements",  // Fixed: proper case
+                CustomerNotes = "We apologize for the cancellation"  // Fixed: proper case
+            };
+
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/cancel", cancelRequest);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            // Should calculate partial charge via Payment Service
+            // Should transition status to Cancelled
+            // Should trigger notification to customer
+        }
+
+        [Fact]
+        public async Task Scenario6_OptimisticConcurrency_ConflictHandling()
         {
-            CancellationReason = "Customer changed requirements",  // Fixed: proper case
-            CustomerNotes = "We apologize for the cancellation"  // Fixed: proper case
-        };
+            // NOTE: This test has a known limitation with in-memory database
+            // In-memory DB doesn't auto-update RowVersion like PostgreSQL, so concurrency conflicts
+            // cannot be properly tested. This test validates the workflow but may not catch conflicts.
+            // Full concurrency testing requires integration tests against real PostgreSQL.
 
-        // Act
-        var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/cancel", cancelRequest);
+            // Arrange - Create an order and get its version
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        // Should calculate partial charge via Payment Service
-        // Should transition status to Cancelled
-        // Should trigger notification to customer
-    }
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
+            var version = createdOrder.GetProperty("version").GetString();
 
-    [Fact]
-    public async Task Scenario6_OptimisticConcurrency_ConflictHandling()
-    {
-        // NOTE: This test has a known limitation with in-memory database
-        // In-memory DB doesn't auto-update RowVersion like PostgreSQL, so concurrency conflicts
-        // cannot be properly tested. This test validates the workflow but may not catch conflicts.
-        // Full concurrency testing requires integration tests against real PostgreSQL.
+            var updateRequest1 = new
+            {
+                version, // Current version
+                assignedEmployeeId = "EMP-001"
+            };
 
-        // Arrange - Create an order and get its version
-        var createRequest = new
+            // Act - First update
+            HttpResponseMessage response1 = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest1);
+            Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
+
+            // Get the updated version from response1
+            JsonElement updatedOrder1 = await response1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            _ = updatedOrder1.GetProperty("version").GetString();
+
+            // Second update with the OLD version (should conflict in real PostgreSQL)
+            var updateRequest2 = new
+            {
+                version, // OLD version - would cause conflict in PostgreSQL
+                assignedEmployeeId = "EMP-002"
+            };
+
+            HttpResponseMessage response2 = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest2);
+
+            // Assert - In-memory DB limitation: conflict detection doesn't work properly
+            // With real PostgreSQL, this would return 409 Conflict
+            // For now, we just verify the update completes (even though it shouldn't in production)
+            Assert.True(response2.StatusCode is HttpStatusCode.OK or HttpStatusCode.Conflict);
+        }
+
+        [Fact]
+        public async Task Scenario7_RBAC_ContextBasedAuthorization()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - Create an order for Customer 1
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
-        var version = createdOrder.GetProperty("version").GetString();
+            // Admin creates order for CUST-001
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        var updateRequest1 = new
+            // Act - Different customer tries to access the order
+            var additionalClaims = new Dictionary<string, string> { { "userType", "customer" } };
+            var hackerToken = _factory.CreateTestJwtToken("HACKER-001", CustomerRoles, additionalClaims);
+            HttpClient hackerClient = _factory.CreateClient();
+            hackerClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {hackerToken}");
+            HttpResponseMessage response = await hackerClient.GetAsync($"/order/v1/orders/{orderId}");
+
+            // Assert - Should be Forbidden
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Scenario8_MaterialCaching_With24HourTTL()
         {
-            version = version, // Current version
-            assignedEmployeeId = "EMP-001"
-        };
+            // Arrange - This test will FAIL until material caching is implemented
+            var orderRequest = new
+            {
+                customerId = "CUST-12345",
+                customerType = "Customer",
+                serviceCategoryId = 1,
+                processTypeId = 1,
+                materialId = 42
+            };
 
-        // Act - First update
-        var response1 = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest1);
-        Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
+            // Act
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", orderRequest);
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        // Get the updated version from response1
-        var updatedOrder1 = await response1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var newVersion = updatedOrder1.GetProperty("version").GetString();
+            HttpResponseMessage getResponse = await _client.GetAsync(createResponse.Headers.Location);
+            var content = await getResponse.Content.ReadAsStringAsync();
 
-        // Second update with the OLD version (should conflict in real PostgreSQL)
-        var updateRequest2 = new
-        {
-            version = version, // OLD version - would cause conflict in PostgreSQL
-            assignedEmployeeId = "EMP-002"
-        };
-
-        var response2 = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest2);
-
-        // Assert - In-memory DB limitation: conflict detection doesn't work properly
-        // With real PostgreSQL, this would return 409 Conflict
-        // For now, we just verify the update completes (even though it shouldn't in production)
-        Assert.True(response2.StatusCode == HttpStatusCode.OK || response2.StatusCode == HttpStatusCode.Conflict);
-    }
-
-    [Fact]
-    public async Task Scenario7_RBAC_ContextBasedAuthorization()
-    {
-        // Arrange - Create an order for Customer 1
-        var createRequest = new
-        {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
-
-        // Admin creates order for CUST-001
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
-
-        // Act - Different customer tries to access the order
-        var additionalClaims = new Dictionary<string, string> { { "userType", "customer" } };
-        var hackerToken = _factory.CreateTestJwtToken("HACKER-001", CustomerRoles, additionalClaims);
-        var hackerClient = _factory.CreateClient();
-        hackerClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {hackerToken}");
-        var response = await hackerClient.GetAsync($"/order/v1/orders/{orderId}");
-
-        // Assert - Should be Forbidden
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Scenario8_MaterialCaching_With24HourTTL()
-    {
-        // Arrange - This test will FAIL until material caching is implemented
-        var orderRequest = new
-        {
-            customerId = "CUST-12345",
-            customerType = "Customer",
-            serviceCategoryId = 1,
-            processTypeId = 1,
-            materialId = 42
-        };
-
-        // Act
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", orderRequest);
-        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
-
-        var getResponse = await _client.GetAsync(createResponse.Headers.Location);
-        var content = await getResponse.Content.ReadAsStringAsync();
-
-        // Assert
-        Assert.NotEmpty(content);
-        // materialName should be cached from Material Service
-        // materialCacheUpdatedAt should be set to current time
-        // Subsequent reads within 24 hours should use cached name
-        // After 24 hours, should refresh from Material Service
+            // Assert
+            Assert.NotEmpty(content);
+            // materialName should be cached from Material Service
+            // materialCacheUpdatedAt should be set to current time
+            // Subsequent reads within 24 hours should use cached name
+            // After 24 hours, should refresh from Material Service
+        }
     }
 }

@@ -1,92 +1,89 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.OrderService.Api.Authorization;
 
-namespace Maliev.OrderService.Tests.Contract;
-
-[Collection("Database")]
-public class BatchOrderEndpointTests : IClassFixture<TestWebApplicationFactory>
+namespace Maliev.OrderService.Tests.Contract
 {
-    private readonly HttpClient _client;
-
-    private static readonly string[] AdminRoles = { "Admin" };
-
-    public BatchOrderEndpointTests(TestWebApplicationFactory factory)
+    [Collection("Database")]
+    public class BatchOrderEndpointTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
     {
-        _client = factory.CreateAuthenticatedClient(
-            "test-admin",
-            AdminRoles,
-            permissions: OrderPermissions.All);
-    }
+        private readonly HttpClient _client = factory.CreateAuthenticatedClient(
+                "test-admin",
+                AdminRoles,
+                permissions: OrderPermissions.All);
 
-    [Fact]
-    public async Task POST_BatchOrders_Creates_Multiple_Orders()
-    {
-        // Arrange
-        var batchRequest = new[]
+        private static readonly string[] AdminRoles = ["Admin"];
+
+        [Fact]
+        public async Task POST_BatchOrders_Creates_Multiple_Orders()
         {
-            new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 },
-            new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 }
-        };
+            // Arrange
+            var batchRequest = new[]
+            {
+                new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 },
+                new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 }
+            };
 
-        // Act
-        var response = await _client.PostAsJsonAsync("/order/v1/orders/batch", batchRequest);
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders/batch", batchRequest);
 
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
+            // Assert
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
 
-    [Fact]
-    public async Task PUT_BatchOrders_Updates_Multiple_Orders()
-    {
-        // Arrange - Create 2 orders first
-        var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
-        var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
-
-        var createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
-        var createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId1 = createdOrder1.GetProperty("orderId").GetString();
-        var version1 = createdOrder1.GetProperty("version").GetString();
-
-        var createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
-        var createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId2 = createdOrder2.GetProperty("orderId").GetString();
-        var version2 = createdOrder2.GetProperty("version").GetString();
-
-        var batchRequest = new[]
+        [Fact]
+        public async Task PUT_BatchOrders_Updates_Multiple_Orders()
         {
-            new { orderId = orderId1, version = version1, assignedEmployeeId = "EMP-001" },
-            new { orderId = orderId2, version = version2, assignedEmployeeId = "EMP-002" }
-        };
+            // Arrange - Create 2 orders first
+            var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 
-        // Act
-        var response = await _client.PutAsJsonAsync("/order/v1/orders/batch", batchRequest);
+            HttpResponseMessage createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
+            JsonElement createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId1 = createdOrder1.GetProperty("orderId").GetString();
+            var version1 = createdOrder1.GetProperty("version").GetString();
 
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+            HttpResponseMessage createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
+            JsonElement createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId2 = createdOrder2.GetProperty("orderId").GetString();
+            var version2 = createdOrder2.GetProperty("version").GetString();
 
-    [Fact]
-    public async Task DELETE_BatchOrders_Cancels_Multiple_Orders()
-    {
-        // Arrange - Create 2 orders first
-        var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
-        var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
+            var batchRequest = new[]
+            {
+                new { orderId = orderId1, version = version1, assignedEmployeeId = "EMP-001" },
+                new { orderId = orderId2, version = version2, assignedEmployeeId = "EMP-002" }
+            };
 
-        var createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
-        var createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId1 = createdOrder1.GetProperty("orderId").GetString();
+            // Act
+            HttpResponseMessage response = await _client.PutAsJsonAsync("/order/v1/orders/batch", batchRequest);
 
-        var createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
-        var createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId2 = createdOrder2.GetProperty("orderId").GetString();
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
 
-        var orderIds = new[] { orderId1, orderId2 };
+        [Fact]
+        public async Task DELETE_BatchOrders_Cancels_Multiple_Orders()
+        {
+            // Arrange - Create 2 orders first
+            var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 
-        // Act
-        var response = await _client.PostAsJsonAsync("/order/v1/orders/batch/cancel", orderIds);
+            HttpResponseMessage createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
+            JsonElement createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId1 = createdOrder1.GetProperty("orderId").GetString();
 
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            HttpResponseMessage createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
+            JsonElement createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId2 = createdOrder2.GetProperty("orderId").GetString();
+
+            var orderIds = new[] { orderId1, orderId2 };
+
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders/batch/cancel", orderIds);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
     }
 }

@@ -1,127 +1,124 @@
 using Maliev.OrderService.Api.Authorization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
-namespace Maliev.OrderService.Tests.Contract;
-
-[Collection("Database")]
-public class FileEndpointTests : IClassFixture<TestWebApplicationFactory>
+namespace Maliev.OrderService.Tests.Contract
 {
-    private readonly HttpClient _client;
-
-    private static readonly string[] AdminRoles = { "Admin" };
-
-    public FileEndpointTests(TestWebApplicationFactory factory)
+    [Collection("Database")]
+    public class FileEndpointTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
     {
-        _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
-    }
+        private readonly HttpClient _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
 
-    [Fact]
-    public async Task GET_OrderFiles_Returns_FileList()
-    {
-        // Arrange - This test will FAIL until GET /orders/{orderId}/files endpoint is implemented
+        private static readonly string[] AdminRoles = ["Admin"];
 
-        // Act
-        var response = await _client.GetAsync("/order/v1/orders/ORD-2025-00001/files");
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task POST_OrderFile_Uploads_File()
-    {
-        // Arrange - Create an order first
-        var createRequest = new
+        [Fact]
+        public async Task GET_OrderFiles_Returns_FileList()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - This test will FAIL until GET /orders/{orderId}/files endpoint is implemented
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+            // Act
+            HttpResponseMessage response = await _client.GetAsync("/order/v1/orders/ORD-2025-00001/files");
 
-        using var content = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-        content.Add(fileContent, "file", "test.stl");
-        content.Add(new StringContent("Input"), "FileRole");  // Fixed: added required fields
-        content.Add(new StringContent("CAD"), "FileCategory");
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
 
-        // Act
-        var response = await _client.PostAsync($"/order/v1/orders/{orderId}/files", content);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GET_OrderFileById_Downloads_File()
-    {
-        // Arrange - Create order and upload file first
-        var createRequest = new
+        [Fact]
+        public async Task POST_OrderFile_Uploads_File()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - Create an order first
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        // Upload a file
-        using var uploadContent = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-        uploadContent.Add(fileContent, "file", "test.stl");
-        uploadContent.Add(new StringContent("Input"), "FileRole");
-        uploadContent.Add(new StringContent("CAD"), "FileCategory");
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent([1, 2, 3]);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Add(fileContent, "file", "test.stl");
+            content.Add(new StringContent("Input"), "FileRole");  // Fixed: added required fields
+            content.Add(new StringContent("CAD"), "FileCategory");
 
-        var uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
-        var uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var fileId = uploadedFile.GetProperty("fileId").GetInt64();
+            // Act
+            HttpResponseMessage response = await _client.PostAsync($"/order/v1/orders/{orderId}/files", content);
 
-        // Act
-        var response = await _client.GetAsync($"/order/v1/orders/{orderId}/files/{fileId}");
+            // Assert
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
 
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task DELETE_OrderFile_Deletes_File()
-    {
-        // Arrange - Create order and upload file first
-        var createRequest = new
+        [Fact]
+        public async Task GET_OrderFileById_Downloads_File()
         {
-            customerId = "CUST-001",
-            customerType = "Customer",
-            serviceCategoryId = 1
-        };
+            // Arrange - Create order and upload file first
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
 
-        var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-        var createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var orderId = createdOrder.GetProperty("orderId").GetString();
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
 
-        // Upload a file
-        using var uploadContent = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-        uploadContent.Add(fileContent, "file", "test.stl");
-        uploadContent.Add(new StringContent("Input"), "FileRole");
-        uploadContent.Add(new StringContent("CAD"), "FileCategory");
+            // Upload a file
+            using var uploadContent = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent([1, 2, 3]);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            uploadContent.Add(fileContent, "file", "test.stl");
+            uploadContent.Add(new StringContent("Input"), "FileRole");
+            uploadContent.Add(new StringContent("CAD"), "FileCategory");
 
-        var uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
-        var uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        var fileId = uploadedFile.GetProperty("fileId").GetInt64();
+            HttpResponseMessage uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
+            JsonElement uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var fileId = uploadedFile.GetProperty("fileId").GetInt64();
 
-        // Act
-        var response = await _client.DeleteAsync($"/order/v1/orders/{orderId}/files/{fileId}");
+            // Act
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/files/{fileId}");
 
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task DELETE_OrderFile_Deletes_File()
+        {
+            // Arrange - Create order and upload file first
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
+
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var orderId = createdOrder.GetProperty("orderId").GetString();
+
+            // Upload a file
+            using var uploadContent = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent([1, 2, 3]);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            uploadContent.Add(fileContent, "file", "test.stl");
+            uploadContent.Add(new StringContent("Input"), "FileRole");
+            uploadContent.Add(new StringContent("CAD"), "FileCategory");
+
+            HttpResponseMessage uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
+            JsonElement uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            var fileId = uploadedFile.GetProperty("fileId").GetInt64();
+
+            // Act
+            HttpResponseMessage response = await _client.DeleteAsync($"/order/v1/orders/{orderId}/files/{fileId}");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
     }
 }
