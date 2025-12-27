@@ -1,12 +1,13 @@
-namespace Maliev.OrderService.Api.DTOs.Response;
-
-/// <summary>
-/// Generic success message response.
-/// </summary>
-public class SuccessMessageResponse
+namespace Maliev.OrderService.Api.DTOs.Response
 {
     /// <summary>
-    /// Gets or sets the success message.
+    /// Generic success message response.
     /// </summary>
-    public required string Message { get; set; }
+    public class SuccessMessageResponse
+    {
+        /// <summary>
+        /// Gets or sets the success message.
+        /// </summary>
+        public required string Message { get; set; }
+    }
 }
