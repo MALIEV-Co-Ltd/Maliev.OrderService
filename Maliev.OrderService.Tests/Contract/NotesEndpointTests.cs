@@ -24,8 +24,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             // Act
             HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/notes");
@@ -46,8 +46,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             var noteRequest = new
             {

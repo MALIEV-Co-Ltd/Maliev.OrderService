@@ -39,7 +39,7 @@ namespace Maliev.OrderService.Api.Authorization
 
         private static bool IsValidPermissionFormat(string permission)
         {
-            var parts = permission.Split('.');
+            string[] parts = permission.Split('.');
             return parts.Length == 3 && parts[0] == "order";
         }
     }

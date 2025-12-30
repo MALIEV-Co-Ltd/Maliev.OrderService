@@ -74,7 +74,7 @@ namespace Maliev.OrderService.Api.Controllers
 
             try
             {
-                var updatedBy = User.GetUserId();
+                string updatedBy = User.GetUserId();
                 OrderStatusResponse status = await _statusService.CreateOrderStatusAsync(orderId, request, updatedBy, cancellationToken);
                 return CreatedAtRoute(new { orderId }, status);
             }

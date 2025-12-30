@@ -40,14 +40,14 @@ namespace Maliev.OrderService.Tests.Contract
             var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 
             HttpResponseMessage createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
-            JsonElement createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId1 = createdOrder1.GetProperty("orderId").GetString();
-            var version1 = createdOrder1.GetProperty("version").GetString();
+            JsonElement createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId1 = createdOrder1.GetProperty("orderId").GetString();
+            string? version1 = createdOrder1.GetProperty("version").GetString();
 
             HttpResponseMessage createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
-            JsonElement createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId2 = createdOrder2.GetProperty("orderId").GetString();
-            var version2 = createdOrder2.GetProperty("version").GetString();
+            JsonElement createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId2 = createdOrder2.GetProperty("orderId").GetString();
+            string? version2 = createdOrder2.GetProperty("version").GetString();
 
             var batchRequest = new[]
             {
@@ -70,14 +70,14 @@ namespace Maliev.OrderService.Tests.Contract
             var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 
             HttpResponseMessage createResponse1 = await _client.PostAsJsonAsync("/order/v1/orders", order1Request);
-            JsonElement createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId1 = createdOrder1.GetProperty("orderId").GetString();
+            JsonElement createdOrder1 = await createResponse1.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId1 = createdOrder1.GetProperty("orderId").GetString();
 
             HttpResponseMessage createResponse2 = await _client.PostAsJsonAsync("/order/v1/orders", order2Request);
-            JsonElement createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId2 = createdOrder2.GetProperty("orderId").GetString();
+            JsonElement createdOrder2 = await createResponse2.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId2 = createdOrder2.GetProperty("orderId").GetString();
 
-            var orderIds = new[] { orderId1, orderId2 };
+            string?[] orderIds = [orderId1, orderId2];
 
             // Act
             HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders/batch/cancel", orderIds);

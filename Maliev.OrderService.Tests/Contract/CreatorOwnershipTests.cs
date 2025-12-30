@@ -16,12 +16,12 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task Creator_CanReadOwnOrder()
         {
             // Arrange
-            var userId = "creator-001";
+            string userId = "creator-001";
             HttpClient client = _factory.CreateAuthenticatedClient(userId,
                 roles: CreatorRoles,
                 permissions: ReadPermissions);
 
-            var orderId = await CreateTestOrderAsync(userId);
+            string orderId = await CreateTestOrderAsync(userId);
 
             // Act
             HttpResponseMessage response = await client.GetAsync($"/order/v1/orders/{orderId}");
@@ -34,14 +34,14 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task Creator_CannotReadOthersOrder()
         {
             // Arrange
-            var creator1 = "creator-001";
-            var creator2 = "creator-002";
+            string creator1 = "creator-001";
+            string creator2 = "creator-002";
 
             HttpClient client = _factory.CreateAuthenticatedClient(creator1,
                 roles: CreatorRoles,
                 permissions: ReadPermissions);
 
-            var othersOrderId = await CreateTestOrderAsync(creator2);
+            string othersOrderId = await CreateTestOrderAsync(creator2);
 
             // Act
             HttpResponseMessage response = await client.GetAsync($"/order/v1/orders/{othersOrderId}");

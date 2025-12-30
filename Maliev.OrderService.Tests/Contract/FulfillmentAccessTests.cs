@@ -22,7 +22,7 @@ namespace Maliev.OrderService.Tests.Contract
                 roles: FulfillmentRoles,
                 permissions: FulfillmentPermissions);
 
-            var orderId = await CreateTestOrderAsync();
+            string orderId = await CreateTestOrderAsync();
 
             var request = new { Status = "Finished", InternalNotes = "Order completed" };
 
@@ -41,7 +41,7 @@ namespace Maliev.OrderService.Tests.Contract
                 roles: FulfillmentRoles,
                 permissions: UpdateOnlyPermissions); // Has update but not approve
 
-            var orderId = await CreateTestOrderAsync();
+            string orderId = await CreateTestOrderAsync();
 
             var request = new
             {

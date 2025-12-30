@@ -16,7 +16,7 @@ namespace Maliev.OrderService.Tests.Contract
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("manager-user",
-                permissions: new[] { OrderPermissions.OrdersCreate });
+                permissions: [OrderPermissions.OrdersCreate]);
 
             var request = new
             {
@@ -37,9 +37,9 @@ namespace Maliev.OrderService.Tests.Contract
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("manager-user",
-                permissions: new[] { OrderPermissions.OrdersRead }); // No delete permission
+                permissions: [OrderPermissions.OrdersRead]); // No delete permission
 
-            var orderId = await CreateTestOrderAsync();
+            string orderId = await CreateTestOrderAsync();
 
             // Act
             HttpResponseMessage response = await client.DeleteAsync($"/order/v1/orders/{orderId}");

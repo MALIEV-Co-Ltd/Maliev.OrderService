@@ -44,7 +44,7 @@ namespace Maliev.OrderService.Api.Authorization
             _cache = cache;
             _logger = logger;
 
-            var serviceName = configuration["Service:Name"] ?? "OrderService";
+            string serviceName = configuration["Service:Name"] ?? "OrderService";
             Meter meter = meterFactory.Create($"{serviceName.ToLowerInvariant()}-authorization-meter");
 
             _defaultTags =
@@ -69,8 +69,8 @@ namespace Maliev.OrderService.Api.Authorization
             AuthorizationHandlerContext context,
             PermissionRequirement requirement)
         {
-            var startTime = Stopwatch.GetTimestamp();
-            var userId = context.User.GetUserId();
+            long startTime = Stopwatch.GetTimestamp();
+            string userId = context.User.GetUserId();
 
             try
             {
@@ -115,7 +115,7 @@ namespace Maliev.OrderService.Api.Authorization
             }
             finally
             {
-                var duration = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
+                double duration = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
 
                 var tags = new TagList();
                 foreach (KeyValuePair<string, object?> tag in _defaultTags)
@@ -131,8 +131,8 @@ namespace Maliev.OrderService.Api.Authorization
 
         private async Task<IEnumerable<string>> GetUserPermissionsAsync(string userId)
         {
-            var cacheKey = $"user_permissions:{userId}";
-            var cachedData = await _cache.GetStringAsync(cacheKey);
+            string cacheKey = $"user_permissions:{userId}";
+            string? cachedData = await _cache.GetStringAsync(cacheKey);
 
             if (!string.IsNullOrEmpty(cachedData))
             {

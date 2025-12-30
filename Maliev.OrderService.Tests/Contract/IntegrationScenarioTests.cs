@@ -35,7 +35,7 @@ namespace Maliev.OrderService.Tests.Contract
 
             // Assert
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var content = await response.Content.ReadAsStringAsync();
+            string content = await response.Content.ReadAsStringAsync();
             Assert.NotEmpty(content);
             // Should verify NDA validation was called
         }
@@ -52,8 +52,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             // Employee updates order status with both internal and customer notes
             var statusRequest = new
@@ -125,8 +125,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             // Order in InProgress status should trigger partial charge calculation
             var cancelRequest = new
@@ -162,9 +162,9 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
-            var version = createdOrder.GetProperty("version").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
+            string? version = createdOrder.GetProperty("version").GetString();
 
             var updateRequest1 = new
             {
@@ -177,7 +177,7 @@ namespace Maliev.OrderService.Tests.Contract
             Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
 
             // Get the updated version from response1
-            JsonElement updatedOrder1 = await response1.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            JsonElement updatedOrder1 = await response1.Content.ReadFromJsonAsync<JsonElement>();
             _ = updatedOrder1.GetProperty("version").GetString();
 
             // Second update with the OLD version (should conflict in real PostgreSQL)
@@ -208,12 +208,12 @@ namespace Maliev.OrderService.Tests.Contract
 
             // Admin creates order for CUST-001
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             // Act - Different customer tries to access the order
             var additionalClaims = new Dictionary<string, string> { { "userType", "customer" } };
-            var hackerToken = _factory.CreateTestJwtToken("HACKER-001", CustomerRoles, additionalClaims);
+            string hackerToken = _factory.CreateTestJwtToken("HACKER-001", CustomerRoles, additionalClaims);
             HttpClient hackerClient = _factory.CreateClient();
             hackerClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {hackerToken}");
             HttpResponseMessage response = await hackerClient.GetAsync($"/order/v1/orders/{orderId}");
@@ -240,7 +240,7 @@ namespace Maliev.OrderService.Tests.Contract
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
             HttpResponseMessage getResponse = await _client.GetAsync(createResponse.Headers.Location);
-            var content = await getResponse.Content.ReadAsStringAsync();
+            string content = await getResponse.Content.ReadAsStringAsync();
 
             // Assert
             Assert.NotEmpty(content);

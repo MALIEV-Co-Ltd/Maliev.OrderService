@@ -21,9 +21,9 @@ namespace Maliev.OrderService.Api.Services.External
         /// <inheritdoc />
         public async Task<string?> GetMaterialNameAsync(int materialId, CancellationToken cancellationToken = default)
         {
-            var cacheKey = $"material_{materialId}";
+            string cacheKey = $"material_{materialId}";
 
-            if (_cache.TryGetValue<string>(cacheKey, out var cachedName))
+            if (_cache.TryGetValue<string>(cacheKey, out string? cachedName))
             {
                 return cachedName;
             }
@@ -52,9 +52,9 @@ namespace Maliev.OrderService.Api.Services.External
         /// <inheritdoc />
         public async Task<string?> GetColorNameAsync(int colorId, CancellationToken cancellationToken = default)
         {
-            var cacheKey = $"color_{colorId}";
+            string cacheKey = $"color_{colorId}";
 
-            if (_cache.TryGetValue<string>(cacheKey, out var cachedName))
+            if (_cache.TryGetValue<string>(cacheKey, out string? cachedName))
             {
                 return cachedName;
             }
@@ -83,9 +83,9 @@ namespace Maliev.OrderService.Api.Services.External
         /// <inheritdoc />
         public async Task<string?> GetSurfaceFinishingNameAsync(int surfaceFinishingId, CancellationToken cancellationToken = default)
         {
-            var cacheKey = $"surface_{surfaceFinishingId}";
+            string cacheKey = $"surface_{surfaceFinishingId}";
 
-            if (_cache.TryGetValue<string>(cacheKey, out var cachedName))
+            if (_cache.TryGetValue<string>(cacheKey, out string? cachedName))
             {
                 return cachedName;
             }

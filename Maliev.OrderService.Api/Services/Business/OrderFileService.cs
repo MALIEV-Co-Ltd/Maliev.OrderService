@@ -50,7 +50,7 @@ namespace Maliev.OrderService.Api.Services.Business
             Order? order = await _context.Orders.FindAsync([orderId], cancellationToken) ?? throw new InvalidOperationException($"Order {orderId} not found");
 
             // Upload to Upload Service
-            var objectPath = $"orders/{orderId}/files/{fileName}";
+            string objectPath = $"orders/{orderId}/files/{fileName}";
             UploadFileResult uploadResult = await _uploadService.UploadFileAsync(objectPath, fileStream, "application/octet-stream", cancellationToken);
 
             // Create file record

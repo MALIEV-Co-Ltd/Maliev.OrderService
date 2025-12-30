@@ -57,7 +57,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 query = query.Where(o => o.CustomerId == customerId);
             }
 
-            var totalCount = await query.CountAsync(cancellationToken);
+            int totalCount = await query.CountAsync(cancellationToken);
             List<Order> items = await query
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip((page - 1) * pageSize)
@@ -177,8 +177,8 @@ namespace Maliev.OrderService.Api.Services.Business
 
         private async Task<string> GenerateOrderIdAsync(CancellationToken cancellationToken)
         {
-            var year = DateTime.UtcNow.Year;
-            var prefix = $"ORD-{year}-";
+            int year = DateTime.UtcNow.Year;
+            string prefix = $"ORD-{year}-";
 
             Order? lastOrder = await _context.Orders
                 .Where(o => o.OrderId.StartsWith(prefix))
@@ -190,7 +190,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 return $"{prefix}00001";
             }
 
-            var lastNumber = int.Parse(lastOrder.OrderId.AsSpan(prefix.Length), CultureInfo.InvariantCulture);
+            int lastNumber = int.Parse(lastOrder.OrderId.AsSpan(prefix.Length), CultureInfo.InvariantCulture);
             return $"{prefix}{lastNumber + 1:D5}";
         }
 

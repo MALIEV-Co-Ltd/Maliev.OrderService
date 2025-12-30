@@ -75,7 +75,7 @@ namespace Maliev.OrderService.Api.Controllers
                 try
                 {
                     var results = new List<object>();
-                    var createdBy = User.GetUserId();
+                    string createdBy = User.GetUserId();
 
                     foreach (CreateOrderRequest request in requests)
                     {
@@ -142,7 +142,7 @@ namespace Maliev.OrderService.Api.Controllers
                 try
                 {
                     var results = new List<object>();
-                    var updatedBy = User.GetUserId();
+                    string updatedBy = User.GetUserId();
 
                     foreach (BatchUpdateOrderRequest request in requests)
                     {
@@ -209,12 +209,12 @@ namespace Maliev.OrderService.Api.Controllers
                 using IDbContextTransaction transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
-                    var cancelledBy = User.GetUserId();
+                    string cancelledBy = User.GetUserId();
                     var results = new List<object>();
 
-                    foreach (var orderId in orderIds)
+                    foreach (string orderId in orderIds)
                     {
-                        var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
+                        bool result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
                         if (!result)
                         {
                             await transaction.RollbackAsync(cancellationToken);

@@ -54,7 +54,7 @@ namespace Maliev.OrderService.Tests
             _rabbitmqConnectionString = _rabbitmqContainer.GetConnectionString();
 
             // Wait for Redis to be ready
-            using (ConnectionMultiplexer connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisConnectionString))
+            using (ConnectionMultiplexer connection = await ConnectionMultiplexer.ConnectAsync(_redisConnectionString))
             {
                 _ = await connection.GetDatabase().PingAsync();
             }

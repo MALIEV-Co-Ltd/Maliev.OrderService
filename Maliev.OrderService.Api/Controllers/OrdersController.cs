@@ -79,7 +79,7 @@ namespace Maliev.OrderService.Api.Controllers
             IEnumerable<string> roles = User.GetRoles();
             if (roles.Contains("roles.order.creator", StringComparer.OrdinalIgnoreCase))
             {
-                var userId = User.GetUserId();
+                string userId = User.GetUserId();
                 if (order.CustomerId != userId)
                 {
                     Log.UnauthorizedOrderAccess(_logger, userId, orderId);
@@ -105,7 +105,7 @@ namespace Maliev.OrderService.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            var createdBy = User.GetUserId();
+            string createdBy = User.GetUserId();
             OrderResponse order = await _orderService.CreateOrderAsync(request, createdBy, cancellationToken);
 
             return CreatedAtAction(nameof(GetOrderById), new { orderId = order.OrderId }, order);
@@ -135,7 +135,7 @@ namespace Maliev.OrderService.Api.Controllers
             {
                 if (!(await _authorizationService.AuthorizeAsync(User, "Permission:" + OrderPermissions.OrdersApprove)).Succeeded)
                 {
-                    var userId = User.GetUserId();
+                    string userId = User.GetUserId();
                     Log.UnauthorizedPricingUpdate(_logger, userId, orderId);
                     return Forbid();
                 }
@@ -143,7 +143,7 @@ namespace Maliev.OrderService.Api.Controllers
 
             try
             {
-                var updatedBy = User.GetUserId();
+                string updatedBy = User.GetUserId();
                 OrderResponse order = await _orderService.UpdateOrderAsync(orderId, request, updatedBy, cancellationToken);
                 return Ok(order);
             }
@@ -167,8 +167,8 @@ namespace Maliev.OrderService.Api.Controllers
         [RequirePermission(OrderPermissions.OrdersCancel)]
         public async Task<IActionResult> CancelOrder(string orderId, CancellationToken cancellationToken = default)
         {
-            var cancelledBy = User.GetUserId();
-            var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
+            string cancelledBy = User.GetUserId();
+            bool result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
 
             return !result
                 ? NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" })
@@ -189,8 +189,8 @@ namespace Maliev.OrderService.Api.Controllers
             [FromBody] CancelOrderRequest request,
             CancellationToken cancellationToken = default)
         {
-            var cancelledBy = User.GetUserId();
-            var result = await _orderService.CancelOrderAsync(orderId, cancelledBy, request.CancellationReason, cancellationToken);
+            string cancelledBy = User.GetUserId();
+            bool result = await _orderService.CancelOrderAsync(orderId, cancelledBy, request.CancellationReason, cancellationToken);
 
             return !result
                 ? NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" })

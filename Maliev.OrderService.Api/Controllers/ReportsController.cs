@@ -58,9 +58,9 @@ namespace Maliev.OrderService.Api.Controllers
         public FileStreamResult ExportReport(string reportType, [FromBody] ExportReportRequest request)
         {
             // Placeholder for export logic since IReportService is not yet implemented
-            var dummyData = System.Text.Encoding.UTF8.GetBytes($"Dummy {reportType} report in {request.Format} format");
+            byte[] dummyData = System.Text.Encoding.UTF8.GetBytes($"Dummy {reportType} report in {request.Format} format");
             var stream = new MemoryStream(dummyData);
-            var contentType = request.Format.Equals("csv", StringComparison.OrdinalIgnoreCase) ? "text/csv" : "application/pdf";
+            string contentType = request.Format.Equals("csv", StringComparison.OrdinalIgnoreCase) ? "text/csv" : "application/pdf";
             return File(stream, contentType, $"{reportType}.{request.Format.ToLowerInvariant()}");
         }
     }

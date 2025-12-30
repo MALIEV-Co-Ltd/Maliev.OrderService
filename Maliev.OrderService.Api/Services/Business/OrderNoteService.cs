@@ -39,7 +39,7 @@ namespace Maliev.OrderService.Api.Services.Business
             CancellationToken cancellationToken = default)
         {
             // Verify order exists
-            var orderExists = await _context.Orders.AnyAsync(o => o.OrderId == orderId, cancellationToken);
+            bool orderExists = await _context.Orders.AnyAsync(o => o.OrderId == orderId, cancellationToken);
             if (!orderExists)
             {
                 throw new InvalidOperationException($"Order {orderId} not found");

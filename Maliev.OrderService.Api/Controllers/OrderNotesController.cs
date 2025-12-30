@@ -47,7 +47,7 @@ namespace Maliev.OrderService.Api.Controllers
 
             try
             {
-                var createdBy = User.GetUserId();
+                string createdBy = User.GetUserId();
                 OrderNoteResponse note = await _noteService.CreateOrderNoteAsync(orderId, request, createdBy, cancellationToken);
                 return CreatedAtRoute(new { orderId }, note);
             }

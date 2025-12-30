@@ -22,7 +22,7 @@ namespace Maliev.OrderService.Tests.Contract
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var content = await response.Content.ReadAsStringAsync();
+            string content = await response.Content.ReadAsStringAsync();
             Assert.NotEmpty(content);
         }
 
@@ -44,7 +44,7 @@ namespace Maliev.OrderService.Tests.Contract
 
             // Assert
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var content = await response.Content.ReadAsStringAsync();
+            string content = await response.Content.ReadAsStringAsync();
             Assert.NotEmpty(content);
         }
 
@@ -62,15 +62,15 @@ namespace Maliev.OrderService.Tests.Contract
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString()!;
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string orderId = createdOrder.GetProperty("orderId").GetString()!;
 
             // Act
             HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}");
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var content = await response.Content.ReadAsStringAsync();
+            string content = await response.Content.ReadAsStringAsync();
             Assert.Contains(orderId, content);
         }
 
@@ -86,9 +86,9 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
-            var version = createdOrder.GetProperty("version").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
+            string? version = createdOrder.GetProperty("version").GetString();
 
             var updateRequest = new
             {
@@ -115,8 +115,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             // Act
             HttpResponseMessage response = await _client.DeleteAsync($"/order/v1/orders/{orderId}");
