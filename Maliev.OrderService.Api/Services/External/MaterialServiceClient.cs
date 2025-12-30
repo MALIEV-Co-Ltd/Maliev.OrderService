@@ -23,7 +23,7 @@ namespace Maliev.OrderService.Api.Services.External
         {
             string cacheKey = $"material_{materialId}";
 
-            if (_cache.TryGetValue<string>(cacheKey, out string? cachedName))
+            if (_cache.TryGetValue(cacheKey, out string? cachedName))
             {
                 return cachedName;
             }
@@ -54,7 +54,7 @@ namespace Maliev.OrderService.Api.Services.External
         {
             string cacheKey = $"color_{colorId}";
 
-            if (_cache.TryGetValue<string>(cacheKey, out string? cachedName))
+            if (_cache.TryGetValue(cacheKey, out string? cachedName))
             {
                 return cachedName;
             }
@@ -85,7 +85,7 @@ namespace Maliev.OrderService.Api.Services.External
         {
             string cacheKey = $"surface_{surfaceFinishingId}";
 
-            if (_cache.TryGetValue<string>(cacheKey, out string? cachedName))
+            if (_cache.TryGetValue(cacheKey, out string? cachedName))
             {
                 return cachedName;
             }
