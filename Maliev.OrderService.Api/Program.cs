@@ -98,19 +98,8 @@ builder.Services.AddRateLimiter(options =>
 WebApplication app = builder.Build();
 ILogger<Program> logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-// Run database migrations on startup (skip in Testing environment)
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    try
-    {
-        await app.MigrateDatabaseAsync<OrderDbContext>();
-    }
-    catch (Exception ex)
-    {
-        Log.MigrationFailed(logger, ex);
-        // Don't throw - allow app to start for debugging
-    }
-}
+// --- Database Migrations ---
+await app.MigrateDatabaseAsync<OrderDbContext>();
 
 // Middleware Pipeline
 app.UseStandardMiddleware();

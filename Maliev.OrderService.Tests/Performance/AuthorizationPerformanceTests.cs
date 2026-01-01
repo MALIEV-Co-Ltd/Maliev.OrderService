@@ -21,10 +21,10 @@ namespace Maliev.OrderService.Tests.Performance
         public async Task AuthorizationCheck_Latency_ShouldBeBelow50ms()
         {
             // Arrange
-            var userId = "test-user-perf";
-            var permission = OrderPermissions.OrdersRead;
+            string userId = "test-user-perf";
+            string permission = OrderPermissions.OrdersRead;
             var permissions = new List<string> { permission };
-            var cachedData = JsonSerializer.Serialize(permissions);
+            string cachedData = JsonSerializer.Serialize(permissions);
 
             var mockIamClient = new Mock<IIamServiceClient>();
             var mockCache = new Mock<IDistributedCache>();
@@ -46,13 +46,13 @@ namespace Maliev.OrderService.Tests.Performance
                 mockConfiguration.Object,
                 mockLogger.Object);
 
-            var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
-            {
+            var user = new ClaimsPrincipal(new ClaimsIdentity(
+            [
                 new Claim(ClaimTypes.NameIdentifier, userId)
-            }, "TestAuth"));
+            ], "TestAuth"));
 
             var requirement = new PermissionRequirement(permission);
-            var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
+            var context = new AuthorizationHandlerContext([requirement], user, null);
 
             // Warm up
             await handler.HandleAsync(context);
@@ -62,12 +62,12 @@ namespace Maliev.OrderService.Tests.Performance
             var sw = Stopwatch.StartNew();
             for (int i = 0; i < iterations; i++)
             {
-                var testContext = new AuthorizationHandlerContext(new[] { requirement }, user, null);
+                var testContext = new AuthorizationHandlerContext([requirement], user, null);
                 await handler.HandleAsync(testContext);
             }
             sw.Stop();
 
-            var averageLatency = sw.Elapsed.TotalMilliseconds / iterations;
+            double averageLatency = sw.Elapsed.TotalMilliseconds / iterations;
             _output.WriteLine($"Average Authorization Latency (Warm Cache): {averageLatency:F4} ms");
 
             // Assert

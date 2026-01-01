@@ -36,8 +36,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             using var content = new MultipartFormDataContent();
             var fileContent = new ByteArrayContent([1, 2, 3]);
@@ -65,8 +65,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             // Upload a file
             using var uploadContent = new MultipartFormDataContent();
@@ -77,8 +77,8 @@ namespace Maliev.OrderService.Tests.Contract
             uploadContent.Add(new StringContent("CAD"), "FileCategory");
 
             HttpResponseMessage uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
-            JsonElement uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var fileId = uploadedFile.GetProperty("fileId").GetInt64();
+            JsonElement uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>();
+            long fileId = uploadedFile.GetProperty("fileId").GetInt64();
 
             // Act
             HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/files/{fileId}");
@@ -99,8 +99,8 @@ namespace Maliev.OrderService.Tests.Contract
             };
 
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var orderId = createdOrder.GetProperty("orderId").GetString();
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
 
             // Upload a file
             using var uploadContent = new MultipartFormDataContent();
@@ -111,8 +111,8 @@ namespace Maliev.OrderService.Tests.Contract
             uploadContent.Add(new StringContent("CAD"), "FileCategory");
 
             HttpResponseMessage uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", uploadContent);
-            JsonElement uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-            var fileId = uploadedFile.GetProperty("fileId").GetInt64();
+            JsonElement uploadedFile = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>();
+            long fileId = uploadedFile.GetProperty("fileId").GetInt64();
 
             // Act
             HttpResponseMessage response = await _client.DeleteAsync($"/order/v1/orders/{orderId}/files/{fileId}");

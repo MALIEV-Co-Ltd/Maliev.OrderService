@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
+using System.Diagnostics.CodeAnalysis;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
@@ -53,11 +54,11 @@ namespace Maliev.OrderService.Tests.Testing
                 .Build();
 
             _redisContainer = new RedisBuilder()
-                .WithImage("redis:7-alpine")
+                .WithImage("redis:8.4-alpine")
                 .Build();
 
             _rabbitmqContainer = new RabbitMqBuilder()
-                .WithImage("rabbitmq:4.2.1-alpine")
+                .WithImage("rabbitmq:4.2-alpine")
                 .Build();
 
             _testRsa = RSA.Create(2048);
@@ -87,7 +88,7 @@ namespace Maliev.OrderService.Tests.Testing
             Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", _rabbitmqContainer.GetConnectionString());
 
             // Wait for Redis to be ready
-            using (ConnectionMultiplexer connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
+            using (ConnectionMultiplexer connection = await ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
             {
                 _ = await connection.GetDatabase().PingAsync();
             }
@@ -223,7 +224,7 @@ namespace Maliev.OrderService.Tests.Testing
                 var mockIamClient = new Mock<IIamServiceClient>();
                 _ = mockIamClient.Setup(x => x.GetUserPermissionsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync((string userId, CancellationToken _) =>
-                        _userPermissions.TryGetValue(userId, out IEnumerable<string>? perms) ? perms : Enumerable.Empty<string>());
+                        _userPermissions.TryGetValue(userId, out IEnumerable<string>? perms) ? perms : []);
 
                 _ = services.AddScoped(_ => mockIamClient.Object);
             });
@@ -260,7 +261,7 @@ namespace Maliev.OrderService.Tests.Testing
         /// </summary>
         public TDbContext CreateDbContext()
         {
-            var connectionString = _postgresContainer.GetConnectionString();
+            string connectionString = _postgresContainer.GetConnectionString();
             var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
             _ = optionsBuilder.UseNpgsql(connectionString);
             return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
@@ -279,6 +280,7 @@ namespace Maliev.OrderService.Tests.Testing
         /// Cleans all data from the database while preserving schema.
         /// Queries the database schema dynamically to get all tables.
         /// </summary>
+        [SuppressMessage("Security", "EF1002:Gaps in SQL queries", Justification = "Table names are retrieved from information_schema and are safe.")]
         public async Task CleanDatabaseAsync()
         {
             await using TDbContext context = CreateDbContext();
@@ -295,13 +297,11 @@ namespace Maliev.OrderService.Tests.Testing
                 .ToListAsync();
 
             // Truncate all tables (CASCADE handles foreign keys)
-            foreach (var tableName in tableNames)
+            foreach (string tableName in tableNames)
             {
                 try
                 {
-#pragma warning disable EF1002
                     _ = await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
-#pragma warning restore EF1002
                 }
                 catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
                 {
@@ -371,7 +371,7 @@ namespace Maliev.OrderService.Tests.Testing
 
             if (roles != null)
             {
-                foreach (var role in roles)
+                foreach (string role in roles)
                 {
                     claims.Add(new Claim("role", role));
                 }
@@ -379,7 +379,7 @@ namespace Maliev.OrderService.Tests.Testing
 
             if (permissions != null)
             {
-                foreach (var permission in permissions)
+                foreach (string permission in permissions)
                 {
                     claims.Add(new Claim("permissions", permission));
                 }
@@ -418,7 +418,7 @@ namespace Maliev.OrderService.Tests.Testing
             string[]? roles = null,
             IEnumerable<string>? permissions = null)
         {
-            var token = CreateTestJwtToken(userId, roles, permissions: permissions);
+            string token = CreateTestJwtToken(userId, roles, permissions: permissions);
             HttpClient client = CreateClient();
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
             return client;

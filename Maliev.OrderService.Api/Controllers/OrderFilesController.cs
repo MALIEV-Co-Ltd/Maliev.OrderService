@@ -63,7 +63,7 @@ namespace Maliev.OrderService.Api.Controllers
 
             try
             {
-                var uploadedBy = User.GetUserId();
+                string uploadedBy = User.GetUserId();
                 await using Stream stream = file.OpenReadStream();
                 OrderFileResponse uploadedFile = await _fileService.UploadOrderFileAsync(
                     orderId,
@@ -114,7 +114,7 @@ namespace Maliev.OrderService.Api.Controllers
             long fileId,
             CancellationToken cancellationToken = default)
         {
-            var result = await _fileService.DeleteOrderFileAsync(orderId, fileId, cancellationToken);
+            bool result = await _fileService.DeleteOrderFileAsync(orderId, fileId, cancellationToken);
 
             if (!result)
             {

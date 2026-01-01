@@ -16,9 +16,9 @@ namespace Maliev.OrderService.Tests.Contract
         {
             // Arrange
             // Admin role should grant delete access
-            HttpClient client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles, permissions: new[] { OrderPermissions.OrdersCancel });
+            HttpClient client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles, permissions: [OrderPermissions.OrdersCancel]);
 
-            var orderId = await CreateTestOrderAsync();
+            string orderId = await CreateTestOrderAsync();
 
             // Act
             HttpResponseMessage response = await client.DeleteAsync($"/order/v1/orders/{orderId}");
