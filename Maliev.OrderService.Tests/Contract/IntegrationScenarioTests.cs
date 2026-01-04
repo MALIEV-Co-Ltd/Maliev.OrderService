@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace Maliev.OrderService.Tests.Contract
 {
     [Collection("Database")]
-    public class IntegrationScenarioTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
+    public class IntegrationScenarioTests(TestWebApplicationFactory factory)
     {
         private readonly HttpClient _client = factory.CreateAuthenticatedClient("test-admin", AdminRoles, OrderPermissions.All);
         private readonly TestWebApplicationFactory _factory = factory;

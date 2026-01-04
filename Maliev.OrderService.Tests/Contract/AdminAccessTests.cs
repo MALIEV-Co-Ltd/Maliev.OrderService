@@ -6,7 +6,7 @@ using Maliev.OrderService.Data.Models;
 namespace Maliev.OrderService.Tests.Contract
 {
     [Collection("Database")]
-    public class AdminAccessTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
+    public class AdminAccessTests(TestWebApplicationFactory factory)
     {
         private readonly TestWebApplicationFactory _factory = factory;
         private static readonly string[] AdminRoles = ["admin"];
