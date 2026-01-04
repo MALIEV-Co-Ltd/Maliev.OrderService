@@ -127,7 +127,7 @@ namespace Maliev.OrderService.Tests.Testing
         private string GetPublicKeyPemBase64()
         {
             // Export public key in PEM format
-            var pemString = _testRsa.ExportSubjectPublicKeyInfoPem();
+            string pemString = _testRsa.ExportSubjectPublicKeyInfoPem();
             // Base64 encode the PEM string as expected by ServiceDefaults
             return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(pemString));
         }
