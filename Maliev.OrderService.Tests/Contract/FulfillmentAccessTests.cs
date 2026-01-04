@@ -7,7 +7,7 @@ using Maliev.OrderService.Data.Models;
 namespace Maliev.OrderService.Tests.Contract
 {
     [Collection("Database")]
-    public class FulfillmentAccessTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
+    public class FulfillmentAccessTests(TestWebApplicationFactory factory)
     {
         private readonly TestWebApplicationFactory _factory = factory;
         private static readonly string[] FulfillmentRoles = ["roles.order.fulfillment"];

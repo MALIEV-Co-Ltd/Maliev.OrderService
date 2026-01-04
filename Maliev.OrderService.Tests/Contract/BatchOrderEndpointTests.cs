@@ -6,7 +6,7 @@ using Maliev.OrderService.Api.Authorization;
 namespace Maliev.OrderService.Tests.Contract
 {
     [Collection("Database")]
-    public class BatchOrderEndpointTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
+    public class BatchOrderEndpointTests(TestWebApplicationFactory factory)
     {
         private readonly TestWebApplicationFactory _factory = factory;
         private readonly HttpClient _client = factory.CreateAuthenticatedClient(

@@ -7,7 +7,7 @@ using Maliev.OrderService.Data.Models;
 namespace Maliev.OrderService.Tests.Contract
 {
     [Collection("Database")]
-    public class ManagerAccessTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
+    public class ManagerAccessTests(TestWebApplicationFactory factory)
     {
         private readonly TestWebApplicationFactory _factory = factory;
 

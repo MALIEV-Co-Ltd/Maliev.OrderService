@@ -6,7 +6,7 @@ using Maliev.OrderService.Data;
 namespace Maliev.OrderService.Tests.Contract
 {
     [Collection("Database")]
-    public class CreatorOwnershipTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
+    public class CreatorOwnershipTests(TestWebApplicationFactory factory)
     {
         private readonly TestWebApplicationFactory _factory = factory;
         private static readonly string[] ReadPermissions = [OrderPermissions.OrdersRead];
