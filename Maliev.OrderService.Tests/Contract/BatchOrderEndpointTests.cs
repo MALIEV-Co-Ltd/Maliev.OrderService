@@ -8,6 +8,7 @@ namespace Maliev.OrderService.Tests.Contract
     [Collection("Database")]
     public class BatchOrderEndpointTests(TestWebApplicationFactory factory) : IClassFixture<TestWebApplicationFactory>
     {
+        private readonly TestWebApplicationFactory _factory = factory;
         private readonly HttpClient _client = factory.CreateAuthenticatedClient(
                 "test-admin",
                 AdminRoles,
@@ -19,6 +20,7 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task POST_BatchOrders_Creates_Multiple_Orders()
         {
             // Arrange
+            await _factory.CleanDatabaseAsync();
             var batchRequest = new[]
             {
                 new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 },
@@ -36,6 +38,7 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task PUT_BatchOrders_Updates_Multiple_Orders()
         {
             // Arrange - Create 2 orders first
+            await _factory.CleanDatabaseAsync();
             var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
             var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 
@@ -66,6 +69,7 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task DELETE_BatchOrders_Cancels_Multiple_Orders()
         {
             // Arrange - Create 2 orders first
+            await _factory.CleanDatabaseAsync();
             var order1Request = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
             var order2Request = new { customerId = "CUST-002", customerType = "Customer", serviceCategoryId = 1 };
 

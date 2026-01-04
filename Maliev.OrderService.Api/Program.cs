@@ -1,5 +1,6 @@
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
+using Maliev.OrderService.Api.Consumers;
 using Maliev.Aspire.ServiceDefaults; // Added
 using Maliev.OrderService.Data;
 using Microsoft.AspNetCore.RateLimiting;
@@ -19,7 +20,11 @@ builder.AddStandardMiddleware(options =>
 builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
 
 builder.AddRedisDistributedCache(instanceName: "order:"); // Redis with in-memory fallback
-builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
+builder.AddMassTransitWithRabbitMq(cfg =>
+{
+    _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
+    _ = cfg.AddConsumer<FileDeletedEventConsumer>();
+}); // RabbitMQ message bus with consumers
 builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
 // --- API Configuration ---

@@ -79,10 +79,12 @@ namespace Maliev.OrderService.Api.Controllers
 
                     foreach (CreateOrderRequest request in requests)
                     {
-                        OrderResponse order = await _orderService.CreateOrderAsync(request, createdBy, cancellationToken);
+                        OrderResponse order = await _orderService.PrepareOrderForCreationAsync(request, createdBy, cancellationToken);
                         results.Add(order);
                     }
 
+                    // Save all changes in one go
+                    _ = await _context.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     return Created(Request.Path, new { Message = $"{requests.Length} orders created successfully", Results = results });
                 }

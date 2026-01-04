@@ -90,5 +90,15 @@ namespace Maliev.OrderService.Tests
 
             _ = context.SaveChanges();
         }
+
+        /// <summary>
+        /// Public method to reseed reference data after database reset.
+        /// Override ResetDatabaseAsync to reseed after truncating tables.
+        /// </summary>
+        public new async Task ResetDatabaseAsync()
+        {
+            await base.ResetDatabaseAsync();
+            SeedReferenceData();
+        }
     }
 }

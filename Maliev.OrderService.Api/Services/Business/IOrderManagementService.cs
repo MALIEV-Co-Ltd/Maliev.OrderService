@@ -37,6 +37,15 @@ namespace Maliev.OrderService.Api.Services.Business
         Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Prepares a new order for creation without saving (for batch operations)
+        /// </summary>
+        /// <param name="request">Order creation request</param>
+        /// <param name="createdBy">User who created the order</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>The prepared order (not yet saved)</returns>
+        Task<OrderResponse> PrepareOrderForCreationAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Updates an existing order
         /// </summary>
         /// <param name="orderId">The order ID</param>

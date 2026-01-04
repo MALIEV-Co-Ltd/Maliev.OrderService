@@ -118,20 +118,18 @@ namespace Maliev.OrderService.Tests.Testing
                 InitializeAsync().GetAwaiter().GetResult();
             }
 
-            // Set environment variables BEFORE host builder processes configuration
-            // Note: Connection strings are now injected via ConfigureAppConfiguration in ConfigureWebHost
-            // to ensure they are available during host building causing Program.cs to see them.
-
-
-            // Export RSA public key for JWT validation
-            RSAParameters rsaParams = _testRsa.ExportParameters(false);
-            Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_MODULUS", Convert.ToBase64String(rsaParams.Modulus!));
-            Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_EXPONENT", Convert.ToBase64String(rsaParams.Exponent!));
-
             // Allow derived classes to set additional environment variables
             ConfigureEnvironmentVariables();
 
             return base.CreateHost(builder);
+        }
+
+        private string GetPublicKeyPemBase64()
+        {
+            // Export public key in PEM format
+            var pemString = _testRsa.ExportSubjectPublicKeyInfoPem();
+            // Base64 encode the PEM string as expected by ServiceDefaults
+            return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(pemString));
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -147,7 +145,10 @@ namespace Maliev.OrderService.Tests.Testing
                 _ = config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["Service:Name"] = "OrderService",
-                    ["Service:Version"] = "1.0.0-test"
+                    ["Service:Version"] = "1.0.0-test",
+                    ["Jwt:Issuer"] = "test-issuer",
+                    ["Jwt:Audience"] = "test-audience",
+                    ["Jwt:PublicKey"] = GetPublicKeyPemBase64()
                 });
             });
 
@@ -202,12 +203,8 @@ namespace Maliev.OrderService.Tests.Testing
                     };
                 });
 
-                // Ensure MassTransit waits until started for tests to avoid race conditions
-                _ = services.Configure<MassTransitHostOptions>(options =>
-                {
-                    options.WaitUntilStarted = true;
-                    options.StartTimeout = TimeSpan.FromSeconds(30);
-                });
+                // Add MassTransit test harness for testing message publishing/consuming
+                _ = services.AddMassTransitTestHarness();
 
                 // Allow derived classes to add additional test services
                 ConfigureAdditionalServices(services);
