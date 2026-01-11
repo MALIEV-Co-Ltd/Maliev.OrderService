@@ -59,7 +59,6 @@ namespace Maliev.OrderService.Tests.Integration
 
             // Get the test harness
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -87,7 +86,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -111,7 +110,6 @@ namespace Maliev.OrderService.Tests.Integration
             Assert.NotNull(createdOrder);
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -145,7 +143,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -174,7 +172,6 @@ namespace Maliev.OrderService.Tests.Integration
                 new CreateOrderStatusRequest { Status = "Reviewed" });
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -207,7 +204,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -238,7 +235,6 @@ namespace Maliev.OrderService.Tests.Integration
                 new CreateOrderStatusRequest { Status = "Quoted" });
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -271,7 +267,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -294,7 +290,6 @@ namespace Maliev.OrderService.Tests.Integration
             Assert.NotNull(createdOrder);
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -327,7 +322,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -361,8 +356,11 @@ namespace Maliev.OrderService.Tests.Integration
             _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
                 new CreateOrderStatusRequest { Status = "Accepted" });
 
+            // Verify it's actually Accepted before proceeding
+            var history = await _client.GetFromJsonAsync<List<OrderStatusResponse>>($"/order/v1/orders/{createdOrder.OrderId}/statuses");
+            Assert.Contains(history!, s => s.Status == "Accepted");
+
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -395,11 +393,19 @@ namespace Maliev.OrderService.Tests.Integration
 
                 await harness.Bus.Publish(paymentCompletedEvent);
 
-                // Wait for consumer to process
-                Assert.True(await harness.Consumed.Any<PaymentCompletedEvent>(),
-                    "PaymentCompletedEvent should be consumed");
+                // Wait for consumer to process - check the specific consumer harness
+                var consumerHarness = harness.GetConsumerHarness<Maliev.OrderService.Api.Consumers.PaymentCompletedEventConsumer>();
+                bool consumed = await consumerHarness.Consumed.Any<PaymentCompletedEvent>(x => x.Context.Message.Payload.OrderNumber == createdOrder.OrderId);
+                
+                if (!consumed)
+                {
+                    // Fallback to general harness check if consumer harness failed
+                    consumed = await harness.Consumed.Any<PaymentCompletedEvent>();
+                }
 
-                // Give some time for async processing
+                Assert.True(consumed, $"PaymentCompletedEvent should be consumed. Expected OrderNumber: {createdOrder.OrderId}");
+
+                // Give a bit more time for DB write
                 await Task.Delay(500);
 
                 // Assert - Verify order status was updated to "Paid"
@@ -423,7 +429,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -456,7 +462,6 @@ namespace Maliev.OrderService.Tests.Integration
                 new CreateOrderStatusRequest { Status = "Accepted" });
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -489,7 +494,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -524,7 +529,6 @@ namespace Maliev.OrderService.Tests.Integration
                 new CreateOrderStatusRequest { Status = "Paid" });
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -557,7 +561,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
 
@@ -594,7 +598,6 @@ namespace Maliev.OrderService.Tests.Integration
                 new CreateOrderStatusRequest { Status = "InProgress" });
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
-            await harness.Start();
 
             try
             {
@@ -627,7 +630,7 @@ namespace Maliev.OrderService.Tests.Integration
             }
             finally
             {
-                await harness.Stop();
+                // No need to stop harness manually here
             }
         }
     }

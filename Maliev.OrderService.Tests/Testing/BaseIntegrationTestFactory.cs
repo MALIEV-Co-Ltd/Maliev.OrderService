@@ -148,7 +148,8 @@ namespace Maliev.OrderService.Tests.Testing
                     ["Service:Version"] = "1.0.0-test",
                     ["Jwt:Issuer"] = "test-issuer",
                     ["Jwt:Audience"] = "test-audience",
-                    ["Jwt:PublicKey"] = GetPublicKeyPemBase64()
+                    ["Jwt:PublicKey"] = GetPublicKeyPemBase64(),
+                    ["Jwt:SecurityKey"] = "test-secret-key-at-least-32-characters-long"
                 });
             });
 

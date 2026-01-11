@@ -46,12 +46,13 @@ namespace Maliev.OrderService.Data.Configurations
 
             _ = builder.Property(o => o.Requirements).HasColumnName("requirements").HasColumnType("text");
 
-            _ = builder.Property(o => o.Version)
-                .HasColumnName("version")
-                .IsRowVersion()
-                .HasDefaultValueSql("'\\x0000000000000000'::bytea")
+            // Map xmin as a system shadow property for optimistic concurrency
+            _ = builder.Property<uint>("xmin")
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
                 .ValueGeneratedOnAddOrUpdate()
-                .IsRequired();
+                .IsConcurrencyToken();
+
             _ = builder.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
             _ = builder.Property(o => o.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
             _ = builder.Property(o => o.CreatedBy).HasColumnName("created_by").HasMaxLength(50).IsRequired();

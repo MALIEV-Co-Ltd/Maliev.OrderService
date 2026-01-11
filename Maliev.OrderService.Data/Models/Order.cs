@@ -51,7 +51,6 @@ namespace Maliev.OrderService.Data.Models
         public string? Requirements { get; set; }
 
         // Audit Fields
-        public byte[] Version { get; set; } = null!; // RowVersion for optimistic concurrency
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public string CreatedBy { get; set; } = null!;

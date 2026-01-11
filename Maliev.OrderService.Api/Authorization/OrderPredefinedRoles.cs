@@ -1,5 +1,3 @@
-using Maliev.Aspire.ServiceDefaults.IAM;
-
 namespace Maliev.OrderService.Api.Authorization
 {
     /// <summary>
@@ -8,21 +6,26 @@ namespace Maliev.OrderService.Api.Authorization
     /// </summary>
     public static class OrderPredefinedRoles
     {
-        /// <summary>Full access to all order operations.</summary>
-        public static readonly RoleRegistration Admin = new()
-        {
-            RoleId = "roles.order.admin",
-            Description = "Full administrative access to all order operations",
-            PermissionIds = [.. OrderPermissions.All]
-        };
-
+        /// <summary>Full administrative access to all order operations.</summary>
+        public const string Admin = "roles.order.admin";
         /// <summary>Operational access to manage orders.</summary>
-        public static readonly RoleRegistration Manager = new()
+        public const string Manager = "roles.order.manager";
+        /// <summary>Can create and manage own orders.</summary>
+        public const string Creator = "roles.order.creator";
+        /// <summary>Read-only access to orders.</summary>
+        public const string Viewer = "roles.order.viewer";
+        /// <summary>Focused on processing and delivery.</summary>
+        public const string Fulfillment = "roles.order.fulfillment";
+
+        /// <summary>
+        /// Collection of all predefined roles for the Order Service.
+        /// </summary>
+        public static readonly IReadOnlyList<(string RoleId, string Description, string[] Permissions)> All = new List<(string, string, string[])>
         {
-            RoleId = "roles.order.manager",
-            Description = "Can create, update, approve, and fulfill orders",
-            PermissionIds =
-            [
+            (Admin, "Full administrative access to all order operations", OrderPermissions.All),
+
+            (Manager, "Can create, update, approve, and fulfill orders", new[]
+            {
                 OrderPermissions.OrdersCreate,
                 OrderPermissions.OrdersRead,
                 OrderPermissions.OrdersUpdate,
@@ -37,16 +40,10 @@ namespace Maliev.OrderService.Api.Authorization
                 OrderPermissions.ReportsSales,
                 OrderPermissions.ReportsAnalytics,
                 OrderPermissions.ReportsExport
-            ]
-        };
+            }),
 
-        /// <summary>Can create and manage own orders.</summary>
-        public static readonly RoleRegistration Creator = new()
-        {
-            RoleId = "roles.order.creator",
-            Description = "Can create and manage own orders",
-            PermissionIds =
-            [
+            (Creator, "Can create and manage own orders", new[]
+            {
                 OrderPermissions.OrdersCreate,
                 OrderPermissions.OrdersRead,
                 OrderPermissions.OrdersUpdate,
@@ -55,42 +52,22 @@ namespace Maliev.OrderService.Api.Authorization
                 OrderPermissions.LineItemsRead,
                 OrderPermissions.LineItemsUpdate,
                 OrderPermissions.LineItemsDelete
-            ]
-        };
+            }),
 
-        /// <summary>Read-only access to orders.</summary>
-        public static readonly RoleRegistration Viewer = new()
-        {
-            RoleId = "roles.order.viewer",
-            Description = "Read-only access to orders and sales reports",
-            PermissionIds =
-            [
+            (Viewer, "Read-only access to orders and sales reports", new[]
+            {
                 OrderPermissions.OrdersRead,
                 OrderPermissions.LineItemsRead,
                 OrderPermissions.ReportsSales
-            ]
-        };
+            }),
 
-        /// <summary>Focused on processing and delivery.</summary>
-        public static readonly RoleRegistration Fulfillment = new()
-        {
-            RoleId = "roles.order.fulfillment",
-            Description = "Can fulfill and cancel orders",
-            PermissionIds =
-            [
+            (Fulfillment, "Can fulfill and cancel orders", new[]
+            {
                 OrderPermissions.OrdersRead,
                 OrderPermissions.OrdersFulfill,
                 OrderPermissions.OrdersCancel,
                 OrderPermissions.LineItemsRead
-            ]
+            })
         };
-
-        /// <summary>
-        /// All predefined roles for the Order Service.
-        /// </summary>
-        public static readonly RoleRegistration[] All =
-        [
-            Admin, Manager, Creator, Viewer, Fulfillment
-        ];
     }
 }

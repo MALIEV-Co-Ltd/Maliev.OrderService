@@ -1,10 +1,13 @@
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
+using Maliev.OrderService.Api.Services;
 using Maliev.OrderService.Api.Consumers;
 using Maliev.Aspire.ServiceDefaults; // Added
 using Maliev.OrderService.Data;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using MassTransit;
+using Maliev.OrderService.Api.Extensions;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +27,15 @@ builder.AddMassTransitWithRabbitMq(cfg =>
 {
     _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
     _ = cfg.AddConsumer<FileDeletedEventConsumer>();
+
+    // TODO: Add MassTransit.EntityFrameworkCore package to enable Transactional Outbox
+    /*
+    _ = cfg.AddEntityFrameworkOutbox<OrderDbContext>(o =>
+    {
+        _ = o.UsePostgres();
+        _ = o.UseBusOutbox();
+    });
+    */
 }); // RabbitMQ message bus with consumers
 builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
@@ -63,6 +75,7 @@ builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>(
 
 // Business Services
 builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
+builder.Services.AddScoped<IOrderAuthorizationService, OrderAuthorizationService>();
 builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
 builder.Services.AddScoped<IOrderFileService, OrderFileService>();
 builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
@@ -70,24 +83,30 @@ builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
 // Rate Limiting Configuration
 builder.Services.AddRateLimiter(options =>
 {
-    // General endpoints: 100 requests per minute per IP
-    _ = options.AddFixedWindowLimiter("general", limiterOptions =>
-    {
-        limiterOptions.PermitLimit = 100;
-        limiterOptions.Window = TimeSpan.FromMinutes(1);
-        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiterOptions.QueueLimit = 10;
-    });
+    // General endpoints: 100 requests per minute partitioned by User
+    _ = options.AddPolicy("general", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.GetUserId() ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 10
+            }));
 
-    // Batch operations: 10 requests per minute per IP (more restrictive)
-    _ = options.AddSlidingWindowLimiter("batch", limiterOptions =>
-    {
-        limiterOptions.PermitLimit = 10;
-        limiterOptions.Window = TimeSpan.FromMinutes(1);
-        limiterOptions.SegmentsPerWindow = 6;
-        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiterOptions.QueueLimit = 2;
-    });
+    // Batch operations: 10 requests per minute partitioned by User
+    _ = options.AddPolicy("batch", httpContext =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: httpContext.User.GetUserId() ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 2
+            }));
 
     options.OnRejected = async (context, cancellationToken) =>
     {
@@ -100,6 +119,10 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
+// IAM Integration
+builder.AddIAMServiceClient("order");
+builder.Services.AddIAMRegistration<OrderIAMRegistrationService>("order");
+
 WebApplication app = builder.Build();
 ILogger<Program> logger = app.Services.GetRequiredService<ILogger<Program>>();
 
@@ -109,7 +132,10 @@ await app.MigrateDatabaseAsync<OrderDbContext>();
 // Middleware Pipeline
 app.UseStandardMiddleware();
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors();
 
 app.UseAuthentication();

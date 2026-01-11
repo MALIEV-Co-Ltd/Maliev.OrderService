@@ -27,6 +27,11 @@ namespace Maliev.OrderService.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Define sequence for OrderId generation
+            _ = modelBuilder.HasSequence<long>("order_id_seq")
+                .StartsAt(1)
+                .IncrementsBy(1);
+
             // Apply all configurations
             _ = modelBuilder.ApplyConfiguration(new OrderConfiguration());
             _ = modelBuilder.ApplyConfiguration(new OrderStatusConfiguration());
@@ -42,7 +47,7 @@ namespace Maliev.OrderService.Data
             _ = modelBuilder.ApplyConfiguration(new Order3DScanningAttributesConfiguration());
             _ = modelBuilder.ApplyConfiguration(new Order3DDesignAttributesConfiguration());
 
-            // Apply PostgreSQL snake_case naming convention globally
+            // Apply PostgreSQL snake_case naming convention globally to all tables and columns
             SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
         }
     }

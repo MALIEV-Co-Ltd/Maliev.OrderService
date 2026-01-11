@@ -1,3 +1,4 @@
+using System.Globalization;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Data.Models;
@@ -11,7 +12,7 @@ namespace Maliev.OrderService.Api.Mapping
     {
         // Order mappings
         /// <summary>Maps an Order domain model to an OrderResponse DTO</summary>
-        public static OrderResponse ToOrderResponse(this Order order)
+        public static OrderResponse ToOrderResponse(this Order order, uint? xmin = null)
         {
             return new OrderResponse
             {
@@ -47,7 +48,7 @@ namespace Maliev.OrderService.Api.Mapping
                 UpdatedAt = order.UpdatedAt,
                 CreatedBy = order.CreatedBy,
                 UpdatedBy = order.UpdatedBy,
-                Version = Convert.ToBase64String(order.Version),
+                Version = xmin?.ToString(CultureInfo.InvariantCulture) ?? "0",
                 PrintingAttributes = order.PrintingAttributes?.ToPrintingAttributesDto(),
                 CncAttributes = order.CncAttributes?.ToCncAttributesDto(),
                 SheetMetalAttributes = order.SheetMetalAttributes?.ToSheetMetalAttributesDto(),
@@ -154,11 +155,10 @@ namespace Maliev.OrderService.Api.Mapping
         {
             return new Order3DPrintingAttributesDto
             {
-                InfillPercentage = null, // Not in domain model
-                LayerHeight = null, // Not in domain model
-                SupportType = null, // Not in domain model
-                Color = null, // Not in domain model
-                Finish = null // Not in domain model
+                ThreadTapRequired = attributes.ThreadTapRequired,
+                InsertRequired = attributes.InsertRequired,
+                PartMarking = attributes.PartMarking,
+                PartAssemblyTestRequired = attributes.PartAssemblyTestRequired
             };
         }
 
@@ -167,9 +167,10 @@ namespace Maliev.OrderService.Api.Mapping
         {
             return new OrderCncMachiningAttributesDto
             {
+                TapRequired = attributes.TapRequired,
                 Tolerance = attributes.Tolerance,
-                SurfaceFinish = attributes.SurfaceRoughness,
-                ThreadType = null // Not in domain model
+                SurfaceRoughness = attributes.SurfaceRoughness,
+                InspectionType = attributes.InspectionType
             };
         }
 
@@ -178,10 +179,11 @@ namespace Maliev.OrderService.Api.Mapping
         {
             return new OrderSheetMetalAttributesDto
             {
-                SheetThickness = attributes.Thickness,
-                BendingMethod = null, // Not in domain model
-                WeldingType = attributes.WeldingRequired ? attributes.WeldingDetails : null,
-                CoatingType = null // Not in domain model
+                Thickness = attributes.Thickness,
+                WeldingRequired = attributes.WeldingRequired,
+                WeldingDetails = attributes.WeldingDetails,
+                Tolerance = attributes.Tolerance,
+                InspectionType = attributes.InspectionType
             };
         }
 
@@ -190,9 +192,10 @@ namespace Maliev.OrderService.Api.Mapping
         {
             return new Order3DScanningAttributesDto
             {
-                ScanResolution = attributes.RequiredAccuracy,
-                ScanFormat = attributes.OutputFileFormats,
-                ObjectSize = null // Not in domain model
+                RequiredAccuracy = attributes.RequiredAccuracy,
+                ScanLocation = attributes.ScanLocation,
+                OutputFileFormats = attributes.OutputFileFormats,
+                DeviationReportRequested = attributes.DeviationReportRequested
             };
         }
 
@@ -201,9 +204,10 @@ namespace Maliev.OrderService.Api.Mapping
         {
             return new Order3DDesignAttributesDto
             {
+                ComplexityLevel = attributes.ComplexityLevel,
+                Deliverables = attributes.Deliverables,
                 DesignSoftware = attributes.DesignSoftware,
-                FileFormat = null, // Not in domain model
-                DesignComplexity = attributes.ComplexityLevel
+                RevisionRounds = attributes.RevisionRounds
             };
         }
 

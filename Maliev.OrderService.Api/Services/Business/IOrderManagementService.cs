@@ -1,5 +1,6 @@
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
+using System.Security.Claims;
 
 namespace Maliev.OrderService.Api.Services.Business
 {
@@ -21,11 +22,12 @@ namespace Maliev.OrderService.Api.Services.Business
         /// </summary>
         /// <param name="page">Page number</param>
         /// <param name="pageSize">Page size</param>
+        /// <param name="user">The user requesting the list (for authorization)</param>
         /// <param name="customerId">Optional customer ID filter</param>
         /// <param name="status">Optional status filter</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Paginated list of orders</returns>
-        Task<PaginatedResponse<OrderResponse>> GetOrdersAsync(int page, int pageSize, string? customerId = null, string? status = null, CancellationToken cancellationToken = default);
+        Task<PaginatedResponse<OrderResponse>> GetOrdersAsync(int page, int pageSize, System.Security.Claims.ClaimsPrincipal user, string? customerId = null, string? status = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Creates a new order
@@ -42,8 +44,8 @@ namespace Maliev.OrderService.Api.Services.Business
         /// <param name="request">Order creation request</param>
         /// <param name="createdBy">User who created the order</param>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>The prepared order (not yet saved)</returns>
-        Task<OrderResponse> PrepareOrderForCreationAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default);
+        /// <returns>The prepared order entity (not yet saved)</returns>
+        Task<Maliev.OrderService.Data.Models.Order> PrepareOrderEntityForCreationAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Updates an existing order

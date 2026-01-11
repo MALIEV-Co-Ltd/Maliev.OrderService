@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
+using System.ComponentModel.DataAnnotations;
 
 using Maliev.OrderService.Api.Authorization;
 using Maliev.Aspire.ServiceDefaults.Authorization;
@@ -24,6 +25,7 @@ namespace Maliev.OrderService.Api.Controllers
     [EnableRateLimiting("general")]
     public partial class OrdersController(
         IOrderManagementService orderService,
+        IOrderAuthorizationService orderAuthService,
         IOrderStatusService statusService,
         IOrderFileService fileService,
         IOrderNoteService noteService,
@@ -31,6 +33,7 @@ namespace Maliev.OrderService.Api.Controllers
         ILogger<OrdersController> logger) : ControllerBase
     {
         private readonly IOrderManagementService _orderService = orderService;
+        private readonly IOrderAuthorizationService _orderAuthService = orderAuthService;
         private readonly IOrderStatusService _statusService = statusService;
         private readonly IOrderFileService _fileService = fileService;
         private readonly IOrderNoteService _noteService = noteService;
@@ -49,13 +52,13 @@ namespace Maliev.OrderService.Api.Controllers
         [HttpGet]
         [RequirePermission(OrderPermissions.OrdersRead)]
         public async Task<IActionResult> GetOrders(
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20,
+            [FromQuery, Range(1, int.MaxValue)] int page = 1,
+            [FromQuery, Range(1, 100)] int pageSize = 20,
             [FromQuery] string? customerId = null,
             [FromQuery] string? status = null,
             CancellationToken cancellationToken = default)
         {
-            PaginatedResponse<OrderResponse> result = await _orderService.GetOrdersAsync(page, pageSize, customerId, status, cancellationToken);
+            PaginatedResponse<OrderResponse> result = await _orderService.GetOrdersAsync(page, pageSize, User, customerId, status, cancellationToken);
             return Ok(result);
         }
 
@@ -75,16 +78,15 @@ namespace Maliev.OrderService.Api.Controllers
                 return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
             }
 
-            // Ownership Check: roles.order.creator can only view their own orders
-            IEnumerable<string> roles = User.GetRoles();
-            if (roles.Contains("roles.order.creator", StringComparer.OrdinalIgnoreCase))
+            // Data Isolation Check: delegate to auth service
+            if (!_orderAuthService.CanViewOrder(User, order))
             {
-                string userId = User.GetUserId();
-                if (order.CustomerId != userId)
+                if (_logger.IsEnabled(LogLevel.Warning))
                 {
+                    string userId = User.GetUserId();
                     Log.UnauthorizedOrderAccess(_logger, userId, orderId);
-                    return Forbid();
                 }
+                return Forbid();
             }
 
             return Ok(order);
@@ -135,8 +137,11 @@ namespace Maliev.OrderService.Api.Controllers
             {
                 if (!(await _authorizationService.AuthorizeAsync(User, "Permission:" + OrderPermissions.OrdersApprove)).Succeeded)
                 {
-                    string userId = User.GetUserId();
-                    Log.UnauthorizedPricingUpdate(_logger, userId, orderId);
+                    if (_logger.IsEnabled(LogLevel.Warning))
+                    {
+                        string userId = User.GetUserId();
+                        Log.UnauthorizedPricingUpdate(_logger, userId, orderId);
+                    }
                     return Forbid();
                 }
             }
@@ -149,7 +154,9 @@ namespace Maliev.OrderService.Api.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return NotFound(new ErrorMessageResponse { Message = ex.Message });
+                return ex.Message.Contains("version", StringComparison.OrdinalIgnoreCase)
+                    ? BadRequest(new ErrorMessageResponse { Message = ex.Message })
+                    : NotFound(new ErrorMessageResponse { Message = ex.Message });
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
             {

@@ -103,8 +103,9 @@ namespace Maliev.OrderService.Api.Services.Business
             file.DeletedAt = DateTime.UtcNow;
             _ = await _context.SaveChangesAsync(cancellationToken);
 
-            // Optionally delete from Upload Service (async, fire-and-forget)
-            _ = Task.Run(async () => await _uploadService.DeleteFileAsync(file.ObjectPath, cancellationToken), cancellationToken);
+            // Note: Hard deletion from GCS is typically handled by a background cleanup service 
+            // after the retention period (30 days) has passed.
+            // Explicit immediate deletion can be awaited if necessary, but we follow the soft-delete policy.
 
             return true;
         }
