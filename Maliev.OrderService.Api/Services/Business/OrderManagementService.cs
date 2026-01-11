@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Security.Claims;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Mapping;
@@ -18,14 +19,17 @@ namespace Maliev.OrderService.Api.Services.Business
     /// Initializes a new instance of the <see cref="OrderManagementService"/> class.
     /// </remarks>
     /// <param name="context">The database context</param>
+    /// <param name="authService">The order authorization service</param>
     /// <param name="logger">The logger instance</param>
     /// <param name="publishEndpoint">The MassTransit publish endpoint</param>
     public partial class OrderManagementService(
         OrderDbContext context,
+        IOrderAuthorizationService authService,
         ILogger<OrderManagementService> logger,
         IPublishEndpoint publishEndpoint) : IOrderManagementService
     {
         private readonly OrderDbContext _context = context;
+        private readonly IOrderAuthorizationService _authService = authService;
         private readonly ILogger<OrderManagementService> _logger = logger;
         private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
 
@@ -50,6 +54,7 @@ namespace Maliev.OrderService.Api.Services.Business
         public async Task<PaginatedResponse<OrderResponse>> GetOrdersAsync(
             int page,
             int pageSize,
+            System.Security.Claims.ClaimsPrincipal user,
             string? customerId = null,
             string? status = null,
             CancellationToken cancellationToken = default)
@@ -60,8 +65,18 @@ namespace Maliev.OrderService.Api.Services.Business
                 .Include(o => o.OrderStatuses)
                 .AsQueryable();
 
+            // Apply data isolation filter based on user roles
+            query = _authService.ApplyDataIsolationFilter(user, query);
+
             if (!string.IsNullOrEmpty(customerId))
-            {}
+            {
+                query = query.Where(o => o.CustomerId == customerId);
+            }
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(o => o.OrderStatuses.OrderByDescending(s => s.Timestamp).Select(s => s.Status).FirstOrDefault() == status);
+            }
 
             int totalCount = await query.CountAsync(cancellationToken);
             List<Order> items = await query

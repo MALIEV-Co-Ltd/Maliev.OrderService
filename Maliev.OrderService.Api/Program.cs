@@ -75,6 +75,7 @@ builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>(
 
 // Business Services
 builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
+builder.Services.AddScoped<IOrderAuthorizationService, OrderAuthorizationService>();
 builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
 builder.Services.AddScoped<IOrderFileService, OrderFileService>();
 builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
