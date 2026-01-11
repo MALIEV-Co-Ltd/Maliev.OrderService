@@ -1,90 +1,84 @@
 # Build results
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
-bld/
 [Bb]in/
 [Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+bld/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
 [Ll]og/
 [Ll]ogs/
 
-# Visual Studio
+# IDE files
 .vs/
+.vscode/
+.idea/
+*.swp
+*.swo
 *.user
 *.suo
 *.userosscache
+*.user.json
 *.sln.docstates
-.vscode/
-
-# ReSharper
+*.sln.iml
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
-# .NET
-project.lock.json
-project.fragment.lock.json
-artifacts/
-
-# NuGet
+# NuGet Packages
 *.nupkg
 *.snupkg
 **/packages/*
 !**/packages/build/
 *.nuget.propss
 *.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
 
-# Test Results
+# Environment & Secrets
+.env
+appsettings.Local.json
+appsettings.Testing.json
+
+# OS files
+.DS_Store
+Thumbs.db
+NUL
+
+# Temporary & Logs
+*.log
+*.bak
+*.sql
+build_errors.txt
+
+# Test Artifacts
 TestResults/
+[Tt]est[Rr]esult*/
 *.trx
 *.coverage
 *.coveragexml
+coverage/
+*test-output.txt
+*_error.txt
 
-# Migration artifacts (keep migrations but not temp files)
-**/Migrations/*.Designer.cs.bak
-
-# macOS
-.DS_Store
-
-# Rider
-.idea/
-
-# User-specific files
-*.rsuser
-*.user.json
-
+# Repository Specific
 .claude/settings.local.json
 .gemini/settings.local.json
-
-# Temporary/debug files
-*.bak
-*.log
-*.sql
-build_errors.txt
-docker-compose.test.yml
-docker-compose.dev.yml
-
-# OpenAPI exports
-*-openapi.json
-*-openapi-*.json
-
-# Temporary tracking docs
 *MIGRATION*.md
 *SUMMARY*.md
 *AUDIT*.md
 *.Improvements.md
-# Test Outputs
-*test-output.txt
-*_error.txt
+**/Migrations/*.Designer.cs.bak
 
+# OpenAPI & Documentation
+*-openapi.json
+*-openapi-*.json
 
-# Test Outputs
-*test-output.txt
-*_error.txt
-
-
-# Windows NUL device file (accidentally created by redirects)
-NUL
+# Enforced Rules (User Request)
+appsettings.Development.json
+docker-compose*.yml
+docker-compose.override.yml

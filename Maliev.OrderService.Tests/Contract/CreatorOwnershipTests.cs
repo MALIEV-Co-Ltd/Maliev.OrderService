@@ -61,7 +61,6 @@ namespace Maliev.OrderService.Tests.Contract
                 ServiceCategoryId = 1,
                 ProcessTypeId = 1,
                 CreatedAt = DateTime.UtcNow,
-                Version = Guid.NewGuid().ToByteArray(),
                 CreatedBy = "system",
                 UpdatedBy = "system"
             };

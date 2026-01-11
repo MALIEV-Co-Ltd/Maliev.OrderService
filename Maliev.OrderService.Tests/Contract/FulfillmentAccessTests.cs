@@ -22,7 +22,7 @@ namespace Maliev.OrderService.Tests.Contract
                 roles: FulfillmentRoles,
                 permissions: FulfillmentPermissions);
 
-            string orderId = await CreateTestOrderAsync();
+            string orderId = await CreateTestOrderAsync("InProgress");
 
             var request = new { Status = "Finished", InternalNotes = "Order completed" };
 
@@ -45,7 +45,7 @@ namespace Maliev.OrderService.Tests.Contract
 
             var request = new
             {
-                Version = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
+                Version = "1",
                 QuotedAmount = 1000.00m // Unauthorized field
             };
 
@@ -56,7 +56,7 @@ namespace Maliev.OrderService.Tests.Contract
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
 
-        private async Task<string> CreateTestOrderAsync()
+        private async Task<string> CreateTestOrderAsync(string initialStatus = "New")
         {
             using OrderDbContext context = _factory.CreateDbContext();
             var order = new Order
@@ -67,11 +67,19 @@ namespace Maliev.OrderService.Tests.Contract
                 ServiceCategoryId = 1,
                 ProcessTypeId = 1,
                 CreatedAt = DateTime.UtcNow,
-                Version = Guid.NewGuid().ToByteArray(),
                 CreatedBy = "system",
                 UpdatedBy = "system"
             };
             _ = context.Orders.Add(order);
+
+            _ = context.OrderStatuses.Add(new OrderStatus
+            {
+                OrderId = order.OrderId,
+                Status = initialStatus,
+                Timestamp = DateTime.UtcNow,
+                UpdatedBy = "system"
+            });
+
             _ = await context.SaveChangesAsync();
             return order.OrderId;
         }
