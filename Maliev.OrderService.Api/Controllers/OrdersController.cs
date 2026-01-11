@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
+using System.ComponentModel.DataAnnotations;
 
 using Maliev.OrderService.Api.Authorization;
 using Maliev.Aspire.ServiceDefaults.Authorization;
@@ -49,12 +50,23 @@ namespace Maliev.OrderService.Api.Controllers
         [HttpGet]
         [RequirePermission(OrderPermissions.OrdersRead)]
         public async Task<IActionResult> GetOrders(
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20,
+            [FromQuery, Range(1, int.MaxValue)] int page = 1,
+            [FromQuery, Range(1, 100)] int pageSize = 20,
             [FromQuery] string? customerId = null,
             [FromQuery] string? status = null,
             CancellationToken cancellationToken = default)
         {
+            // Enforcement: non-admin roles should only see their relevant data scope
+            // This would normally be handled in the service layer filtering, 
+            // but we ensure the parameters don't bypass security.
+            IEnumerable<string> roles = User.GetRoles();
+            string userId = User.GetUserId();
+
+            if (roles.Contains(OrderPredefinedRoles.Creator, StringComparer.OrdinalIgnoreCase) && !roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase))
+            {
+                customerId = userId; // Force customer to see only their own
+            }
+
             PaginatedResponse<OrderResponse> result = await _orderService.GetOrdersAsync(page, pageSize, customerId, status, cancellationToken);
             return Ok(result);
         }
@@ -75,12 +87,19 @@ namespace Maliev.OrderService.Api.Controllers
                 return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
             }
 
-            // Ownership Check: roles.order.creator can only view their own orders
+            // Data Isolation Check: roles.order.creator can only view their own orders, Employee only assigned
             IEnumerable<string> roles = User.GetRoles();
-            if (roles.Contains("roles.order.creator", StringComparer.OrdinalIgnoreCase))
+            string userId = User.GetUserId();
+
+            if (!roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) && !roles.Contains(OrderPredefinedRoles.Manager, StringComparer.OrdinalIgnoreCase))
             {
-                string userId = User.GetUserId();
-                if (order.CustomerId != userId)
+                if (roles.Contains(OrderPredefinedRoles.Creator, StringComparer.OrdinalIgnoreCase) && order.CustomerId != userId)
+                {
+                    Log.UnauthorizedOrderAccess(_logger, userId, orderId);
+                    return Forbid();
+                }
+
+                if (roles.Contains(OrderPredefinedRoles.Fulfillment, StringComparer.OrdinalIgnoreCase) && order.AssignedEmployeeId != userId)
                 {
                     Log.UnauthorizedOrderAccess(_logger, userId, orderId);
                     return Forbid();
@@ -149,7 +168,9 @@ namespace Maliev.OrderService.Api.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return NotFound(new ErrorMessageResponse { Message = ex.Message });
+                return ex.Message.Contains("version", StringComparison.OrdinalIgnoreCase)
+                    ? BadRequest(new ErrorMessageResponse { Message = ex.Message })
+                    : NotFound(new ErrorMessageResponse { Message = ex.Message });
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
             {

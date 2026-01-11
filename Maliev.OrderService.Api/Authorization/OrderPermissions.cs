@@ -43,13 +43,30 @@ namespace Maliev.OrderService.Api.Authorization
         public const string ReportsExport = "order.reports.export";
 
         /// <summary>
+        /// Collection of all defined order permissions with descriptions.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> AllWithDescriptions = new Dictionary<string, string>
+    {
+        { OrdersCreate, "Create new orders" },
+        { OrdersRead, "Read order details" },
+        { OrdersUpdate, "Update order information" },
+        { OrdersDelete, "Delete orders" },
+        { OrdersApprove, "Approve orders for production" },
+        { OrdersCancel, "Cancel orders" },
+        { OrdersFulfill, "Fulfill/complete orders" },
+        { OrdersExport, "Export order data" },
+        { LineItemsCreate, "Add items to an order" },
+        { LineItemsRead, "View item details" },
+        { LineItemsUpdate, "Modify item specifications" },
+        { LineItemsDelete, "Remove items from an order" },
+        { ReportsSales, "View sales performance reports" },
+        { ReportsAnalytics, "Access detailed order analytics" },
+        { ReportsExport, "Export report data" }
+    };
+
+        /// <summary>
         /// All permissions defined for the Order Service.
         /// </summary>
-        public static readonly string[] All =
-        [
-            OrdersCreate, OrdersRead, OrdersUpdate, OrdersDelete, OrdersApprove, OrdersCancel, OrdersFulfill, OrdersExport,
-            LineItemsCreate, LineItemsRead, LineItemsUpdate, LineItemsDelete,
-            ReportsSales, ReportsAnalytics, ReportsExport
-        ];
+        public static readonly string[] All = [.. AllWithDescriptions.Keys];
     }
 }

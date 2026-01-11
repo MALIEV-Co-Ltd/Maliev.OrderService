@@ -54,8 +54,9 @@ namespace Maliev.OrderService.Api.Consumers
                 // Order not found or invalid state transition
                 Log.FailedToUpdateOrderToPaidStatus(_logger, ex, payload.OrderId, ex.Message);
 
-                // Don't throw - this is expected if order is already paid or in wrong state
-                // The event has been processed, just couldn't apply the status change
+                // Re-throw to trigger retry/dead-letter. 
+                // Silently ignoring a payment completion event is a data integrity risk.
+                throw;
             }
             catch (Exception ex)
             {

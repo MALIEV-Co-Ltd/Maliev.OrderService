@@ -72,17 +72,16 @@ namespace Maliev.OrderService.Api.Authorization
             long startTime = Stopwatch.GetTimestamp();
             string userId = context.User.GetUserId();
 
+            var tags = new TagList();
+            foreach (KeyValuePair<string, object?> tag in _defaultTags)
+            {
+                tags.Add(tag);
+            }
+            tags.Add("permission", requirement.Permission);
+
             try
             {
                 IEnumerable<string> permissions = await GetUserPermissionsAsync(userId);
-
-                var tags = new TagList();
-                foreach (KeyValuePair<string, object?> tag in _defaultTags)
-                {
-                    tags.Add(tag);
-                }
-
-                tags.Add("permission", requirement.Permission);
 
                 if (permissions.Contains(requirement.Permission, StringComparer.OrdinalIgnoreCase))
                 {
@@ -102,13 +101,6 @@ namespace Maliev.OrderService.Api.Authorization
             {
                 Log.AuthorizationError(_logger, userId, requirement.Permission, ex);
 
-                var tags = new TagList();
-                foreach (KeyValuePair<string, object?> tag in _defaultTags)
-                {
-                    tags.Add(tag);
-                }
-
-                tags.Add("permission", requirement.Permission);
                 tags.Add("reason", "error");
                 _authFailureCounter.Add(1, tags);
                 // Fail-secure: context.Succeed is NOT called
@@ -116,15 +108,6 @@ namespace Maliev.OrderService.Api.Authorization
             finally
             {
                 double duration = Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
-
-                var tags = new TagList();
-                foreach (KeyValuePair<string, object?> tag in _defaultTags)
-                {
-                    tags.Add(tag);
-                }
-
-                tags.Add("permission", requirement.Permission);
-
                 _authCheckDuration.Record(duration, tags);
             }
         }
@@ -168,11 +151,8 @@ namespace Maliev.OrderService.Api.Authorization
             finally
             {
                 _ = semaphore.Release();
-                // Optional: clean up semaphore if no one else is waiting
-                if (semaphore.CurrentCount == 1)
-                {
-                    _ = _userSemaphores.TryRemove(userId, out _);
-                }
+                // DONT cleanup semaphore based on CurrentCount to avoid race condition with TryRemove.
+                // Semaphores are small; let them be handled by the ConcurrentDictionary or periodically cleaned.
             }
         }
 

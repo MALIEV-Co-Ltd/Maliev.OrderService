@@ -12,6 +12,8 @@ using Maliev.OrderService.Api.Authorization;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Api.Mapping;
 
 namespace Maliev.OrderService.Api.Controllers
 {
@@ -74,19 +76,23 @@ namespace Maliev.OrderService.Api.Controllers
                 using IDbContextTransaction transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
-                    var results = new List<object>();
+                    var orders = new List<Order>();
                     string createdBy = User.GetUserId();
 
                     foreach (CreateOrderRequest request in requests)
                     {
-                        OrderResponse order = await _orderService.PrepareOrderForCreationAsync(request, createdBy, cancellationToken);
-                        results.Add(order);
+                        Order order = await _orderService.PrepareOrderEntityForCreationAsync(request, createdBy, cancellationToken);
+                        orders.Add(order);
                     }
 
                     // Save all changes in one go
                     _ = await _context.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
-                    return Created(Request.Path, new { Message = $"{requests.Length} orders created successfully", Results = results });
+
+                    // Map results AFTER save to get correct xmin
+                    var results = orders.Select(o => o.ToOrderResponse(_context.Entry(o).Property<uint>("xmin").CurrentValue)).ToList();
+
+                    return Created(uri: (string?)null, new { Message = $"{requests.Length} orders created successfully", Results = results });
                 }
                 catch (Exception ex)
                 {
@@ -143,7 +149,7 @@ namespace Maliev.OrderService.Api.Controllers
                 using IDbContextTransaction transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
-                    var results = new List<object>();
+                    var results = new List<OrderResponse>();
                     string updatedBy = User.GetUserId();
 
                     foreach (BatchUpdateOrderRequest request in requests)
@@ -157,8 +163,8 @@ namespace Maliev.OrderService.Api.Controllers
                             DepartmentId = request.DepartmentId
                         };
 
-                        OrderResponse order = await _orderService.UpdateOrderAsync(request.OrderId, updateRequest, updatedBy, cancellationToken);
-                        results.Add(order);
+                        OrderResponse updatedOrderDto = await _orderService.UpdateOrderAsync(request.OrderId, updateRequest, updatedBy, cancellationToken);
+                        results.Add(updatedOrderDto);
                     }
 
                     await transaction.CommitAsync(cancellationToken);
