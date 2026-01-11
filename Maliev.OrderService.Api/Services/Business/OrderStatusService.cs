@@ -56,11 +56,8 @@ namespace Maliev.OrderService.Api.Services.Business
             CancellationToken cancellationToken = default)
         {
             // Verify order exists
-            bool orderExists = await _context.Orders.AnyAsync(o => o.OrderId == orderId, cancellationToken);
-            if (!orderExists)
-            {
-                throw new InvalidOperationException($"Order {orderId} not found");
-            }
+            Order? order = await _context.Orders.FindAsync([orderId], cancellationToken)
+                ?? throw new InvalidOperationException($"Order {orderId} not found");
 
             // Get current status
             OrderStatus? currentStatus = await _context.OrderStatuses
@@ -68,10 +65,19 @@ namespace Maliev.OrderService.Api.Services.Business
                 .OrderByDescending(s => s.Timestamp)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            // Validate state transition (basic validation - full validation would check ValidTransitions)
-            if (currentStatus?.Status == request.Status)
+            var fromStatus = currentStatus != null
+                ? Enum.Parse<OrderStatusValue>(currentStatus.Status)
+                : OrderStatusValue.New;
+
+            if (!Enum.TryParse(request.Status, out OrderStatusValue toStatus))
             {
-                throw new InvalidOperationException($"Order is already in {request.Status} status");
+                throw new InvalidOperationException($"Invalid status value: {request.Status}");
+            }
+
+            // Full state machine validation
+            if (!IsValidTransition(fromStatus, toStatus))
+            {
+                throw new InvalidOperationException($"Invalid transition from {fromStatus} to {toStatus}");
             }
 
             var newStatus = request.ToOrderStatus();
@@ -80,22 +86,53 @@ namespace Maliev.OrderService.Api.Services.Business
             newStatus.Timestamp = DateTime.UtcNow;
 
             _ = _context.OrderStatuses.Add(newStatus);
-            _ = await _context.SaveChangesAsync(cancellationToken);
 
-            // Get order details for event publishing
-            Order? order = await _context.Orders.FindAsync([orderId], cancellationToken)
-                ?? throw new InvalidOperationException($"Order {orderId} not found after status update");
+            // Add Audit Log
+            _ = _context.AuditLogs.Add(new AuditLog
+            {
+                OrderId = orderId,
+                Action = "StatusChanged",
+                PerformedBy = updatedBy,
+                PerformedAt = DateTime.UtcNow,
+                EntityType = "OrderStatus",
+                EntityId = orderId,
+                ChangeDetails = System.Text.Json.JsonSerializer.Serialize(new { from = fromStatus.ToString(), to = toStatus.ToString(), notes = request.CustomerNotes })
+            });
 
-            // Publish status change events
+            // Publish status change events via Transactional Outbox (implicitly handled by SaveChanges if configured)
             await PublishStatusChangeEventsAsync(
                 order,
-                currentStatus?.Status,
-                request.Status,
+                fromStatus,
+                toStatus,
                 updatedBy,
                 request.InternalNotes,
                 cancellationToken);
 
+            _ = await _context.SaveChangesAsync(cancellationToken);
+
             return newStatus.ToOrderStatusResponse();
+        }
+
+        private static bool IsValidTransition(OrderStatusValue from, OrderStatusValue to)
+        {
+            if (from == to) return false;
+
+            return from switch
+            {
+                OrderStatusValue.New => to is OrderStatusValue.Reviewing or OrderStatusValue.Cancelled,
+                OrderStatusValue.Reviewing => to is OrderStatusValue.Rejected or OrderStatusValue.Reviewed or OrderStatusValue.Cancelled,
+                OrderStatusValue.Reviewed => to is OrderStatusValue.Quoted or OrderStatusValue.Cancelled,
+                OrderStatusValue.Quoted => to is OrderStatusValue.Declined or OrderStatusValue.Accepted or OrderStatusValue.Expired or OrderStatusValue.Cancelled,
+                OrderStatusValue.Accepted => to is OrderStatusValue.Paid or OrderStatusValue.POIssued or OrderStatusValue.Cancelled,
+                OrderStatusValue.Paid => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
+                OrderStatusValue.POIssued => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
+                OrderStatusValue.InProgress => to is OrderStatusValue.OnHold or OrderStatusValue.Finished or OrderStatusValue.Cancelled,
+                OrderStatusValue.OnHold => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
+                OrderStatusValue.Finished => to is OrderStatusValue.Shipped or OrderStatusValue.Reopen,
+                OrderStatusValue.Shipped => to is OrderStatusValue.Reopen,
+                OrderStatusValue.Reopen => to is OrderStatusValue.InProgress,
+                _ => false
+            };
         }
 
         /// <summary>
@@ -103,15 +140,15 @@ namespace Maliev.OrderService.Api.Services.Business
         /// </summary>
         private async Task PublishStatusChangeEventsAsync(
             Order order,
-            string? previousStatus,
-            string newStatus,
+            OrderStatusValue previousStatus,
+            OrderStatusValue newStatus,
             string changedBy,
             string? reason,
             CancellationToken cancellationToken)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            Guid orderId = StringToGuid(order.OrderId);
-            Guid customerId = StringToGuid(order.CustomerId);
+            Guid orderGuid = StringToGuid(order.OrderId);
+            Guid customerGuid = StringToGuid(order.CustomerId);
 
             // Always publish generic OrderStatusChangedEvent
             await _publishEndpoint.Publish(new OrderStatusChangedEvent(
@@ -126,10 +163,10 @@ namespace Maliev.OrderService.Api.Services.Business
                 OccurredAtUtc: now,
                 IsPublic: false,
                 Payload: new OrderStatusChangedEventPayload(
-                    OrderId: orderId,
+                    OrderId: orderGuid,
                     OrderNumber: order.OrderId,
-                    PreviousStatus: previousStatus ?? "None",
-                    NewStatus: newStatus,
+                    PreviousStatus: previousStatus.ToString(),
+                    NewStatus: newStatus.ToString(),
                     ChangedBy: StringToGuid(changedBy),
                     ChangedAt: now,
                     Reason: reason
@@ -139,18 +176,7 @@ namespace Maliev.OrderService.Api.Services.Business
             // Publish specific events based on new status
             switch (newStatus)
             {
-                case "Quoted":
-                    // Get payload requirements from schema
-                    var quotedPayload = new OrderQuotedEventPayload(
-                        OrderId: orderId,
-                        OrderNumber: order.OrderId,
-                        QuotedAmount: (double)(order.QuotedAmount ?? 0),
-                        Currency: order.QuoteCurrency ?? "THB",
-                        ValidUntil: now.AddDays(30),
-                        QuotedBy: StringToGuid(changedBy),
-                        QuotedAt: now
-                    );
-
+                case OrderStatusValue.Quoted:
                     await _publishEndpoint.Publish(new OrderQuotedEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderQuotedEvent",
@@ -162,11 +188,19 @@ namespace Maliev.OrderService.Api.Services.Business
                         CausationId: null,
                         OccurredAtUtc: now,
                         IsPublic: false,
-                        Payload: quotedPayload
+                        Payload: new OrderQuotedEventPayload(
+                            OrderId: orderGuid,
+                            OrderNumber: order.OrderId,
+                            QuotedAmount: (double)(order.QuotedAmount ?? 0),
+                            Currency: order.QuoteCurrency ?? "THB",
+                            ValidUntil: now.AddDays(30),
+                            QuotedBy: StringToGuid(changedBy),
+                            QuotedAt: now
+                        )
                     ), cancellationToken);
                     break;
 
-                case "Accepted":
+                case OrderStatusValue.Accepted:
                     await _publishEndpoint.Publish(new OrderAcceptedEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderAcceptedEvent",
@@ -179,9 +213,9 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderAcceptedEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
-                            CustomerId: customerId,
+                            CustomerId: customerGuid,
                             AcceptedAmount: (double)(order.QuotedAmount ?? 0),
                             Currency: order.QuoteCurrency ?? "THB",
                             AcceptedAt: now
@@ -189,7 +223,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     ), cancellationToken);
                     break;
 
-                case "Paid":
+                case OrderStatusValue.Paid:
                     await _publishEndpoint.Publish(new OrderPaidEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderPaidEvent",
@@ -202,7 +236,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderPaidEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             PaymentId: order.PaymentId != null ? StringToGuid(order.PaymentId) : Guid.Empty,
                             PaidAmount: (double)(order.QuotedAmount ?? 0),
@@ -212,7 +246,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     ), cancellationToken);
                     break;
 
-                case "InProgress":
+                case OrderStatusValue.InProgress:
                     await _publishEndpoint.Publish(new OrderInProgressEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderInProgressEvent",
@@ -225,7 +259,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderInProgressEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             StartedAt: now,
                             EstimatedCompletionDate: order.PromisedDeliveryDate != null
@@ -235,7 +269,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     ), cancellationToken);
                     break;
 
-                case "Finished":
+                case OrderStatusValue.Finished:
                     await _publishEndpoint.Publish(new OrderCompletedEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderCompletedEvent",
@@ -248,7 +282,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderCompletedEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             CompletedAt: now,
                             CompletedBy: StringToGuid(changedBy)
@@ -256,7 +290,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     ), cancellationToken);
                     break;
 
-                case "Shipped":
+                case OrderStatusValue.Shipped:
                     await _publishEndpoint.Publish(new OrderShippedEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderShippedEvent",
@@ -269,17 +303,17 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderShippedEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             ShippedAt: now,
-                            TrackingNumber: null, // TODO: Get from order tracking data
+                            TrackingNumber: null,
                             Carrier: null,
                             EstimatedDeliveryDate: null
                         )
                     ), cancellationToken);
                     break;
 
-                case "Cancelled":
+                case OrderStatusValue.Cancelled:
                     await _publishEndpoint.Publish(new OrderCancelledEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderCancelledEvent",
@@ -292,17 +326,17 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderCancelledEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             CancelledBy: StringToGuid(changedBy),
                             CancelledAt: now,
                             CancellationReason: reason ?? "Not specified",
-                            RefundRequired: previousStatus == "Paid" // Refund if already paid
+                            RefundRequired: previousStatus == OrderStatusValue.Paid
                         )
                     ), cancellationToken);
                     break;
 
-                case "Rejected":
+                case OrderStatusValue.Rejected:
                     await _publishEndpoint.Publish(new OrderRejectedEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderRejectedEvent",
@@ -315,7 +349,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderRejectedEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             RejectedBy: StringToGuid(changedBy),
                             RejectedAt: now,
@@ -324,7 +358,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     ), cancellationToken);
                     break;
 
-                case "OnHold":
+                case OrderStatusValue.OnHold:
                     await _publishEndpoint.Publish(new OrderOnHoldEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderOnHoldEvent",
@@ -337,7 +371,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderOnHoldEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             PutOnHoldBy: StringToGuid(changedBy),
                             PutOnHoldAt: now,
@@ -346,7 +380,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     ), cancellationToken);
                     break;
 
-                case "Reopened":
+                case OrderStatusValue.Reopen:
                     await _publishEndpoint.Publish(new OrderReopenedEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: "OrderReopenedEvent",
@@ -359,7 +393,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         OccurredAtUtc: now,
                         IsPublic: false,
                         Payload: new OrderReopenedEventPayload(
-                            OrderId: orderId,
+                            OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             ReopenedBy: StringToGuid(changedBy),
                             ReopenedAt: now,
@@ -371,7 +405,9 @@ namespace Maliev.OrderService.Api.Services.Business
                     break;
             }
 
-            Log.StatusChangeEventsPublished(_logger, order.OrderId, previousStatus, newStatus);
+            string prevStatusStr = previousStatus.ToString();
+            string newStatusStr = newStatus.ToString();
+            Log.StatusChangeEventsPublished(_logger, order.OrderId, prevStatusStr, newStatusStr);
         }
 
         /// <summary>
@@ -387,7 +423,7 @@ namespace Maliev.OrderService.Api.Services.Business
         private static partial class Log
         {
             [LoggerMessage(Level = LogLevel.Information, Message = "Published status change events for order {OrderId}: {PreviousStatus} → {NewStatus}")]
-            public static partial void StatusChangeEventsPublished(ILogger logger, string orderId, string? previousStatus, string newStatus);
+            public static partial void StatusChangeEventsPublished(ILogger logger, string orderId, string previousStatus, string newStatus);
         }
     }
 }

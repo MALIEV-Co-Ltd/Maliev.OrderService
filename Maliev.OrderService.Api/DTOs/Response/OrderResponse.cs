@@ -125,20 +125,17 @@ namespace Maliev.OrderService.Api.DTOs.Response
     /// </summary>
     public class Order3DPrintingAttributesDto
     {
-        /// <summary>Gets or sets the infill percentage</summary>
-        public string? InfillPercentage { get; set; }
+        /// <summary>Gets or sets if thread/tap is required</summary>
+        public bool ThreadTapRequired { get; set; }
 
-        /// <summary>Gets or sets the layer height</summary>
-        public string? LayerHeight { get; set; }
+        /// <summary>Gets or sets if inserts are required</summary>
+        public bool InsertRequired { get; set; }
 
-        /// <summary>Gets or sets the support type</summary>
-        public string? SupportType { get; set; }
+        /// <summary>Gets or sets the part marking text</summary>
+        public string? PartMarking { get; set; }
 
-        /// <summary>Gets or sets the color</summary>
-        public string? Color { get; set; }
-
-        /// <summary>Gets or sets the finish</summary>
-        public string? Finish { get; set; }
+        /// <summary>Gets or sets if assembly testing is required</summary>
+        public bool PartAssemblyTestRequired { get; set; }
     }
 
     /// <summary>
@@ -146,14 +143,20 @@ namespace Maliev.OrderService.Api.DTOs.Response
     /// </summary>
     public class OrderCncMachiningAttributesDto
     {
+        /// <summary>Gets or sets if tapping is required</summary>
+        public bool TapRequired { get; set; }
+
         /// <summary>Gets or sets the tolerance specification</summary>
         public string? Tolerance { get; set; }
 
         /// <summary>Gets or sets the surface finish requirement</summary>
         public string? SurfaceFinish { get; set; }
 
-        /// <summary>Gets or sets the thread type</summary>
-        public string? ThreadType { get; set; }
+        /// <summary>Gets or sets the surface roughness requirement</summary>
+        public string? SurfaceRoughness { get; set; }
+
+        /// <summary>Gets or sets the inspection type</summary>
+        public string? InspectionType { get; set; }
     }
 
     /// <summary>
@@ -162,16 +165,19 @@ namespace Maliev.OrderService.Api.DTOs.Response
     public class OrderSheetMetalAttributesDto
     {
         /// <summary>Gets or sets the sheet thickness</summary>
-        public string? SheetThickness { get; set; }
+        public string? Thickness { get; set; }
 
-        /// <summary>Gets or sets the bending method</summary>
-        public string? BendingMethod { get; set; }
+        /// <summary>Gets or sets if welding is required</summary>
+        public bool WeldingRequired { get; set; }
 
-        /// <summary>Gets or sets the welding type</summary>
-        public string? WeldingType { get; set; }
+        /// <summary>Gets or sets the welding details</summary>
+        public string? WeldingDetails { get; set; }
 
-        /// <summary>Gets or sets the coating type</summary>
-        public string? CoatingType { get; set; }
+        /// <summary>Gets or sets the tolerance specification</summary>
+        public string? Tolerance { get; set; }
+
+        /// <summary>Gets or sets the inspection type</summary>
+        public string? InspectionType { get; set; }
     }
 
     /// <summary>
@@ -179,14 +185,17 @@ namespace Maliev.OrderService.Api.DTOs.Response
     /// </summary>
     public class Order3DScanningAttributesDto
     {
-        /// <summary>Gets or sets the scan resolution</summary>
-        public string? ScanResolution { get; set; }
+        /// <summary>Gets or sets the required accuracy</summary>
+        public string? RequiredAccuracy { get; set; }
+
+        /// <summary>Gets or sets the scan location</summary>
+        public string? ScanLocation { get; set; }
 
         /// <summary>Gets or sets the scan output format</summary>
-        public string? ScanFormat { get; set; }
+        public string? OutputFileFormats { get; set; }
 
-        /// <summary>Gets or sets the object size</summary>
-        public string? ObjectSize { get; set; }
+        /// <summary>Gets or sets if deviation report is requested</summary>
+        public bool DeviationReportRequested { get; set; }
     }
 
     /// <summary>
@@ -197,10 +206,13 @@ namespace Maliev.OrderService.Api.DTOs.Response
         /// <summary>Gets or sets the design software used</summary>
         public string? DesignSoftware { get; set; }
 
-        /// <summary>Gets or sets the file format</summary>
-        public string? FileFormat { get; set; }
+        /// <summary>Gets or sets the deliverables</summary>
+        public string? Deliverables { get; set; }
 
         /// <summary>Gets or sets the design complexity level</summary>
-        public string? DesignComplexity { get; set; }
+        public string? ComplexityLevel { get; set; }
+
+        /// <summary>Gets or sets the revision rounds</summary>
+        public int RevisionRounds { get; set; }
     }
 }

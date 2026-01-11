@@ -11,47 +11,32 @@ namespace Maliev.OrderService.Api.Services
     /// Initializes a new instance of the <see cref="OrderIAMRegistrationService"/> class.
     /// </remarks>
     public class OrderIAMRegistrationService(
-        IHttpClientFactory httpClientFactory,
-        ILogger<OrderIAMRegistrationService> logger) : IAMRegistrationService(httpClientFactory, logger, "order")
+        IConfiguration configuration,
+        ILogger<OrderIAMRegistrationService> logger) : IAMRegistrationService(configuration, logger, "order")
     {
 
         /// <inheritdoc />
         protected override IEnumerable<PermissionRegistration> GetPermissions()
         {
-            return OrderPermissions.All.Select(p => new PermissionRegistration
+            return OrderPermissions.AllWithDescriptions.Select(p => new PermissionRegistration
             {
-                PermissionId = p,
-                Description = GetPermissionDescription(p)
+                PermissionId = p.Key,
+                Description = p.Value
             });
         }
 
         /// <inheritdoc />
         protected override IEnumerable<RoleRegistration> GetPredefinedRoles()
         {
-            return OrderPredefinedRoles.All;
-        }
-
-        private static string GetPermissionDescription(string permission)
-        {
-            return permission switch
+            return OrderPredefinedRoles.All.Select(r => new RoleRegistration
             {
-                OrderPermissions.OrdersCreate => "Create new orders",
-                OrderPermissions.OrdersRead => "Read order details",
-                OrderPermissions.OrdersUpdate => "Update order information",
-                OrderPermissions.OrdersDelete => "Delete orders",
-                OrderPermissions.OrdersApprove => "Approve orders for production",
-                OrderPermissions.OrdersCancel => "Cancel orders",
-                OrderPermissions.OrdersFulfill => "Fulfill/complete orders",
-                OrderPermissions.OrdersExport => "Export order data",
-                OrderPermissions.LineItemsCreate => "Add items to an order",
-                OrderPermissions.LineItemsRead => "View item details",
-                OrderPermissions.LineItemsUpdate => "Modify item specifications",
-                OrderPermissions.LineItemsDelete => "Remove items from an order",
-                OrderPermissions.ReportsSales => "View sales performance reports",
-                OrderPermissions.ReportsAnalytics => "Access detailed order analytics",
-                OrderPermissions.ReportsExport => "Export report data",
-                _ => $"Permission: {permission}"
-            };
+                RoleId = r.RoleId,
+                Description = r.Description,
+                PermissionIds = [.. r.Permissions],
+                IsCustom = false
+            });
         }
     }
 }
+
+

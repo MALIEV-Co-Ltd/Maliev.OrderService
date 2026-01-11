@@ -43,7 +43,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 .Include(o => o.DesignAttributes)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
 
-            return order?.ToOrderResponse();
+            return order?.ToOrderResponse(_context.Entry(order).Property<uint>("xmin").CurrentValue);
         }
 
         /// <inheritdoc />
@@ -61,9 +61,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(customerId))
-            {
-                query = query.Where(o => o.CustomerId == customerId);
-            }
+            {}
 
             int totalCount = await query.CountAsync(cancellationToken);
             List<Order> items = await query
@@ -74,7 +72,7 @@ namespace Maliev.OrderService.Api.Services.Business
 
             return new PaginatedResponse<OrderResponse>
             {
-                Items = [.. items.Select(o => o.ToOrderResponse())],
+                Items = [.. items.Select(o => o.ToOrderResponse(_context.Entry(o).Property<uint>("xmin").CurrentValue))],
                 Page = page,
                 PageSize = pageSize,
                 TotalCount = totalCount,
@@ -83,7 +81,45 @@ namespace Maliev.OrderService.Api.Services.Business
         }
 
         /// <inheritdoc />
-        public async Task<OrderResponse> PrepareOrderForCreationAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
+        public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
+        {
+            Order order = await PrepareOrderEntityForCreationAsync(request, createdBy, cancellationToken);
+            _ = await _context.SaveChangesAsync(cancellationToken);
+
+            // Now map to response with the REAL xmin from the DB
+            uint? xmin = _context.Entry(order).Property<uint>("xmin").CurrentValue;
+            var response = order.ToOrderResponse(xmin);
+
+            // Publish OrderCreatedEvent
+            await _publishEndpoint.Publish(new OrderCreatedEvent(
+                MessageId: Guid.NewGuid(),
+                MessageName: "OrderCreatedEvent",
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "OrderService",
+                ConsumedBy: OrderCreatedConsumers,
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new OrderCreatedEventPayload(
+                    OrderId: StringToGuid(response.OrderId),
+                    OrderNumber: response.OrderId,
+                    CustomerId: StringToGuid(response.CustomerId),
+                    TotalAmount: (double)(response.QuotedAmount ?? 0),
+                    Currency: response.QuoteCurrency ?? "THB",
+                    CreatedAt: new DateTimeOffset(response.CreatedAt, TimeSpan.Zero),
+                    AssignedEmployeeId: response.AssignedEmployeeId != null ? StringToGuid(response.AssignedEmployeeId) : null
+                )
+            ), cancellationToken);
+
+            Log.OrderCreatedEventPublished(_logger, response.OrderId);
+
+            return response;
+        }
+
+        /// <inheritdoc />
+        public async Task<Order> PrepareOrderEntityForCreationAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
         {
             var order = request.ToOrder();
             order.OrderId = await GenerateOrderIdAsync(cancellationToken);
@@ -91,7 +127,6 @@ namespace Maliev.OrderService.Api.Services.Business
             order.UpdatedBy = createdBy;
             order.CreatedAt = DateTime.UtcNow;
             order.UpdatedAt = DateTime.UtcNow;
-            order.Version = new byte[8]; // Initialize RowVersion for PostgreSQL
 
             _ = _context.Orders.Add(order);
 
@@ -104,63 +139,18 @@ namespace Maliev.OrderService.Api.Services.Business
             };
             _ = _context.OrderStatuses.Add(initialStatus);
 
-            // Don't save changes - caller will save in batch
-            return order.ToOrderResponse();
-        }
-
-        /// <inheritdoc />
-        public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
-        {
-            const int maxRetries = 3;
-            int retryCount = 0;
-
-            while (true)
+            // Add Audit Log
+            _ = _context.AuditLogs.Add(new AuditLog
             {
-                try
-                {
-                    OrderResponse order = await PrepareOrderForCreationAsync(request, createdBy, cancellationToken);
-                    _ = await _context.SaveChangesAsync(cancellationToken);
+                OrderId = order.OrderId,
+                Action = "OrderCreated",
+                PerformedBy = createdBy,
+                PerformedAt = DateTime.UtcNow,
+                EntityType = "Order",
+                EntityId = order.OrderId
+            });
 
-                    // Publish OrderCreatedEvent
-                    await _publishEndpoint.Publish(new OrderCreatedEvent(
-                        MessageId: Guid.NewGuid(),
-                        MessageName: "OrderCreatedEvent",
-                        MessageType: MessageType.Event,
-                        MessageVersion: "1.0.0",
-                        PublishedBy: "OrderService",
-                        ConsumedBy: OrderCreatedConsumers,
-                        CorrelationId: Guid.NewGuid(),
-                        CausationId: null,
-                        OccurredAtUtc: DateTimeOffset.UtcNow,
-                        IsPublic: false,
-                        Payload: new OrderCreatedEventPayload(
-                            OrderId: StringToGuid(order.OrderId),
-                            OrderNumber: order.OrderId,
-                            CustomerId: StringToGuid(order.CustomerId),
-                            TotalAmount: (double)(order.QuotedAmount ?? 0),
-                            Currency: order.QuoteCurrency ?? "THB",
-                            CreatedAt: new DateTimeOffset(order.CreatedAt, TimeSpan.Zero),
-                            AssignedEmployeeId: order.AssignedEmployeeId != null ? StringToGuid(order.AssignedEmployeeId) : null
-                        )
-                    ), cancellationToken);
-
-                    Log.OrderCreatedEventPublished(_logger, order.OrderId);
-
-                    return order;
-                }
-                catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" } && retryCount < maxRetries)
-                {
-                    // Unique constraint violation - likely a race condition in GenerateOrderIdAsync
-                    retryCount++;
-                    Log.RaceConditionDetected(_logger, retryCount, maxRetries);
-
-                    // Clear the tracker to avoid issues with the failed entity
-                    _context.ChangeTracker.Clear();
-
-                    // Small random delay to desynchronize
-                    await Task.Delay(Random.Shared.Next(10, 50), cancellationToken);
-                }
-            }
+            return order;
         }
 
         /// <inheritdoc />
@@ -168,29 +158,41 @@ namespace Maliev.OrderService.Api.Services.Business
         {
             Order? order = await _context.Orders.FindAsync([orderId], cancellationToken) ?? throw new InvalidOperationException($"Order {orderId} not found");
 
-            // Optimistic concurrency check
-            byte[] requestVersion;
-            try
+            // Optimistic concurrency check using xmin shadow property
+            if (!uint.TryParse(request.Version, out uint requestVersion))
             {
-                requestVersion = Convert.FromBase64String(request.Version);
-            }
-            catch (FormatException)
-            {
-                throw new InvalidOperationException($"Invalid version format for order {orderId}. Version must be a valid Base64 string.");
+                throw new InvalidOperationException($"Invalid version format for order {orderId}. Version must be a valid number.");
             }
 
-            if (!order.Version.SequenceEqual(requestVersion))
+            uint? currentVersion = _context.Entry(order).Property<uint>("xmin").CurrentValue;
+            if (currentVersion != requestVersion)
             {
                 throw new DbUpdateConcurrencyException("Order has been modified by another user");
             }
+
+            // Capture state for audit
+            string oldState = System.Text.Json.JsonSerializer.Serialize(order);
 
             order.UpdateOrder(request);
             order.UpdatedBy = updatedBy;
             order.UpdatedAt = DateTime.UtcNow;
 
+            // Add Audit Log
+            _ = _context.AuditLogs.Add(new AuditLog
+            {
+                OrderId = order.OrderId,
+                Action = "OrderUpdated",
+                PerformedBy = updatedBy,
+                PerformedAt = DateTime.UtcNow,
+                EntityType = "Order",
+                EntityId = order.OrderId,
+                ChangeDetails = System.Text.Json.JsonSerializer.Serialize(new { before = oldState })
+            });
+
             _ = await _context.SaveChangesAsync(cancellationToken);
 
-            return order.ToOrderResponse();
+            uint? xmin = _context.Entry(order).Property<uint>("xmin").CurrentValue;
+            return order.ToOrderResponse(xmin);
         }
 
         /// <inheritdoc />
@@ -212,6 +214,19 @@ namespace Maliev.OrderService.Api.Services.Business
             };
 
             _ = _context.OrderStatuses.Add(cancelStatus);
+
+            // Add Audit Log
+            _ = _context.AuditLogs.Add(new AuditLog
+            {
+                OrderId = orderId,
+                Action = "OrderCancelled",
+                PerformedBy = cancelledBy,
+                PerformedAt = DateTime.UtcNow,
+                EntityType = "Order",
+                EntityId = orderId,
+                ChangeDetails = System.Text.Json.JsonSerializer.Serialize(new { reason })
+            });
+
             _ = await _context.SaveChangesAsync(cancellationToken);
 
             return true;
@@ -222,33 +237,10 @@ namespace Maliev.OrderService.Api.Services.Business
             int year = DateTime.UtcNow.Year;
             string prefix = $"ORD-{year}-";
 
-            // Check both database AND ChangeTracker for the highest OrderId
-            Order? lastOrder = await _context.Orders
-                .Where(o => o.OrderId.StartsWith(prefix))
-                .OrderByDescending(o => o.OrderId)
-                .FirstOrDefaultAsync(cancellationToken);
+            // Use PostgreSQL sequence for atomic ID generation
+            long nextVal = await _context.Database.SqlQueryRaw<long>("SELECT nextval('order_id_seq') AS \"Value\"").SingleAsync(cancellationToken);
 
-            // Also check pending orders in ChangeTracker (for batch operations)
-            Order? pendingOrders = _context.ChangeTracker.Entries<Order>()
-                .Where(e => e.State == EntityState.Added && e.Entity.OrderId.StartsWith(prefix, StringComparison.Ordinal))
-                .Select(e => e.Entity)
-                .OrderByDescending(o => o.OrderId)
-                .FirstOrDefault();
-
-            // Use whichever is higher
-            string? highestOrderId = lastOrder?.OrderId;
-            if (pendingOrders != null && (highestOrderId == null || string.CompareOrdinal(pendingOrders.OrderId, highestOrderId) > 0))
-            {
-                highestOrderId = pendingOrders.OrderId;
-            }
-
-            if (highestOrderId == null)
-            {
-                return $"{prefix}00001";
-            }
-
-            int lastNumber = int.Parse(highestOrderId.AsSpan(prefix.Length), CultureInfo.InvariantCulture);
-            return $"{prefix}{lastNumber + 1:D5}";
+            return $"{prefix}{nextVal:D5}";
         }
 
         /// <summary>
