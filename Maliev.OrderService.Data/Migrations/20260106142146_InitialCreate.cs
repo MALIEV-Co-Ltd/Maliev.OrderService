@@ -1,8 +1,8 @@
-#pragma warning disable CA1861 // Avoid constant arrays as arguments
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
+#pragma warning disable CA1861 // Prefer static readonly arrays in migrations
 
 namespace Maliev.OrderService.Data.Migrations
 {
