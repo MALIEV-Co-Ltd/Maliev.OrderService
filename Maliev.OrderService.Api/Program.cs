@@ -1,5 +1,3 @@
-#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
-
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
 using Maliev.OrderService.Api.Services;
@@ -18,7 +16,7 @@ var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
-    bootstrapLogger.LogInformation("Starting Order Service host");
+    Program.Log.StartingHost(bootstrapLogger, "Order Service");
 
     WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -152,12 +150,12 @@ try
     // Map OpenAPI and Scalar documentation (dev/staging only)
     app.MapApiDocumentation(servicePrefix: "order");
 
-    logger.LogInformation("OrderService started successfully");
+    Program.Log.ServiceStarted(logger, "Order Service");
     await app.RunAsync();
 }
 catch (Exception ex)
 {
-    bootstrapLogger.LogCritical(ex, "Order Service host terminated unexpectedly during startup");
+    Program.Log.HostTerminated(bootstrapLogger, ex, "Order Service");
     throw;
 }
 finally
@@ -175,8 +173,14 @@ public partial class Program
     /// </summary>
     internal static partial class Log
     {
-        [LoggerMessage(Level = LogLevel.Information, Message = "OrderService started successfully")]
-        public static partial void ServiceStarted(ILogger logger);
+        [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+        public static partial void StartingHost(ILogger logger, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+        public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+        public static partial void ServiceStarted(ILogger logger, string serviceName);
 
         [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
         public static partial void MigrationFailed(ILogger logger, Exception exception);
