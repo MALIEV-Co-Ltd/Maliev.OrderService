@@ -16,7 +16,7 @@ var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
-    Program.Log.StartingHost(bootstrapLogger, "Order Service");
+    Log.StartingHost(bootstrapLogger, "Order Service");
 
     WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -150,12 +150,12 @@ try
     // Map OpenAPI and Scalar documentation (dev/staging only)
     app.MapApiDocumentation(servicePrefix: "order");
 
-    Program.Log.ServiceStarted(logger, "Order Service");
+    Log.ServiceStarted(logger, "Order Service");
     await app.RunAsync();
 }
 catch (Exception ex)
 {
-    Program.Log.HostTerminated(bootstrapLogger, ex, "Order Service");
+    Log.HostTerminated(bootstrapLogger, ex, "Order Service");
     throw;
 }
 finally
@@ -168,9 +168,6 @@ finally
 /// </summary>
 public partial class Program
 {
-    /// <summary>
-    /// High-performance logger message definitions for startup.
-    /// </summary>
     internal static partial class Log
     {
         [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
