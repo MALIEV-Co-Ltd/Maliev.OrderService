@@ -65,7 +65,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 .OrderByDescending(s => s.Timestamp)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var fromStatus = currentStatus != null
+            OrderStatusValue fromStatus = currentStatus != null
                 ? Enum.Parse<OrderStatusValue>(currentStatus.Status)
                 : OrderStatusValue.New;
 
@@ -115,24 +115,26 @@ namespace Maliev.OrderService.Api.Services.Business
 
         private static bool IsValidTransition(OrderStatusValue from, OrderStatusValue to)
         {
-            if (from == to) return false;
-
-            return from switch
-            {
-                OrderStatusValue.New => to is OrderStatusValue.Reviewing or OrderStatusValue.Cancelled,
-                OrderStatusValue.Reviewing => to is OrderStatusValue.Rejected or OrderStatusValue.Reviewed or OrderStatusValue.Cancelled,
-                OrderStatusValue.Reviewed => to is OrderStatusValue.Quoted or OrderStatusValue.Cancelled,
-                OrderStatusValue.Quoted => to is OrderStatusValue.Declined or OrderStatusValue.Accepted or OrderStatusValue.Expired or OrderStatusValue.Cancelled,
-                OrderStatusValue.Accepted => to is OrderStatusValue.Paid or OrderStatusValue.POIssued or OrderStatusValue.Cancelled,
-                OrderStatusValue.Paid => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
-                OrderStatusValue.POIssued => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
-                OrderStatusValue.InProgress => to is OrderStatusValue.OnHold or OrderStatusValue.Finished or OrderStatusValue.Cancelled,
-                OrderStatusValue.OnHold => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
-                OrderStatusValue.Finished => to is OrderStatusValue.Shipped or OrderStatusValue.Reopen,
-                OrderStatusValue.Shipped => to is OrderStatusValue.Reopen,
-                OrderStatusValue.Reopen => to is OrderStatusValue.InProgress,
-                _ => false
-            };
+            return from != to && from switch
+                {
+                    OrderStatusValue.New => to is OrderStatusValue.Reviewing or OrderStatusValue.Cancelled,
+                    OrderStatusValue.Reviewing => to is OrderStatusValue.Rejected or OrderStatusValue.Reviewed or OrderStatusValue.Cancelled,
+                    OrderStatusValue.Reviewed => to is OrderStatusValue.Quoted or OrderStatusValue.Cancelled,
+                    OrderStatusValue.Quoted => to is OrderStatusValue.Declined or OrderStatusValue.Accepted or OrderStatusValue.Expired or OrderStatusValue.Cancelled,
+                    OrderStatusValue.Accepted => to is OrderStatusValue.Paid or OrderStatusValue.POIssued or OrderStatusValue.Cancelled,
+                    OrderStatusValue.Paid => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
+                    OrderStatusValue.POIssued => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
+                    OrderStatusValue.InProgress => to is OrderStatusValue.OnHold or OrderStatusValue.Finished or OrderStatusValue.Cancelled,
+                    OrderStatusValue.OnHold => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
+                    OrderStatusValue.Finished => to is OrderStatusValue.Shipped or OrderStatusValue.Reopen,
+                    OrderStatusValue.Shipped => to is OrderStatusValue.Reopen,
+                    OrderStatusValue.Reopen => to is OrderStatusValue.InProgress,
+                    OrderStatusValue.Rejected => throw new NotImplementedException(),
+                    OrderStatusValue.Declined => throw new NotImplementedException(),
+                    OrderStatusValue.Expired => throw new NotImplementedException(),
+                    OrderStatusValue.Cancelled => throw new NotImplementedException(),
+                    _ => false
+                };
         }
 
         /// <summary>
@@ -400,6 +402,18 @@ namespace Maliev.OrderService.Api.Services.Business
                             ReopenReason: reason ?? "Not specified"
                         )
                     ), cancellationToken);
+                    break;
+                case OrderStatusValue.New:
+                    break;
+                case OrderStatusValue.Reviewing:
+                    break;
+                case OrderStatusValue.Reviewed:
+                    break;
+                case OrderStatusValue.Declined:
+                    break;
+                case OrderStatusValue.Expired:
+                    break;
+                case OrderStatusValue.POIssued:
                     break;
                 default:
                     break;

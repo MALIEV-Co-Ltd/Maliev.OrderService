@@ -1,6 +1,5 @@
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
-using System.Security.Claims;
 
 namespace Maliev.OrderService.Api.Services.Business
 {
@@ -45,7 +44,7 @@ namespace Maliev.OrderService.Api.Services.Business
         /// <param name="createdBy">User who created the order</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>The prepared order entity (not yet saved)</returns>
-        Task<Maliev.OrderService.Data.Models.Order> PrepareOrderEntityForCreationAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default);
+        Task<Data.Models.Order> PrepareOrderEntityForCreationAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Updates an existing order

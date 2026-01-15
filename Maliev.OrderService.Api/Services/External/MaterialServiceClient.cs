@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Caching.Distributed;
-using System.Text.Json;
 
 namespace Maliev.OrderService.Api.Services.External
 {
@@ -33,7 +32,10 @@ namespace Maliev.OrderService.Api.Services.External
             try
             {
                 HttpResponseMessage response = await _httpClient.GetAsync($"/api/v1/materials/{materialId}", cancellationToken);
-                if (!response.IsSuccessStatusCode) return null;
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
 
                 MaterialDto? material = await response.Content.ReadFromJsonAsync<MaterialDto>(cancellationToken: cancellationToken);
                 if (material != null)
@@ -65,7 +67,10 @@ namespace Maliev.OrderService.Api.Services.External
             try
             {
                 HttpResponseMessage response = await _httpClient.GetAsync($"/api/v1/colors/{colorId}", cancellationToken);
-                if (!response.IsSuccessStatusCode) return null;
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
 
                 ColorDto? color = await response.Content.ReadFromJsonAsync<ColorDto>(cancellationToken: cancellationToken);
                 if (color != null)
@@ -97,7 +102,10 @@ namespace Maliev.OrderService.Api.Services.External
             try
             {
                 HttpResponseMessage response = await _httpClient.GetAsync($"/api/v1/surface-finishings/{surfaceFinishingId}", cancellationToken);
-                if (!response.IsSuccessStatusCode) return null;
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
 
                 SurfaceFinishingDto? surface = await response.Content.ReadFromJsonAsync<SurfaceFinishingDto>(cancellationToken: cancellationToken);
                 if (surface != null)

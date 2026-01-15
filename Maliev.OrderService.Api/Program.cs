@@ -1,18 +1,15 @@
+using Maliev.Aspire.ServiceDefaults;
+using Maliev.OrderService.Api.Consumers;
+using Maliev.OrderService.Api.Extensions;
+using Maliev.OrderService.Api.Services;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
-using Maliev.OrderService.Api.Services;
-using Maliev.OrderService.Api.Consumers;
-using Maliev.Aspire.ServiceDefaults;
 using Maliev.OrderService.Data;
-using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Logging;
 using System.Threading.RateLimiting;
-using MassTransit;
-using Maliev.OrderService.Api.Extensions;
 
 // Initialize bootstrap logging
-using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
-var bootstrapLogger = loggerFactory.CreateLogger("Program");
+using ILoggerFactory loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
+ILogger bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
@@ -21,34 +18,34 @@ try
     WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
     // --- Secrets & Configuration ---
-    builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
+    _ = builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
 
     // --- Infrastructure & Observability ---
-    builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
-    builder.AddStandardMiddleware(options =>
+    _ = builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+    _ = builder.AddStandardMiddleware(options =>
     {
         options.EnableRequestLogging = true;
     });
-    builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
+    _ = builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
 
-    builder.AddRedisDistributedCache(instanceName: "order:"); // Redis with in-memory fallback
-    builder.AddMassTransitWithRabbitMq(cfg =>
+    _ = builder.AddRedisDistributedCache(instanceName: "order:"); // Redis with in-memory fallback
+    _ = builder.AddMassTransitWithRabbitMq(cfg =>
     {
         _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
         _ = cfg.AddConsumer<FileDeletedEventConsumer>();
     }); // RabbitMQ message bus with consumers
-    builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
+    _ = builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
     // --- API Configuration ---
-    builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
-    builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
+    _ = builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+    _ = builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
-    builder.AddJwtAuthentication();
-    builder.Services.AddPermissionAuthorization();
+    _ = builder.AddJwtAuthentication();
+    _ = builder.Services.AddPermissionAuthorization();
 
     // Add specific policies
-    builder.Services.AddAuthorizationBuilder()
+    _ = builder.Services.AddAuthorizationBuilder()
         .AddPolicy("Admin", policy =>
         {
             _ = policy.RequireAuthenticatedUser();
@@ -63,25 +60,25 @@ try
             description: "Sales order processing service. Manages order lifecycle from creation to fulfillment, batch order operations, status history tracking, file attachments, internal notes, and cancellation with reason tracking.");
     }
 
-    builder.Services.AddControllers();
+    _ = builder.Services.AddControllers();
     // External Service HttpClients with Standard Resilience Handler
-    builder.AddServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService");
-    builder.AddServiceClient<IMaterialServiceClient, MaterialServiceClient>("MaterialService");
-    builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
-    builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadService");
-    builder.AddServiceClient<IAuthServiceClient, AuthServiceClient>("AuthService");
-    builder.AddServiceClient<IEmployeeServiceClient, EmployeeServiceClient>("EmployeeService");
-    builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
+    _ = builder.AddServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService");
+    _ = builder.AddServiceClient<IMaterialServiceClient, MaterialServiceClient>("MaterialService");
+    _ = builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
+    _ = builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadService");
+    _ = builder.AddServiceClient<IAuthServiceClient, AuthServiceClient>("AuthService");
+    _ = builder.AddServiceClient<IEmployeeServiceClient, EmployeeServiceClient>("EmployeeService");
+    _ = builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
 
     // Business Services
-    builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
-    builder.Services.AddScoped<IOrderAuthorizationService, OrderAuthorizationService>();
-    builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
-    builder.Services.AddScoped<IOrderFileService, OrderFileService>();
-    builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
+    _ = builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
+    _ = builder.Services.AddScoped<IOrderAuthorizationService, OrderAuthorizationService>();
+    _ = builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
+    _ = builder.Services.AddScoped<IOrderFileService, OrderFileService>();
+    _ = builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
 
     // Rate Limiting Configuration
-    builder.Services.AddRateLimiter(options =>
+    _ = builder.Services.AddRateLimiter(options =>
     {
         // General endpoints: 100 requests per minute partitioned by User
         _ = options.AddPolicy("general", httpContext =>
@@ -120,8 +117,8 @@ try
     });
 
     // IAM Integration
-    builder.AddIAMServiceClient("order");
-    builder.Services.AddIAMRegistration<OrderIAMRegistrationService>("order");
+    _ = builder.AddIAMServiceClient("order");
+    _ = builder.Services.AddIAMRegistration<OrderIAMRegistrationService>("order");
 
     WebApplication app = builder.Build();
     ILogger<Program> logger = app.Services.GetRequiredService<ILogger<Program>>();
@@ -130,25 +127,25 @@ try
     await app.MigrateDatabaseAsync<OrderDbContext>();
 
     // Middleware Pipeline
-    app.UseStandardMiddleware();
+    _ = app.UseStandardMiddleware();
 
     if (!app.Environment.IsDevelopment())
     {
-        app.UseHttpsRedirection();
+        _ = app.UseHttpsRedirection();
     }
-    app.UseCors();
+    _ = app.UseCors();
 
-    app.UseAuthentication();
-    app.UseAuthorization();
+    _ = app.UseAuthentication();
+    _ = app.UseAuthorization();
 
     // Map endpoints after middleware
-    app.MapControllers();
+    _ = app.MapControllers();
 
     // Map Aspire default endpoints (/health, /alive, /metrics)
-    app.MapDefaultEndpoints(servicePrefix: "order");
+    _ = app.MapDefaultEndpoints(servicePrefix: "order");
 
     // Map OpenAPI and Scalar documentation (dev/staging only)
-    app.MapApiDocumentation(servicePrefix: "order");
+    _ = app.MapApiDocumentation(servicePrefix: "order");
 
     Log.ServiceStarted(logger, "Order Service");
     await app.RunAsync();
@@ -156,6 +153,9 @@ try
 catch (Exception ex)
 {
     Log.HostTerminated(bootstrapLogger, ex, "Order Service");
+    // Force flush to ensure Aspire captures the error before process exits
+    Console.Out.Flush();
+    Console.Error.Flush();
     throw;
 }
 finally
