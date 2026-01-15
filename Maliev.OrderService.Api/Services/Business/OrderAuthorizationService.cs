@@ -18,7 +18,7 @@ namespace Maliev.OrderService.Api.Services.Business
             string userId = user.GetUserId();
 
             // Admin and Manager can see all orders (supporting both full and simple role names for tests)
-            if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) || 
+            if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains(OrderPredefinedRoles.Manager, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains("Admin", StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains("Manager", StringComparer.OrdinalIgnoreCase))
@@ -33,12 +33,7 @@ namespace Maliev.OrderService.Api.Services.Business
             }
 
             // Fulfillment can only see orders assigned to them
-            if (roles.Contains(OrderPredefinedRoles.Fulfillment, StringComparer.OrdinalIgnoreCase) && order.AssignedEmployeeId == userId)
-            {
-                return true;
-            }
-
-            return false;
+            return roles.Contains(OrderPredefinedRoles.Fulfillment, StringComparer.OrdinalIgnoreCase) && order.AssignedEmployeeId == userId;
         }
 
         /// <inheritdoc />
@@ -48,7 +43,7 @@ namespace Maliev.OrderService.Api.Services.Business
             string userId = user.GetUserId();
 
             // Admin and Manager can see all orders (supporting both full and simple role names for tests)
-            if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) || 
+            if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains(OrderPredefinedRoles.Manager, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains("Admin", StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains("Manager", StringComparer.OrdinalIgnoreCase))
@@ -63,12 +58,7 @@ namespace Maliev.OrderService.Api.Services.Business
             }
 
             // Fulfillment can only see orders assigned to them
-            if (roles.Contains(OrderPredefinedRoles.Fulfillment, StringComparer.OrdinalIgnoreCase) && order.AssignedEmployeeId == userId)
-            {
-                return true;
-            }
-
-            return false;
+            return roles.Contains(OrderPredefinedRoles.Fulfillment, StringComparer.OrdinalIgnoreCase) && order.AssignedEmployeeId == userId;
         }
 
         /// <inheritdoc />
@@ -78,7 +68,7 @@ namespace Maliev.OrderService.Api.Services.Business
             string userId = user.GetUserId();
 
             // Admin and Manager can see all orders (no filter needed)
-            if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) || 
+            if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains(OrderPredefinedRoles.Manager, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains("Admin", StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains("Manager", StringComparer.OrdinalIgnoreCase))

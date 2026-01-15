@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -10,11 +10,11 @@ namespace Maliev.OrderService.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
+            _ = migrationBuilder.DropColumn(
                 name: "version",
                 table: "orders");
 
-            migrationBuilder.CreateSequence(
+            _ = migrationBuilder.CreateSequence(
                 name: "order_id_seq");
 
             /*
@@ -37,10 +37,10 @@ namespace Maliev.OrderService.Data.Migrations
                 table: "orders");
             */
 
-            migrationBuilder.DropSequence(
+            _ = migrationBuilder.DropSequence(
                 name: "order_id_seq");
 
-            migrationBuilder.AddColumn<byte[]>(
+            _ = migrationBuilder.AddColumn<byte[]>(
                 name: "version",
                 table: "orders",
                 type: "bytea",

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Data.Models;
 
 namespace Maliev.OrderService.Api.Services.Business
@@ -22,7 +23,7 @@ namespace Maliev.OrderService.Api.Services.Business
         /// <param name="user">The claims principal.</param>
         /// <param name="order">The order response DTO to check.</param>
         /// <returns>True if the user can view the order; otherwise, false.</returns>
-        bool CanViewOrder(ClaimsPrincipal user, Maliev.OrderService.Api.DTOs.Response.OrderResponse order);
+        bool CanViewOrder(ClaimsPrincipal user, OrderResponse order);
 
         /// <summary>
         /// Applies data isolation filters to an order query based on user roles.
