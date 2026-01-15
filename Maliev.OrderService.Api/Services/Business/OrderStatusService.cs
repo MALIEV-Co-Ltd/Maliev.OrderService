@@ -129,10 +129,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     OrderStatusValue.Finished => to is OrderStatusValue.Shipped or OrderStatusValue.Reopen,
                     OrderStatusValue.Shipped => to is OrderStatusValue.Reopen,
                     OrderStatusValue.Reopen => to is OrderStatusValue.InProgress,
-                    OrderStatusValue.Rejected => throw new NotImplementedException(),
-                    OrderStatusValue.Declined => throw new NotImplementedException(),
-                    OrderStatusValue.Expired => throw new NotImplementedException(),
-                    OrderStatusValue.Cancelled => throw new NotImplementedException(),
+                    OrderStatusValue.Rejected or OrderStatusValue.Declined or OrderStatusValue.Expired or OrderStatusValue.Cancelled => false,
                     _ => false
                 };
         }
