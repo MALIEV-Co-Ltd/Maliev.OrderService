@@ -1,12 +1,12 @@
 using Asp.Versioning;
-using Maliev.OrderService.Api.DTOs.Request;
-using Maliev.OrderService.Api.Services.Business;
-using Maliev.OrderService.Api.Extensions;
-using Maliev.OrderService.Api.Authorization;
 using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.OrderService.Api.Authorization;
+using Maliev.OrderService.Api.DTOs.Request;
+using Maliev.OrderService.Api.DTOs.Response;
+using Maliev.OrderService.Api.Extensions;
+using Maliev.OrderService.Api.Services.Business;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Maliev.OrderService.Api.DTOs.Response;
 
 namespace Maliev.OrderService.Api.Controllers
 {

@@ -1,12 +1,12 @@
-using System.Security.Cryptography;
+using Maliev.MessagingContracts.Generated;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Mapping;
 using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
-using Microsoft.EntityFrameworkCore;
 using MassTransit;
-using Maliev.MessagingContracts.Generated;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 
 namespace Maliev.OrderService.Api.Services.Business
 {

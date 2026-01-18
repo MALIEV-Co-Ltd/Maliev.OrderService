@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using Maliev.Aspire.ServiceDefaults.Database;
-using Maliev.OrderService.Data.Models;
 using Maliev.OrderService.Data.Configurations;
+using Maliev.OrderService.Data.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Data
 {

@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Data.Models;
+using System.Security.Claims;
 
 namespace Maliev.OrderService.Api.Services.Business
 {

@@ -62,7 +62,7 @@ namespace Maliev.OrderService.Tests.Contract
             HttpResponseMessage response = await _client.PutAsJsonAsync("/order/v1/orders/batch", batchRequest);
 
             // Assert
-            Assert.True(response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Conflict, 
+            Assert.True(response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Conflict,
                 $"Expected OK or Conflict, but got {response.StatusCode}. Content: {await response.Content.ReadAsStringAsync()}");
         }
 
@@ -89,6 +89,35 @@ namespace Maliev.OrderService.Tests.Contract
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task POST_BatchOrders_ValidationFailure_ReturnsBadRequest()
+        {
+            // Arrange
+            var batchRequest = new[]
+            {
+                new { customerId = "", customerType = "Customer", serviceCategoryId = 1 } // Missing customerId
+            };
+
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders/batch", batchRequest);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task POST_BatchCancel_NotFound_ReturnsNotFound()
+        {
+            // Arrange
+            string[] orderIds = ["NON-EXISTENT-1"];
+
+            // Act
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders/batch/cancel", orderIds);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
     }
 }
