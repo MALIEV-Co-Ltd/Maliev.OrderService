@@ -1,10 +1,10 @@
-using System.Diagnostics;
-using System.Diagnostics.Metrics;
-using System.Text.Json;
 using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Api.Services.External;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Caching.Distributed;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.Text.Json;
 
 namespace Maliev.OrderService.Api.Authorization
 {

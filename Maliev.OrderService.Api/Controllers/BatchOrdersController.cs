@@ -1,19 +1,19 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.DTOs.Request;
+using Maliev.OrderService.Api.DTOs.Response;
+using Maliev.OrderService.Api.Extensions;
+using Maliev.OrderService.Api.Mapping;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Data;
+using Maliev.OrderService.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Maliev.OrderService.Api.DTOs.Response;
-using System.ComponentModel.DataAnnotations;
-using Maliev.OrderService.Api.Extensions;
-using Maliev.OrderService.Api.Authorization;
-using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Maliev.OrderService.Data.Models;
-using Maliev.OrderService.Api.Mapping;
+using System.ComponentModel.DataAnnotations;
 
 namespace Maliev.OrderService.Api.Controllers
 {

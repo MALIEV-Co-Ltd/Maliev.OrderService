@@ -37,32 +37,49 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task POST_OrderStatus_Updates_Status_With_StateTransition()
+        public async Task POST_OrderStatus_Transitions_Through_Quoted_Accepted_Paid()
         {
-            // Arrange - First create an order
-            var createRequest = new
-            {
-                customerId = "CUST-001",
-                customerType = "Customer",
-                serviceCategoryId = 1
-            };
+            // 1. Create Order
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
 
-            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
-            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
-            string? orderId = createdOrder.GetProperty("orderId").GetString();
-
-            var statusRequest = new
-            {
-                Status = "Reviewing",
-                InternalNotes = "Internal review notes",
-                CustomerNotes = "Your order is being reviewed"
-            };
-
-            // Act
-            HttpResponseMessage response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", statusRequest);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            // 2. New -> Reviewing
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewing" });
+            // 3. Reviewing -> Reviewed
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewed" });
+            // 4. Reviewed -> Quoted
+            var quotedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Quoted" });
+            Assert.Equal(HttpStatusCode.Created, quotedResponse.StatusCode);
+            // 5. Quoted -> Accepted
+            var acceptedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Accepted" });
+            Assert.Equal(HttpStatusCode.Created, acceptedResponse.StatusCode);
+            // 6. Accepted -> Paid
+            var paidResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Paid" });
+            Assert.Equal(HttpStatusCode.Created, paidResponse.StatusCode);
+            // 7. Paid -> InProgress
+            var inProgressResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "InProgress" });
+            Assert.Equal(HttpStatusCode.Created, inProgressResponse.StatusCode);
+            // 8. InProgress -> Finished
+            var finishedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Finished" });
+            Assert.Equal(HttpStatusCode.Created, finishedResponse.StatusCode);
+            // 9. Finished -> Shipped
+            var shippedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped" });
+            Assert.Equal(HttpStatusCode.Created, shippedResponse.StatusCode);
         }
+
+        [Fact]
+        public async Task POST_OrderStatus_InvalidTransition_ReturnsBadRequest()
+        {
+            // 1. Create Order
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            // 2. Try New -> Shipped (Invalid)
+            var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped" });
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
     }
 }

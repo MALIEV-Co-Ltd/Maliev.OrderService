@@ -1,7 +1,7 @@
-using System.Globalization;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Data.Models;
+using System.Globalization;
 
 namespace Maliev.OrderService.Api.Mapping
 {

@@ -1,8 +1,8 @@
-using System.Security.Claims;
 using Maliev.OrderService.Api.Authorization;
+using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Data.Models;
-using Maliev.OrderService.Api.DTOs.Response;
+using System.Security.Claims;
 
 namespace Maliev.OrderService.Api.Services.Business
 {

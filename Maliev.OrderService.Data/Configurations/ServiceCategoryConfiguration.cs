@@ -1,6 +1,6 @@
+using Maliev.OrderService.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Maliev.OrderService.Data.Models;
 
 namespace Maliev.OrderService.Data.Configurations
 {

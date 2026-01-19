@@ -19,6 +19,11 @@ using Testcontainers.Redis;
 using Maliev.OrderService.Api.Services.External;
 using Moq;
 using StackExchange.Redis;
+using Xunit;
+using Microsoft.AspNetCore.Builder;
+
+// Disable parallel execution to prevent race conditions on the shared singleton database
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 namespace Maliev.OrderService.Tests.Testing
 {
@@ -32,11 +37,13 @@ namespace Maliev.OrderService.Tests.Testing
         where TProgram : class
         where TDbContext : DbContext
     {
-        private readonly PostgreSqlContainer _postgresContainer;
-        private readonly RedisContainer _redisContainer;
-        private readonly RabbitMqContainer _rabbitmqContainer;
+        private static PostgreSqlContainer? _postgresContainer;
+        private static RedisContainer? _redisContainer;
+        private static RabbitMqContainer? _rabbitmqContainer;
+        private static bool _containersStarted;
+        private static readonly SemaphoreSlim _initLock = new(1, 1);
+
         private readonly RSA _testRsa;
-        private bool _containersStarted;
 
         // Store permissions for test users
         private readonly ConcurrentDictionary<string, IEnumerable<string>> _userPermissions = new();
@@ -49,18 +56,6 @@ namespace Maliev.OrderService.Tests.Testing
 
         public BaseIntegrationTestFactory()
         {
-            _postgresContainer = new PostgreSqlBuilder()
-                .WithImage("postgres:18-alpine")
-                .Build();
-
-            _redisContainer = new RedisBuilder()
-                .WithImage("redis:8.4-alpine")
-                .Build();
-
-            _rabbitmqContainer = new RabbitMqBuilder()
-                .WithImage("rabbitmq:4.2-alpine")
-                .Build();
-
             _testRsa = RSA.Create(2048);
 
             // Set environment variable EARLY so Program.cs picks it up during WebApplication.CreateBuilder
@@ -69,44 +64,86 @@ namespace Maliev.OrderService.Tests.Testing
 
         public async Task InitializeAsync()
         {
-            if (_containersStarted)
+            await _initLock.WaitAsync();
+            try
             {
-                return;
-            }
+                if (!_containersStarted)
+                {
+                    _postgresContainer = new PostgreSqlBuilder()
+                        .WithImage("postgres:18-alpine")
+                        .Build();
 
-            // Start all containers in parallel
-            await Task.WhenAll(
-                _postgresContainer.StartAsync(),
-                _redisContainer.StartAsync(),
-                _rabbitmqContainer.StartAsync()
-            );
+                    _redisContainer = new RedisBuilder()
+                        .WithImage("redis:8.4-alpine")
+                        .Build();
+
+                    _rabbitmqContainer = new RabbitMqBuilder()
+                        .WithImage("rabbitmq:4.2-alpine")
+                        .Build();
+
+                    // Start all containers in parallel
+                    await Task.WhenAll(
+                        _postgresContainer.StartAsync(),
+                        _redisContainer.StartAsync(),
+                        _rabbitmqContainer.StartAsync()
+                    );
+
+                    // Ensure PostgreSQL is fully ready and accepting connections
+                    var postgresReady = false;
+                    var retryCount = 0;
+                    const int maxRetries = 60;
+                    while (!postgresReady && retryCount < maxRetries)
+                    {
+                        try
+                        {
+                            await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
+                            await conn.OpenAsync();
+                            await using var cmd = conn.CreateCommand();
+                            cmd.CommandText = "SELECT 1";
+                            await cmd.ExecuteScalarAsync();
+                            postgresReady = true;
+                        }
+                        catch
+                        {
+                            retryCount++;
+                            await Task.Delay(1000);
+                        }
+                    }
+
+                    if (!postgresReady)
+                    {
+                        throw new InvalidOperationException("PostgreSQL Testcontainer failed to become ready (Ping failed) after 60 seconds.");
+                    }
+
+                    // Wait for Redis to be ready
+                    using (ConnectionMultiplexer connection = await ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
+                    {
+                        _ = await connection.GetDatabase().PingAsync();
+                    }
+
+                    // Apply database migrations
+                    await ApplyMigrationsAsync();
+
+                    _containersStarted = true;
+                }
+            }
+            finally
+            {
+                _initLock.Release();
+            }
 
             // Set environment variables immediately after containers start
-            // This ensures they are available when Program.Main runs (which happens when .Server is accessed)
-            Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", _postgresContainer.GetConnectionString());
-            Environment.SetEnvironmentVariable("ConnectionStrings__redis", _redisContainer.GetConnectionString());
-            Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", _rabbitmqContainer.GetConnectionString());
-
-            // Wait for Redis to be ready
-            using (ConnectionMultiplexer connection = await ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
-            {
-                _ = await connection.GetDatabase().PingAsync();
-            }
-
-            // Apply database migrations
-            await ApplyMigrationsAsync();
-
-            _containersStarted = true;
+            Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", _postgresContainer!.GetConnectionString());
+            Environment.SetEnvironmentVariable("ConnectionStrings__redis", _redisContainer!.GetConnectionString());
+            Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", _rabbitmqContainer!.GetConnectionString());
         }
 
         public new async Task DisposeAsync()
         {
-            await _postgresContainer.DisposeAsync();
-            await _redisContainer.DisposeAsync();
-            await _rabbitmqContainer.DisposeAsync();
+            await base.DisposeAsync(); // Stop the Host
+            // Static containers are NOT disposed here to allow reuse across tests
             _testRsa.Dispose();
             Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
-            await base.DisposeAsync();
         }
 
 
@@ -135,9 +172,9 @@ namespace Maliev.OrderService.Tests.Testing
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             // Set configuration directly into the WebHost configuration that Program.cs reads.
-            _ = builder.UseSetting($"ConnectionStrings:{DbConnectionStringName}", _postgresContainer.GetConnectionString());
-            _ = builder.UseSetting("ConnectionStrings:redis", _redisContainer.GetConnectionString());
-            _ = builder.UseSetting("ConnectionStrings:rabbitmq", _rabbitmqContainer.GetConnectionString());
+            _ = builder.UseSetting($"ConnectionStrings:{DbConnectionStringName}", _postgresContainer!.GetConnectionString());
+            _ = builder.UseSetting("ConnectionStrings:redis", _redisContainer!.GetConnectionString());
+            _ = builder.UseSetting("ConnectionStrings:rabbitmq", _rabbitmqContainer!.GetConnectionString());
             _ = builder.UseSetting("Features:PermissionBasedAuthEnabled", "true");
 
             _ = builder.ConfigureAppConfiguration((context, config) =>
@@ -259,7 +296,7 @@ namespace Maliev.OrderService.Tests.Testing
         /// </summary>
         public TDbContext CreateDbContext()
         {
-            string connectionString = _postgresContainer.GetConnectionString();
+            string connectionString = _postgresContainer!.GetConnectionString();
             var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
             _ = optionsBuilder.UseNpgsql(connectionString);
             return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
