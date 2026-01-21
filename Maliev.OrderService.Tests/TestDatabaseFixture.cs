@@ -154,40 +154,33 @@ namespace Maliev.OrderService.Tests
         /// </summary>
         public async Task CleanupAsync()
         {
-            // Force garbage collection and clear connection pools
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            for (int i = 0; i < 3; i++)
-            {
-                Npgsql.NpgsqlConnection.ClearAllPools();
-                await Task.Delay(200);
-            }
-
             await using OrderDbContext context = CreateDbContext();
 
-            // Terminate any active connections
-            _ = await context.Database.ExecuteSqlRawAsync(@"
-            SELECT pg_terminate_backend(pid)
-            FROM pg_stat_activity
-            WHERE datname = current_database()
-            AND pid <> pg_backend_pid()
-            AND state IN ('idle in transaction', 'active');
-        ");
+            // Dynamically get table names from model
+            var tableNames = context.Model.GetEntityTypes()
+                .Select(t => t.GetTableName())
+                .Where(t => t != null && !new[] { "service_categories", "process_types" }.Contains(t))
+                .Cast<string>()
+                .ToList();
 
-            await Task.Delay(100);
-
-            // Truncate tables (keeping reference data)
-            _ = await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE order_files CASCADE");
-            _ = await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE order_notes CASCADE");
-            _ = await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE order_statuses CASCADE");
-            _ = await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE orders CASCADE");
-            _ = await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE audit_logs CASCADE");
+            // Truncate all tables in reverse order (to respect foreign keys if needed, though CASCADE is used)
+            foreach (var tableName in tableNames)
+            {
+                try
+                {
+                    // Table names are from the model, not user input - safe from SQL injection
+#pragma warning disable EF1002, EF1003
+                    await context.Database.ExecuteSqlRawAsync($"TRUNCATE TABLE \"{tableName}\" RESTART IDENTITY CASCADE");
+#pragma warning restore EF1002, EF1003
+                }
+                catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
+                {
+                    // Table doesn't exist - ignore this error
+                }
+            }
 
             context.ChangeTracker.Clear();
             await context.Database.CloseConnectionAsync();
-
             Npgsql.NpgsqlConnection.ClearAllPools();
         }
 
