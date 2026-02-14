@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.Controllers;
 using Xunit;
 
@@ -15,7 +16,10 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task GetAnalyticsReport_AsAdmin_ReturnsOk()
         {
             // Arrange
-            HttpClient client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles);
+            HttpClient client = _factory.CreateAuthenticatedClient(
+                "admin-user", 
+                roles: AdminRoles, 
+                permissions: [OrderPermissions.ReportsAnalytics]);
 
             // Act
             HttpResponseMessage response = await client.GetAsync("/order/v1/reports/analytics");
@@ -28,7 +32,10 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task ExportReport_AsAdmin_ReturnsFile()
         {
             // Arrange
-            HttpClient client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles);
+            HttpClient client = _factory.CreateAuthenticatedClient(
+                "admin-user", 
+                roles: AdminRoles, 
+                permissions: [OrderPermissions.ReportsExport]);
             var request = new ExportReportRequest { Format = "CSV" };
 
             // Act

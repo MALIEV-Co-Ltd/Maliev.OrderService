@@ -17,6 +17,7 @@ using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
 using Maliev.OrderService.Api.Services.External;
+using Maliev.Aspire.ServiceDefaults.IAM;
 using Moq;
 using StackExchange.Redis;
 using Xunit;
@@ -69,16 +70,13 @@ namespace Maliev.OrderService.Tests.Testing
             {
                 if (!_containersStarted)
                 {
-                    _postgresContainer = new PostgreSqlBuilder()
-                        .WithImage("postgres:18-alpine")
+                    _postgresContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
                         .Build();
 
-                    _redisContainer = new RedisBuilder()
-                        .WithImage("redis:8.4-alpine")
+                    _redisContainer = new RedisBuilder().WithName("redis:8.4-alpine")
                         .Build();
 
-                    _rabbitmqContainer = new RabbitMqBuilder()
-                        .WithImage("rabbitmq:4.2-alpine")
+                    _rabbitmqContainer = new RabbitMqBuilder().WithName("rabbitmq:4.2-alpine")
                         .Build();
 
                     // Start all containers in parallel
@@ -176,6 +174,8 @@ namespace Maliev.OrderService.Tests.Testing
             _ = builder.UseSetting("ConnectionStrings:redis", _redisContainer!.GetConnectionString());
             _ = builder.UseSetting("ConnectionStrings:rabbitmq", _rabbitmqContainer!.GetConnectionString());
             _ = builder.UseSetting("Features:PermissionBasedAuthEnabled", "true");
+            _ = builder.UseSetting("IAM:RegistrationDelaySeconds", "0");
+            _ = builder.UseSetting("Features:FailOpenOnIAMError", "true");
 
             _ = builder.ConfigureAppConfiguration((context, config) =>
             {
@@ -249,17 +249,20 @@ namespace Maliev.OrderService.Tests.Testing
 
                 // T010: Update factory to support permission-based token generation
                 // Remove the real IAM client before adding the mock
-                ServiceDescriptor? descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IIamServiceClient));
+                ServiceDescriptor? descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(Maliev.Aspire.ServiceDefaults.IAM.IIamServiceClient));
                 if (descriptor != null)
                 {
                     _ = services.Remove(descriptor);
                 }
 
                 // Mock IIamServiceClient to return permissions from our dictionary
-                var mockIamClient = new Mock<IIamServiceClient>();
+                var mockIamClient = new Mock<Maliev.Aspire.ServiceDefaults.IAM.IIamServiceClient>();
                 _ = mockIamClient.Setup(x => x.GetUserPermissionsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync((string userId, CancellationToken _) =>
                         _userPermissions.TryGetValue(userId, out IEnumerable<string>? perms) ? perms : []);
+
+                _ = mockIamClient.Setup(x => x.CheckPermissionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(false); // Fallback to claims check in PermissionAuthorizationHandler
 
                 _ = services.AddScoped(_ => mockIamClient.Object);
             });

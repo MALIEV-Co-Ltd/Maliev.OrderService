@@ -31,7 +31,10 @@ namespace Maliev.OrderService.Tests.Contract
         public async Task Admin_CanAccessReports()
         {
             // Arrange
-            HttpClient client = _factory.CreateAuthenticatedClient("admin-user", roles: AdminRoles);
+            HttpClient client = _factory.CreateAuthenticatedClient(
+                "admin-user", 
+                roles: AdminRoles, 
+                permissions: [OrderPermissions.ReportsSales]);
 
             // Act
             HttpResponseMessage response = await client.GetAsync("/order/v1/reports/sales");
