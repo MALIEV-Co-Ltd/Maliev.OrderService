@@ -32,8 +32,8 @@ namespace Maliev.OrderService.Tests.Contract
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient(
-                "admin-user", 
-                roles: AdminRoles, 
+                "admin-user",
+                roles: AdminRoles,
                 permissions: [OrderPermissions.ReportsSales]);
 
             // Act
