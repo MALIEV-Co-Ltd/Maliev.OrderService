@@ -5,7 +5,6 @@ using Maliev.OrderService.Api.Services;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
 using Maliev.OrderService.Data;
-using System.Threading.RateLimiting;
 
 // Initialize bootstrap logging
 using ILoggerFactory loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -28,7 +27,7 @@ try
     });
     _ = builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
 
-    _ = builder.AddRedisDistributedCache(instanceName: "order:"); // Redis with in-memory fallback
+    _ = builder.AddStandardCache("order:"); // Redis + in-memory fallback, memory-optimized
     _ = builder.AddMassTransitWithRabbitMq(cfg =>
     {
         _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
@@ -37,20 +36,12 @@ try
     _ = builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
     // --- API Configuration ---
-    _ = builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+    _ = builder.AddStandardCors(); // CORS with fail-fast validation
     _ = builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
     _ = builder.AddJwtAuthentication();
     _ = builder.Services.AddPermissionAuthorization();
-
-    // Add specific policies
-    _ = builder.Services.AddAuthorizationBuilder()
-        .AddPolicy("Admin", policy =>
-        {
-            _ = policy.RequireAuthenticatedUser();
-            _ = policy.RequireClaim("role", "admin");
-        });
 
     // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
     if (!builder.Environment.IsProduction())
@@ -77,44 +68,8 @@ try
     _ = builder.Services.AddScoped<IOrderFileService, OrderFileService>();
     _ = builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
 
-    // Rate Limiting Configuration
-    _ = builder.Services.AddRateLimiter(options =>
-    {
-        // General endpoints: 100 requests per minute partitioned by User
-        _ = options.AddPolicy("general", httpContext =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: httpContext.User.GetUserId() ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-                factory: _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 100,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    QueueLimit = 10
-                }));
-
-        // Batch operations: 10 requests per minute partitioned by User
-        _ = options.AddPolicy("batch", httpContext =>
-            RateLimitPartition.GetSlidingWindowLimiter(
-                partitionKey: httpContext.User.GetUserId() ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-                factory: _ => new SlidingWindowRateLimiterOptions
-                {
-                    PermitLimit = 10,
-                    Window = TimeSpan.FromMinutes(1),
-                    SegmentsPerWindow = 6,
-                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    QueueLimit = 2
-                }));
-
-        options.OnRejected = async (context, cancellationToken) =>
-        {
-            context.HttpContext.Response.StatusCode = 429;
-            await context.HttpContext.Response.WriteAsJsonAsync(new
-            {
-                error = "Too many requests. Please try again later.",
-                retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter) ? retryAfter.TotalSeconds : 60
-            }, cancellationToken);
-        };
-    });
+    // Rate Limiting (memory-optimized for low-spec nodes)
+    _ = builder.AddStandardRateLimiting();
 
     // IAM Integration
     _ = builder.AddIAMServiceClient("order");

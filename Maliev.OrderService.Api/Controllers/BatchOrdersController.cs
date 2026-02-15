@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.DTOs.Request;
@@ -27,7 +28,7 @@ namespace Maliev.OrderService.Api.Controllers
     [ApiVersion("1.0")]
     [Authorize]
     [Route("order/v{version:apiVersion}/orders/batch")]
-    [EnableRateLimiting("batch")]
+    [EnableRateLimiting(RateLimitPolicies.Batch)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public partial class BatchOrdersController(

@@ -176,6 +176,7 @@ namespace Maliev.OrderService.Tests.Testing
             _ = builder.UseSetting("Features:PermissionBasedAuthEnabled", "true");
             _ = builder.UseSetting("IAM:RegistrationDelaySeconds", "0");
             _ = builder.UseSetting("Features:FailOpenOnIAMError", "true");
+            _ = builder.UseSetting("CORS:AllowedOrigins:0", "http://localhost:3000");
 
             _ = builder.ConfigureAppConfiguration((context, config) =>
             {

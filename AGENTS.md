@@ -1,0 +1,120 @@
+# AGENTS.md
+
+This file provides context, commands, and strict guidelines for AI agents working on the `Maliev.OrderService` repository.
+**Strictly adhere to these instructions.**
+
+## 1. Project Overview
+
+- **Framework**: .NET 10.0 (ASP.NET Core Web API)
+- **Database**: PostgreSQL (Npgsql, EF Core 10.0.0). Uses `xmin` system column for optimistic concurrency.
+- **Messaging**: MassTransit (RabbitMQ) with `Maliev.MessagingContracts`.
+- **Integration**: Aspire Service Defaults, Google Secret Manager (`/mnt/secrets`).
+- **Structure**:
+    - `Maliev.OrderService.Api`: Main Web API
+    - `Maliev.OrderService.Data`: EF Core Context, Models, Migrations
+    - `Maliev.OrderService.Tests`: xUnit, Testcontainers, Integration Tests
+
+## 2. Build & Test Commands
+
+Always verify changes before submitting.
+
+### Build
+```bash
+dotnet build Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
+```
+
+### Run Tests
+**Run all tests (Integration & Unit):**
+```bash
+dotnet test Maliev.OrderService.Tests/Maliev.OrderService.Tests.csproj
+```
+
+**Run a single test (CRITICAL for iteration):**
+Use `--filter` with the fully qualified name.
+```bash
+dotnet test Maliev.OrderService.Tests/Maliev.OrderService.Tests.csproj --filter "FullyQualifiedName~Maliev.OrderService.Tests.Controllers.OrdersControllerTests.GetOrders_ReturnsOk"
+```
+
+### Run Application
+```bash
+dotnet run --project Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
+```
+
+## 3. Code Style & Conventions
+
+### General
+- **Nullable**: `<Nullable>enable</Nullable>` is on. Handle nulls explicitly.
+- **Warnings**: Treat warnings as errors. No unused variables or missing awaits.
+- **Implicit Usings**: Enabled. Do not add `using System;` etc. explicitly if covered.
+- **File-Scoped Namespaces**: Use `namespace Maliev.OrderService.Api.Services;` (no braces).
+
+### Modern C# Features (Mandatory)
+- **Primary Constructors**: Use for DI.
+    ```csharp
+    public partial class OrderService(OrderDbContext context, ILogger<OrderService> logger) : IOrderService { ... }
+    ```
+- **Async/Await**: Always pass `CancellationToken` as the last optional parameter.
+    ```csharp
+    public async Task<Order?> GetAsync(string id, CancellationToken cancellationToken = default) { ... }
+    ```
+- **Collection Expressions**: Use `[]` for arrays/lists.
+    ```csharp
+    List<string> items = ["a", "b"];
+    return [.. existingItems, newItem];
+    ```
+
+### Logging
+- **Source Generated Logging**: **DO NOT** use `logger.LogInformation(...)`.
+- Create a `private static partial class Log` inside the class.
+    ```csharp
+    private static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Information, Message = "Order {OrderId} created")]
+        public static partial void OrderCreated(ILogger logger, string orderId);
+    }
+    // Usage: Log.OrderCreated(_logger, orderId);
+    ```
+
+### Error Handling & Results
+- **Controllers**: Return `IActionResult` (`Ok`, `NotFound`, `BadRequest`, `Conflict`, `Forbid`).
+- **DTOs**: Use `ErrorMessageResponse` for failures.
+- **Concurrency**: Catch `DbUpdateConcurrencyException` -> return HTTP 409 Conflict.
+- **Validation**: Use FluentValidation or `ModelState.IsValid`.
+
+## 4. Architecture & Patterns
+
+### Controllers & Services
+- **Thin Controllers**: Delegate logic to Scoped Business Services (e.g., `IOrderManagementService`).
+- **DTOs**: STRICT separation between Entities and DTOs. Never return Entity classes directly.
+- **Mapping**: Use manual mapping extensions (e.g., `order.ToOrderResponse()`).
+
+### Authorization (RBAC & Data Isolation)
+- **Attributes**: Use `[RequirePermission(OrderPermissions.X)]` on endpoints.
+- **Data Isolation**: Use `IOrderAuthorizationService.ApplyDataIsolationFilter(User, query)` to restrict data access based on UserType (Customer/Employee/Manager).
+- **Claims**: User context is derived from JWT claims (`uid`, `role`, `userType`).
+
+### Database & Persistence
+- **Optimistic Concurrency**: Use `xmin` shadow property.
+    ```csharp
+    // Reading
+    var xmin = _context.Entry(entity).Property<uint>("xmin").CurrentValue;
+    // Writing/Checking
+    if (originalXmin != currentXmin) throw new DbUpdateConcurrencyException(...);
+    ```
+- **Transactions**: Use `BeginTransactionAsync` for multi-step operations.
+
+### Configuration & Secrets
+- **Pattern**: Inject `IConfiguration`. **NEVER** hardcode secrets/URLs.
+- **Secret Manager**: Secrets are mounted at `/mnt/secrets`.
+- **Naming**: `Jwt__SecurityKey` in secrets becomes `Jwt:SecurityKey` in config.
+- **External Services**: Use `ExternalServiceOptions` pattern (BaseUrl, Timeout).
+
+### Testing Strategy
+- **Integration First**: Prefer integration tests using `Testcontainers` (Postgres, RabbitMQ).
+- **Configuration**: `TestDatabaseFixture` builds config from `appsettings.Testing.json` -> User Secrets -> Env Vars.
+- **Mocking**: Use `Moq` sparingly, primarily for external HTTP services or unit tests.
+
+## 5. Security & Safety
+- **Secrets**: Never commit `.env` or secrets.
+- **Validation**: Validate all inputs.
+- **Crypto**: Use platform-provided crypto.

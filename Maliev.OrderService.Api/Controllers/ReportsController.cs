@@ -1,4 +1,7 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.OrderService.Api.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -16,8 +19,7 @@ namespace Maliev.OrderService.Api.Controllers
     [ApiController]
     [ApiVersion("1.0")]
     [Route("order/v{version:apiVersion}/reports")]
-    [EnableRateLimiting("general")]
-    [Authorize(Policy = "Admin")]
+    [EnableRateLimiting(RateLimitPolicies.Batch)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public class ReportsController(ILogger<ReportsController> logger) : ControllerBase
@@ -27,6 +29,7 @@ namespace Maliev.OrderService.Api.Controllers
         /// <summary>
         /// Get sales performance report.
         /// </summary>
+        [RequirePermission(OrderPermissions.ReportsSales)]
         [HttpGet("sales")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public OkObjectResult GetSalesReport()
@@ -38,6 +41,7 @@ namespace Maliev.OrderService.Api.Controllers
         /// <summary>
         /// Get detailed order analytics.
         /// </summary>
+        [RequirePermission(OrderPermissions.ReportsAnalytics)]
         [HttpGet("analytics")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public OkObjectResult GetAnalyticsReport()
@@ -52,6 +56,7 @@ namespace Maliev.OrderService.Api.Controllers
         /// <param name="reportType">Type of report</param>
         /// <param name="request">Export format request</param>
         /// <returns>File stream</returns>
+        [RequirePermission(OrderPermissions.ReportsExport)]
         [HttpPost("{reportType}/export")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]

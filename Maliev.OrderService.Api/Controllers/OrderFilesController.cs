@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.DTOs.Request;
@@ -21,7 +22,7 @@ namespace Maliev.OrderService.Api.Controllers
     [ApiVersion("1.0")]
     [Route("order/v{version:apiVersion}/orders/{orderId}/files")]
     [Authorize]
-    [EnableRateLimiting("general")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public class OrderFilesController(
         IOrderFileService fileService,
         ILogger<OrderFilesController> logger) : ControllerBase
