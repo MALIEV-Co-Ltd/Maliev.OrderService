@@ -43,6 +43,10 @@ namespace Maliev.OrderService.Data.Models
         public string? PaymentId { get; set; }
         public string PaymentStatus { get; set; } = "Unpaid"; // Unpaid, Paid, POIssued
 
+        // Customer Purchase Order (Inbound)
+        public string? CustomerPoNumber { get; set; }
+        public Guid? CustomerPoFileId { get; set; }
+
         // Assignment Information
         public string? AssignedEmployeeId { get; set; }
         public string? DepartmentId { get; set; }

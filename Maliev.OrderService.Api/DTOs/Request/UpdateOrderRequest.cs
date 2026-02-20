@@ -60,5 +60,12 @@ namespace Maliev.OrderService.Api.DTOs.Request
         /// <summary>Gets or sets the department ID</summary>
         [MaxLength(50, ErrorMessage = "Department ID must not exceed 50 characters")]
         public string? DepartmentId { get; set; }
+
+        /// <summary>Gets or sets the customer purchase order number</summary>
+        [MaxLength(100, ErrorMessage = "Customer PO Number must not exceed 100 characters")]
+        public string? CustomerPoNumber { get; set; }
+
+        /// <summary>Gets or sets the customer purchase order file ID</summary>
+        public Guid? CustomerPoFileId { get; set; }
     }
 }

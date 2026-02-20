@@ -58,6 +58,10 @@ namespace Maliev.OrderService.Data.Configurations
             _ = builder.Property(o => o.CreatedBy).HasColumnName("created_by").HasMaxLength(50).IsRequired();
             _ = builder.Property(o => o.UpdatedBy).HasColumnName("updated_by").HasMaxLength(50).IsRequired();
 
+            // Customer Purchase Order fields
+            _ = builder.Property(o => o.CustomerPoNumber).HasColumnName("customer_po_number").HasMaxLength(50);
+            _ = builder.Property(o => o.CustomerPoFileId).HasColumnName("customer_po_file_id");
+
             // Indexes
             _ = builder.HasIndex(o => o.CustomerId).HasDatabaseName("IX_Order_CustomerId");
             _ = builder.HasIndex(o => o.AssignedEmployeeId).HasDatabaseName("IX_Order_AssignedEmployeeId");

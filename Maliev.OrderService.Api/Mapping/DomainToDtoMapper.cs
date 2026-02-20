@@ -38,6 +38,8 @@ namespace Maliev.OrderService.Api.Mapping
                 ActualDeliveryDate = order.ActualDeliveryDate,
                 QuotedAmount = order.QuotedAmount,
                 QuoteCurrency = order.QuoteCurrency,
+                CustomerPoNumber = order.CustomerPoNumber,
+                CustomerPoFileId = order.CustomerPoFileId,
                 PaymentId = order.PaymentId,
                 PaymentStatus = order.PaymentStatus,
                 AssignedEmployeeId = order.AssignedEmployeeId,
@@ -75,7 +77,9 @@ namespace Maliev.OrderService.Api.Mapping
                 LeadTimeDays = request.LeadTimeDays,
                 PromisedDeliveryDate = request.PromisedDeliveryDate,
                 AssignedEmployeeId = request.AssignedEmployeeId,
-                DepartmentId = request.DepartmentId
+                DepartmentId = request.DepartmentId,
+                CustomerPoNumber = request.CustomerPoNumber,
+                CustomerPoFileId = request.CustomerPoFileId
             };
         }
 
@@ -146,6 +150,16 @@ namespace Maliev.OrderService.Api.Mapping
             if (request.DepartmentId != null)
             {
                 order.DepartmentId = request.DepartmentId;
+            }
+
+            if (request.CustomerPoNumber != null)
+            {
+                order.CustomerPoNumber = request.CustomerPoNumber;
+            }
+
+            if (request.CustomerPoFileId.HasValue)
+            {
+                order.CustomerPoFileId = request.CustomerPoFileId;
             }
         }
 
