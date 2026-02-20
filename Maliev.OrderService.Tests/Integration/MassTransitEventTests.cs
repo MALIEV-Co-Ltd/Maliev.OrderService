@@ -396,7 +396,7 @@ namespace Maliev.OrderService.Tests.Integration
                 // Wait for consumer to process - check the specific consumer harness
                 var consumerHarness = harness.GetConsumerHarness<Maliev.OrderService.Api.Consumers.PaymentCompletedEventConsumer>();
                 bool consumed = await consumerHarness.Consumed.Any<PaymentCompletedEvent>(x => x.Context.Message.Payload.OrderNumber == createdOrder.OrderId);
-                
+
                 if (!consumed)
                 {
                     // Fallback to general harness check if consumer harness failed

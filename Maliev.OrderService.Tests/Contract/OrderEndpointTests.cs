@@ -166,7 +166,7 @@ namespace Maliev.OrderService.Tests.Contract
         [Fact]
         public async Task GET_SubResources_ReturnOk()
         {
-             // Arrange
+            // Arrange
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
             HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
             JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
