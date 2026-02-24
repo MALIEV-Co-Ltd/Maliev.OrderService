@@ -1,4 +1,5 @@
 using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Uploads;
 using Maliev.OrderService.Data;
 using Maliev.OrderService.Data.Models;
 using MassTransit;

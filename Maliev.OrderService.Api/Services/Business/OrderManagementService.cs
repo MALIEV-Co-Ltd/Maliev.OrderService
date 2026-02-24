@@ -1,4 +1,5 @@
 using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Mapping;
@@ -106,7 +107,7 @@ namespace Maliev.OrderService.Api.Services.Business
             // Publish OrderCreatedEvent
             await _publishEndpoint.Publish(new OrderCreatedEvent(
                 MessageId: Guid.NewGuid(),
-                MessageName: "OrderCreatedEvent",
+                MessageName: nameof(OrderCreatedEvent),
                 MessageType: MessageType.Event,
                 MessageVersion: "1.0.0",
                 PublishedBy: "OrderService",
@@ -266,8 +267,8 @@ namespace Maliev.OrderService.Api.Services.Business
             return new Guid(hash);
         }
 
-        // Static readonly array for ConsumedBy list to avoid CA1861
-        private static readonly string[] OrderCreatedConsumers = ["InvoiceService", "NotificationService"];
+        // Static readonly list for ConsumedBy list to avoid CA1861
+        private static readonly List<string> OrderCreatedConsumers = new List<string> { "InvoiceService", "NotificationService" };
 
         private static partial class Log
         {

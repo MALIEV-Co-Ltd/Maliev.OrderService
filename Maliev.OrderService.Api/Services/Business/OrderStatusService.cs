@@ -1,4 +1,5 @@
 using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Mapping;
@@ -29,13 +30,13 @@ namespace Maliev.OrderService.Api.Services.Business
         private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
 
         // Static readonly arrays for ConsumedBy lists to avoid CA1861
-        private static readonly string[] GenericStatusChangeConsumers = ["NotificationService", "InvoiceService"];
-        private static readonly string[] QuotedConsumers = ["NotificationService", "InvoiceService"];
-        private static readonly string[] AcceptedConsumers = ["PaymentService", "NotificationService"];
-        private static readonly string[] PaidConsumers = ["InvoiceService", "NotificationService"];
-        private static readonly string[] NotificationOnlyConsumers = ["NotificationService"];
-        private static readonly string[] CompletedConsumers = ["NotificationService", "InvoiceService"];
-        private static readonly string[] CancelledConsumers = ["PaymentService", "NotificationService"];
+        private static readonly List<string> GenericStatusChangeConsumers = new List<string> { "NotificationService", "InvoiceService" };
+        private static readonly List<string> QuotedConsumers = new List<string> { "NotificationService", "InvoiceService" };
+        private static readonly List<string> AcceptedConsumers = new List<string> { "PaymentService", "NotificationService" };
+        private static readonly List<string> PaidConsumers = new List<string> { "InvoiceService", "NotificationService" };
+        private static readonly List<string> NotificationOnlyConsumers = new List<string> { "NotificationService" };
+        private static readonly List<string> CompletedConsumers = new List<string> { "NotificationService", "InvoiceService" };
+        private static readonly List<string> CancelledConsumers = new List<string> { "PaymentService", "NotificationService" };
 
         /// <inheritdoc />
         public async Task<List<OrderStatusResponse>> GetOrderStatusHistoryAsync(string orderId, CancellationToken cancellationToken = default)
@@ -152,7 +153,7 @@ namespace Maliev.OrderService.Api.Services.Business
             // Always publish generic OrderStatusChangedEvent
             await _publishEndpoint.Publish(new OrderStatusChangedEvent(
                 MessageId: Guid.NewGuid(),
-                MessageName: "OrderStatusChangedEvent",
+                MessageName: nameof(OrderStatusChangedEvent),
                 MessageType: MessageType.Event,
                 MessageVersion: "1.0.0",
                 PublishedBy: "OrderService",
@@ -178,7 +179,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Quoted:
                     await _publishEndpoint.Publish(new OrderQuotedEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderQuotedEvent",
+                        MessageName: nameof(OrderQuotedEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -202,7 +203,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Accepted:
                     await _publishEndpoint.Publish(new OrderAcceptedEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderAcceptedEvent",
+                        MessageName: nameof(OrderAcceptedEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -225,7 +226,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Paid:
                     await _publishEndpoint.Publish(new OrderPaidEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderPaidEvent",
+                        MessageName: nameof(OrderPaidEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -248,7 +249,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.InProgress:
                     await _publishEndpoint.Publish(new OrderInProgressEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderInProgressEvent",
+                        MessageName: nameof(OrderInProgressEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -271,7 +272,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Finished:
                     await _publishEndpoint.Publish(new OrderCompletedEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderCompletedEvent",
+                        MessageName: nameof(OrderCompletedEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -283,8 +284,11 @@ namespace Maliev.OrderService.Api.Services.Business
                         Payload: new OrderCompletedEventPayload(
                             OrderId: orderGuid,
                             OrderNumber: order.OrderId,
+                            CustomerId: customerGuid,
+                            CustomerName: null, // Default
                             CompletedAt: now,
-                            CompletedBy: StringToGuid(changedBy)
+                            CompletedBy: StringToGuid(changedBy),
+                            Items: new List<OrderCompletedEventPayloadItemsItem>() // Placeholder
                         )
                     ), cancellationToken);
                     break;
@@ -292,7 +296,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Shipped:
                     await _publishEndpoint.Publish(new OrderShippedEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderShippedEvent",
+                        MessageName: nameof(OrderShippedEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -315,7 +319,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Cancelled:
                     await _publishEndpoint.Publish(new OrderCancelledEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderCancelledEvent",
+                        MessageName: nameof(OrderCancelledEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -338,7 +342,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Rejected:
                     await _publishEndpoint.Publish(new OrderRejectedEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderRejectedEvent",
+                        MessageName: nameof(OrderRejectedEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -360,7 +364,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.OnHold:
                     await _publishEndpoint.Publish(new OrderOnHoldEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderOnHoldEvent",
+                        MessageName: nameof(OrderOnHoldEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
@@ -382,7 +386,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.Reopen:
                     await _publishEndpoint.Publish(new OrderReopenedEvent(
                         MessageId: Guid.NewGuid(),
-                        MessageName: "OrderReopenedEvent",
+                        MessageName: nameof(OrderReopenedEvent),
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
