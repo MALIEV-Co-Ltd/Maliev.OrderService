@@ -18,7 +18,7 @@ namespace Maliev.OrderService.Api.Services.External
         {
             try
             {
-                HttpResponseMessage response = await _httpClient.GetAsync($"/api/v1/customers/{customerId}/nda-status", cancellationToken);
+                HttpResponseMessage response = await _httpClient.GetAsync($"/customer/v1/ndas/customer/{customerId}", cancellationToken);
                 _ = response.EnsureSuccessStatusCode();
 
                 NdaStatusResponse? result = await response.Content.ReadFromJsonAsync<NdaStatusResponse>(cancellationToken: cancellationToken);
@@ -36,7 +36,7 @@ namespace Maliev.OrderService.Api.Services.External
         {
             try
             {
-                HttpResponseMessage response = await _httpClient.GetAsync($"/api/v1/customers/{customerId}", cancellationToken);
+                HttpResponseMessage response = await _httpClient.GetAsync($"/customer/v1/customers/{customerId}", cancellationToken);
                 _ = response.EnsureSuccessStatusCode();
 
                 return await response.Content.ReadFromJsonAsync<CustomerDetailsDto>(cancellationToken: cancellationToken);
