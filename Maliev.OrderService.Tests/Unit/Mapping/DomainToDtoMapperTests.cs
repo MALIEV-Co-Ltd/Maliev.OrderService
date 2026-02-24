@@ -8,7 +8,7 @@ namespace Maliev.OrderService.Tests.Unit.Mapping;
 public class DomainToDtoMapperTests
 {
     [Fact]
-    public void ToOrderResponse_MapsAllFields()
+    public void ToOrderResponseMapsAllFields()
     {
         var order = new Order
         {
@@ -32,7 +32,7 @@ public class DomainToDtoMapperTests
     }
 
     [Fact]
-    public void ToOrder_MapsRequestToModel()
+    public void ToOrderMapsRequestToModel()
     {
         var request = new CreateOrderRequest
         {
@@ -51,7 +51,7 @@ public class DomainToDtoMapperTests
     }
 
     [Fact]
-    public void UpdateOrder_UpdatesSpecificFields()
+    public void UpdateOrderUpdatesSpecificFields()
     {
         var order = new Order { Requirements = "Old" };
         var request = new UpdateOrderRequest
@@ -68,7 +68,7 @@ public class DomainToDtoMapperTests
     }
 
     [Fact]
-    public void ToOrderResponse_WithAttributes_MapsAttributes()
+    public void ToOrderResponseWithAttributesMapsAttributes()
     {
         var order = new Order
         {
@@ -98,7 +98,7 @@ public class DomainToDtoMapperTests
     }
 
     [Fact]
-    public void OrderStatus_Mappings_Work()
+    public void OrderStatusMappingsWork()
     {
         var request = new CreateOrderStatusRequest { Status = "Approved", InternalNotes = "Notes" };
         var model = request.ToOrderStatus();
@@ -110,7 +110,7 @@ public class DomainToDtoMapperTests
     }
 
     [Fact]
-    public void OrderFile_Mappings_Work()
+    public void OrderFileMappingsWork()
     {
         var request = new UploadOrderFileRequest { FileRole = "Input", FileCategory = "CAD" };
         var model = request.ToOrderFile();
@@ -122,7 +122,7 @@ public class DomainToDtoMapperTests
     }
 
     [Fact]
-    public void OrderNote_Mappings_Work()
+    public void OrderNoteMappingsWork()
     {
         var request = new CreateOrderNoteRequest { NoteType = "internal", NoteText = "Secret" };
         var model = request.ToOrderNote();

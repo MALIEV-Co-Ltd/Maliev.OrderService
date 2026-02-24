@@ -11,7 +11,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         private readonly OrderAuthorizationService _service = new();
 
         [Fact]
-        public void CanViewOrder_AdminRole_ReturnsTrue()
+        public void CanViewOrderAdminRoleReturnsTrue()
         {
             // Arrange
             var user = CreateUserWithRoles("Admin");
@@ -25,7 +25,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public void CanViewOrder_ManagerRole_ReturnsTrue()
+        public void CanViewOrderManagerRoleReturnsTrue()
         {
             // Arrange
             var user = CreateUserWithRoles(OrderPredefinedRoles.Manager);
@@ -39,7 +39,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public void CanViewOrder_CreatorRole_OwnOrder_ReturnsTrue()
+        public void CanViewOrderCreatorRoleOwnOrderReturnsTrue()
         {
             // Arrange
             string userId = "user-1";
@@ -54,7 +54,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public void CanViewOrder_CreatorRole_OthersOrder_ReturnsFalse()
+        public void CanViewOrderCreatorRoleOthersOrderReturnsFalse()
         {
             // Arrange
             string userId = "user-1";
@@ -69,7 +69,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public void CanViewOrder_FulfillmentRole_AssignedOrder_ReturnsTrue()
+        public void CanViewOrderFulfillmentRoleAssignedOrderReturnsTrue()
         {
             // Arrange
             string userId = "emp-1";
@@ -84,7 +84,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public void ApplyDataIsolationFilter_Creator_FiltersByCustomerId()
+        public void ApplyDataIsolationFilterCreatorFiltersByCustomerId()
         {
             // Arrange
             string userId = "user-1";
@@ -104,7 +104,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public void ApplyDataIsolationFilter_Fulfillment_FiltersByAssignedEmployeeId()
+        public void ApplyDataIsolationFilterFulfillmentFiltersByAssignedEmployeeId()
         {
             // Arrange
             string userId = "emp-1";
@@ -124,7 +124,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public void ApplyDataIsolationFilter_UnknownRole_ReturnsEmpty()
+        public void ApplyDataIsolationFilterUnknownRoleReturnsEmpty()
         {
             // Arrange
             var user = CreateUserWithRoles("Viewer");

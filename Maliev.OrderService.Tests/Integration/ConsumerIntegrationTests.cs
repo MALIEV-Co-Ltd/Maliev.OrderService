@@ -14,7 +14,7 @@ namespace Maliev.OrderService.Tests.Integration
         private readonly TestWebApplicationFactory _factory = factory;
 
         [Fact]
-        public async Task FileDeletedEvent_MarkOrderFileAsDeleted()
+        public async Task FileDeletedEventMarkOrderFileAsDeleted()
         {
             // 1. Arrange - Setup database with an order file
             using (var scope = _factory.Services.CreateScope())

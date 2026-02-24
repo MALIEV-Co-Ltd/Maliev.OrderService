@@ -13,7 +13,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] AdminRoles = ["Admin"];
 
         [Fact]
-        public async Task GET_OrderFiles_Returns_FileList()
+        public async Task GetOrderFilesReturnsFileList()
         {
             // Arrange - First create an order
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
@@ -28,7 +28,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task POST_OrderFile_Uploads_File()
+        public async Task PostOrderFileUploadsFile()
         {
             // Arrange - Create an order first
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
@@ -50,7 +50,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task GET_OrderFileById_Downloads_File()
+        public async Task GetOrderFileByIdDownloadsFile()
         {
             // Arrange - Create order and upload file first
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };

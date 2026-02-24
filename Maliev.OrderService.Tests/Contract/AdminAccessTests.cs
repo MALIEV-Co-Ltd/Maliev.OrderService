@@ -12,7 +12,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] AdminRoles = ["admin"];
 
         [Fact]
-        public async Task Admin_CanDeleteOrder()
+        public async Task AdminCanDeleteOrder()
         {
             // Arrange
             // Admin role should grant delete access
@@ -28,7 +28,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Admin_CanAccessReports()
+        public async Task AdminCanAccessReports()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient(

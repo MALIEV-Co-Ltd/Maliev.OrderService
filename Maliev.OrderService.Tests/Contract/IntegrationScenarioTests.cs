@@ -15,7 +15,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] CustomerRoles = ["customer"];
 
         [Fact]
-        public async Task Scenario1_CustomerCreatesConfidentialOrder_AutoNDA()
+        public async Task Scenario1CustomerCreatesConfidentialOrderAutoNda()
         {
             // Arrange - This test will FAIL until full implementation is complete
             // Customer creates confidential 3D printing order
@@ -41,7 +41,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Scenario2_EmployeeUpdatesStatus_WithDualNotes()
+        public async Task Scenario2EmployeeUpdatesStatusWithDualNotes()
         {
             // Arrange - Create an order first
             var createRequest = new
@@ -74,7 +74,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Scenario3_BatchOperation_AllOrNothingRollback()
+        public async Task Scenario3BatchOperationAllOrNothingRollback()
         {
             // Arrange - This test will FAIL until batch operations with transactions are implemented
             var batchRequest = new[]
@@ -94,7 +94,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Scenario4_FileUpload_WithRetryAndSizeValidation()
+        public async Task Scenario4FileUploadWithRetryAndSizeValidation()
         {
             // Arrange - This test will FAIL until file upload with Upload Service integration is implemented
             using var content = new MultipartFormDataContent();
@@ -114,7 +114,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Scenario5_OrderCancellation_WithPartialCharge()
+        public async Task Scenario5OrderCancellationWithPartialCharge()
         {
             // Arrange - Create an order first
             var createRequest = new
@@ -146,7 +146,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Scenario6_OptimisticConcurrency_ConflictHandling()
+        public async Task Scenario6OptimisticConcurrencyConflictHandling()
         {
             // NOTE: This test has a known limitation with in-memory database
             // In-memory DB doesn't auto-update RowVersion like PostgreSQL, so concurrency conflicts
@@ -198,7 +198,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Scenario7_RBAC_ContextBasedAuthorization()
+        public async Task Scenario7RbacContextBasedAuthorization()
         {
             // Arrange - Create an order for Customer 1
             var createRequest = new
@@ -225,7 +225,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Scenario8_MaterialCaching_With24HourTTL()
+        public async Task Scenario8MaterialCachingWith24HourTtl()
         {
             // Arrange - This test will FAIL until material caching is implemented
             var orderRequest = new

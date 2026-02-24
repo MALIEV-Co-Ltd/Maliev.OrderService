@@ -13,7 +13,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] AdminRoles = ["admin"];
 
         [Fact]
-        public async Task GetAnalyticsReport_AsAdmin_ReturnsOk()
+        public async Task GetAnalyticsReportAsAdminReturnsOk()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient(
@@ -29,7 +29,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task ExportReport_AsAdmin_ReturnsFile()
+        public async Task ExportReportAsAdminReturnsFile()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient(
@@ -47,7 +47,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task GetSalesReport_WithoutAdmin_ReturnsForbidden()
+        public async Task GetSalesReportWithoutAdminReturnsForbidden()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("normal-user", roles: ["customer"]);

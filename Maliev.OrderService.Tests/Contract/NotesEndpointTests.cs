@@ -13,7 +13,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] AdminRoles = ["Admin"];
 
         [Fact]
-        public async Task GET_OrderNotes_Returns_NotesList()
+        public async Task GetOrderNotesReturnsNotesList()
         {
             // Arrange - Create an order first
             var createRequest = new
@@ -35,7 +35,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task POST_OrderNote_Creates_Note_With_RBAC()
+        public async Task PostOrderNoteCreatesNoteWithRbac()
         {
             // Arrange - Create an order first
             var createRequest = new

@@ -13,9 +13,8 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] AdminRoles = ["Admin"];
 
         [Fact]
-        public async Task GET_OrderStatuses_Returns_History()
+        public async Task GetOrderStatusesReturnsHistory()
         {
-            // Arrange - First create an order
             var createRequest = new
             {
                 customerId = "CUST-001",
@@ -27,17 +26,15 @@ namespace Maliev.OrderService.Tests.Contract
             JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
             string? orderId = createdOrder.GetProperty("orderId").GetString();
 
-            // Act
             HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/statuses");
 
-            // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             string content = await response.Content.ReadAsStringAsync();
             Assert.NotEmpty(content);
         }
 
         [Fact]
-        public async Task POST_OrderStatus_Transitions_Through_Quoted_Accepted_Paid()
+        public async Task PostOrderStatusTransitionsThroughQuotedAcceptedPaid()
         {
             // 1. Create Order
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
@@ -69,7 +66,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task POST_OrderStatus_InvalidTransition_ReturnsBadRequest()
+        public async Task PostOrderStatusInvalidTransitionReturnsBadRequest()
         {
             // 1. Create Order
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
@@ -80,6 +77,5 @@ namespace Maliev.OrderService.Tests.Contract
             var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped" });
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
-
     }
 }

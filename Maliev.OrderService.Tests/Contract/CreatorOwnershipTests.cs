@@ -13,7 +13,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] CreatorRoles = ["roles.order.creator"];
 
         [Fact]
-        public async Task Creator_CanReadOwnOrder()
+        public async Task CreatorCanReadOwnOrder()
         {
             // Arrange
             string userId = "creator-001";
@@ -31,7 +31,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Creator_CannotReadOthersOrder()
+        public async Task CreatorCannotReadOthersOrder()
         {
             // Arrange
             string creator1 = "creator-001";

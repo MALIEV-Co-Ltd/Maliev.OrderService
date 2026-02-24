@@ -11,7 +11,7 @@ namespace Maliev.OrderService.Tests.Contract
         private readonly HttpClient _client = factory.CreateAuthenticatedClient("test-admin", ["Admin"], OrderPermissions.All);
 
         [Fact]
-        public async Task FileEndpoints_WorkCorrectly()
+        public async Task FileEndpointsWorkCorrectly()
         {
             // 1. Create Order
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
@@ -40,7 +40,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task NoteEndpoints_WorkCorrectly()
+        public async Task NoteEndpointsWorkCorrectly()
         {
             // 1. Create Order
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };

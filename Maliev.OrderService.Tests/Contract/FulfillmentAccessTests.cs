@@ -15,7 +15,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] UpdateOnlyPermissions = [OrderPermissions.OrdersUpdate];
 
         [Fact]
-        public async Task Fulfillment_CanMarkAsFulfilled()
+        public async Task FulfillmentCanMarkAsFulfilled()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("fulfillment-user",
@@ -34,7 +34,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Fulfillment_CannotUpdatePricing()
+        public async Task FulfillmentCannotUpdatePricing()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("fulfillment-user",

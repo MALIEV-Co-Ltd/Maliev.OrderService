@@ -7,7 +7,7 @@ namespace Maliev.OrderService.Tests.Infrastructure;
 public class ModelIntegrityTests
 {
     [Fact]
-    public void Model_ShouldNotHavePendingChanges()
+    public void ModelShouldNotHavePendingChanges()
     {
         var options = new DbContextOptionsBuilder<OrderDbContext>()
             .UseNpgsql("Host=localhost;Database=ModelCheck")

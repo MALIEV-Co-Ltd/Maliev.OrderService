@@ -15,7 +15,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         private readonly Mock<ILogger<PaymentCompletedEventConsumer>> _paymentLoggerMock = new();
 
         [Fact]
-        public async Task PaymentCompletedEventConsumer_Success_UpdatesStatus()
+        public async Task PaymentCompletedEventConsumerSuccessUpdatesStatus()
         {
             // Arrange
             _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
@@ -64,7 +64,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
-        public async Task PaymentCompletedEventConsumer_Error_Throws()
+        public async Task PaymentCompletedEventConsumerErrorThrows()
         {
             // Arrange
             _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Warning)).Returns(true);

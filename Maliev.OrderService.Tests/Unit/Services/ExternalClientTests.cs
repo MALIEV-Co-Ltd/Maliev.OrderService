@@ -16,7 +16,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         private readonly Mock<ILogger<UploadServiceClient>> _uploadLoggerMock = new();
 
         [Fact]
-        public async Task AuthServiceClient_ValidateTokenAsync_Success_ReturnsUserContext()
+        public async Task AuthServiceClientValidateTokenAsyncSuccessReturnsUserContext()
         {
             // Arrange
             var expectedContext = new UserContextDto
@@ -51,7 +51,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task AuthServiceClient_ValidateTokenAsync_Error_ReturnsNull()
+        public async Task AuthServiceClientValidateTokenAsyncErrorReturnsNull()
         {
             // Arrange
             var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
@@ -78,7 +78,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task CustomerServiceClient_GetCustomerDetailsAsync_Success_ReturnsDetails()
+        public async Task CustomerServiceClientGetCustomerDetailsAsyncSuccessReturnsDetails()
         {
             // Arrange
             var expectedDetails = new CustomerDetailsDto
@@ -113,7 +113,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task PaymentServiceClient_CalculatePartialChargeAsync_Success_ReturnsAmount()
+        public async Task PaymentServiceClientCalculatePartialChargeAsyncSuccessReturnsAmount()
         {
             // Arrange
             decimal expectedAmount = 50.5m;
@@ -142,7 +142,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task PaymentServiceClient_GetPaymentStatusAsync_Error_ReturnsNull()
+        public async Task PaymentServiceClientGetPaymentStatusAsyncErrorReturnsNull()
         {
             // Arrange
             var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
@@ -166,7 +166,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task IamServiceClient_GetUserPermissionsAsync_Success_ReturnsPermissions()
+        public async Task IamServiceClientGetUserPermissionsAsyncSuccessReturnsPermissions()
         {
             // Arrange
             string userId = "user-1";
@@ -199,7 +199,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task MaterialServiceClient_GetMaterialNameAsync_Success_ReturnsName()
+        public async Task MaterialServiceClientGetMaterialNameAsyncSuccessReturnsName()
         {
             // Arrange
             var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
@@ -231,7 +231,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task EmployeeServiceClient_GetEmployeeDetailsAsync_Success_ReturnsDetails()
+        public async Task EmployeeServiceClientGetEmployeeDetailsAsyncSuccessReturnsDetails()
         {
             // Arrange
             var expected = new EmployeeDetailsDto { EmployeeId = "emp-1", Name = "John Doe", Email = "john@example.com" };
@@ -252,7 +252,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task NotificationServiceClient_SendOrderNotificationAsync_Success_ReturnsTrue()
+        public async Task NotificationServiceClientSendOrderNotificationAsyncSuccessReturnsTrue()
         {
             // Arrange
             _notifLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
@@ -281,7 +281,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task UploadServiceClient_UploadFileAsync_Success_ReturnsResult()
+        public async Task UploadServiceClientUploadFileAsyncSuccessReturnsResult()
         {
             // Arrange
             var expected = new UploadFileResult { ObjectPath = "path/to/file", FileSizeBytes = 10, ContentType = "application/pdf", UploadedAt = DateTime.UtcNow };

@@ -12,7 +12,7 @@ namespace Maliev.OrderService.Tests.Contract
         private readonly TestWebApplicationFactory _factory = factory;
 
         [Fact]
-        public async Task Manager_CanCreateOrder()
+        public async Task ManagerCanCreateOrder()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("manager-user",
@@ -33,7 +33,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task Manager_CannotDeleteOrder()
+        public async Task ManagerCannotDeleteOrder()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("manager-user",

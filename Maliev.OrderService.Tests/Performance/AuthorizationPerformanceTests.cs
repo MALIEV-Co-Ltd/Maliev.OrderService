@@ -18,7 +18,7 @@ namespace Maliev.OrderService.Tests.Performance
         private readonly ITestOutputHelper _output = output;
 
         [Fact]
-        public async Task AuthorizationCheck_Latency_ShouldBeBelow50ms()
+        public async Task AuthorizationCheckLatencyShouldBeBelow50ms()
         {
             // Arrange
             string userId = "test-user-perf";

@@ -44,7 +44,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task CreateOrder_ShouldPublishOrderCreatedEvent()
+        public async Task CreateOrderShouldPublishOrderCreatedEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest
@@ -91,7 +91,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateOrderStatus_ShouldPublishOrderStatusChangedEvent()
+        public async Task UpdateOrderStatusShouldPublishOrderStatusChangedEvent()
         {
             // Arrange
             // First create an order
@@ -148,7 +148,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateStatusToQuoted_ShouldPublishOrderQuotedEvent()
+        public async Task UpdateStatusToQuotedShouldPublishOrderQuotedEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest
@@ -209,7 +209,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateStatusToAccepted_ShouldPublishOrderAcceptedEvent()
+        public async Task UpdateStatusToAcceptedShouldPublishOrderAcceptedEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest
@@ -272,7 +272,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateStatusToCancelled_ShouldPublishOrderCancelledEvent()
+        public async Task UpdateStatusToCancelledShouldPublishOrderCancelledEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest
@@ -328,7 +328,7 @@ namespace Maliev.OrderService.Tests.Integration
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5351:Do Not Use Broken Cryptographic Algorithms", Justification = "MD5 is used for deterministic hashing in tests, not cryptography")]
         [Fact]
-        public async Task PaymentCompletedEventConsumer_ShouldUpdateOrderToPaidStatus()
+        public async Task PaymentCompletedEventConsumerShouldUpdateOrderToPaidStatus()
         {
             // Arrange
             // Create an order and accept it
@@ -434,7 +434,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateStatusToPaid_ShouldPublishOrderPaidEvent()
+        public async Task UpdateStatusToPaidShouldPublishOrderPaidEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest
@@ -499,7 +499,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateStatusToInProgress_ShouldPublishOrderInProgressEvent()
+        public async Task UpdateStatusToInProgressShouldPublishOrderInProgressEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest
@@ -566,7 +566,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateStatusToFinished_ShouldPublishOrderCompletedEvent()
+        public async Task UpdateStatusToFinishedShouldPublishOrderCompletedEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest

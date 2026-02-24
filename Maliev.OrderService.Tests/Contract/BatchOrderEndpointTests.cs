@@ -17,7 +17,7 @@ namespace Maliev.OrderService.Tests.Contract
         private static readonly string[] AdminRoles = ["Admin"];
 
         [Fact]
-        public async Task POST_BatchOrders_Creates_Multiple_Orders()
+        public async Task PostBatchOrdersCreatesMultipleOrders()
         {
             // Arrange
             await _factory.ResetDatabaseAsync();
@@ -35,7 +35,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task PUT_BatchOrders_Updates_Multiple_Orders()
+        public async Task PutBatchOrdersUpdatesMultipleOrders()
         {
             // Arrange - Create 2 orders first
             await _factory.ResetDatabaseAsync();
@@ -67,7 +67,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task DELETE_BatchOrders_Cancels_Multiple_Orders()
+        public async Task DeleteBatchOrdersCancelsMultipleOrders()
         {
             // Arrange - Create 2 orders first
             await _factory.ResetDatabaseAsync();
@@ -92,7 +92,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task POST_BatchOrders_ValidationFailure_ReturnsBadRequest()
+        public async Task PostBatchOrdersValidationFailureReturnsBadRequest()
         {
             // Arrange
             var batchRequest = new[]
@@ -108,7 +108,7 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
-        public async Task POST_BatchCancel_NotFound_ReturnsNotFound()
+        public async Task PostBatchCancelNotFoundReturnsNotFound()
         {
             // Arrange
             string[] orderIds = ["NON-EXISTENT-1"];

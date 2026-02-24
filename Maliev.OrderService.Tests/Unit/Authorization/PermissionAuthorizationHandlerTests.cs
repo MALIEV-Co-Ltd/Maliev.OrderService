@@ -37,7 +37,7 @@ namespace Maliev.OrderService.Tests.Unit.Authorization
         }
 
         [Fact]
-        public async Task HandleRequirementAsync_CacheHit_Succeeds()
+        public async Task HandleRequirementAsyncCacheHitSucceeds()
         {
             // Arrange
             string userId = "user-1";
@@ -58,7 +58,7 @@ namespace Maliev.OrderService.Tests.Unit.Authorization
         }
 
         [Fact]
-        public async Task HandleRequirementAsync_CacheMiss_FetchesFromIam_Succeeds()
+        public async Task HandleRequirementAsyncCacheMissFetchesFromIamSucceeds()
         {
             // Arrange
             string userId = "user-1";
@@ -87,7 +87,7 @@ namespace Maliev.OrderService.Tests.Unit.Authorization
         }
 
         [Fact]
-        public async Task HandleRequirementAsync_MissingPermission_DoesNotSucceed()
+        public async Task HandleRequirementAsyncMissingPermissionDoesNotSucceed()
         {
             // Arrange
             string userId = "user-1";
@@ -108,7 +108,7 @@ namespace Maliev.OrderService.Tests.Unit.Authorization
         }
 
         [Fact]
-        public async Task HandleRequirementAsync_IamError_DoesNotSucceed()
+        public async Task HandleRequirementAsyncIamErrorDoesNotSucceed()
         {
             // Arrange
             string userId = "user-1";

@@ -6,7 +6,7 @@ namespace Maliev.OrderService.Tests.Unit.Extensions
     public class ClaimsPrincipalExtensionsTests
     {
         [Fact]
-        public void GetUserId_ReturnsNameIdentifier()
+        public void GetUserIdReturnsNameIdentifier()
         {
             var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "user-123") };
             var principal = new ClaimsPrincipal(new ClaimsIdentity(claims));
@@ -15,7 +15,7 @@ namespace Maliev.OrderService.Tests.Unit.Extensions
         }
 
         [Fact]
-        public void GetRoles_ReturnsAllRoles()
+        public void GetRolesReturnsAllRoles()
         {
             var claims = new[]
             {
@@ -31,7 +31,7 @@ namespace Maliev.OrderService.Tests.Unit.Extensions
         }
 
         [Fact]
-        public void HasPermission_ReturnsTrueIfFound()
+        public void HasPermissionReturnsTrueIfFound()
         {
             var claims = new[] { new Claim("permissions", "orders.read") };
             var principal = new ClaimsPrincipal(new ClaimsIdentity(claims));
