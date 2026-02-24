@@ -123,7 +123,17 @@ namespace Maliev.OrderService.Api.Services.Business
                     TotalAmount: (double)(response.QuotedAmount ?? 0),
                     Currency: response.QuoteCurrency ?? "THB",
                     CreatedAt: new DateTimeOffset(response.CreatedAt, TimeSpan.Zero),
-                    AssignedEmployeeId: response.AssignedEmployeeId != null ? StringToGuid(response.AssignedEmployeeId) : null
+                    AssignedEmployeeId: response.AssignedEmployeeId != null ? StringToGuid(response.AssignedEmployeeId) : null,
+                    Items: [
+                        new OrderCreatedEventPayloadItemsItem(
+                            ProductId: response.MaterialId.HasValue ? StringToGuid(response.MaterialId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) : Guid.Empty,
+                            ProductCode: response.MaterialName ?? "Unknown",
+                            ProductName: response.MaterialName ?? "Unknown",
+                            Quantity: (double)(response.OrderedQuantity ?? 1),
+                            UnitPrice: (double)(response.QuotedAmount ?? 0) / (double)(response.OrderedQuantity ?? 1),
+                            LineTotal: (double)(response.QuotedAmount ?? 0)
+                        )
+                    ]
                 )
             ), cancellationToken);
 

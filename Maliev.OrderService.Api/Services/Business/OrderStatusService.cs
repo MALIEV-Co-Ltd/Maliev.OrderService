@@ -284,11 +284,25 @@ namespace Maliev.OrderService.Api.Services.Business
                         Payload: new OrderCompletedEventPayload(
                             OrderId: orderGuid,
                             OrderNumber: order.OrderId,
-                            CustomerId: customerGuid,
-                            CustomerName: null, // Default
+                            QuotationId: Guid.Empty,
+                            OrderCreatedAt: new DateTimeOffset(order.CreatedAt, TimeSpan.Zero),
                             CompletedAt: now,
                             CompletedBy: StringToGuid(changedBy),
-                            Items: new List<OrderCompletedEventPayloadItemsItem>() // Placeholder
+                            JobSucceeded: true,
+                            ActualMaterialUsedCm3: null,
+                            ActualPrintTimeHours: null,
+                            ActualLaborHours: null,
+                            ActualTotalCost: null,
+                            Items: [
+                                new OrderCompletedEventPayloadItemsItem(
+                                    ProductId: order.MaterialId.HasValue ? StringToGuid(order.MaterialId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) : Guid.Empty,
+                                    ProductCode: order.MaterialName ?? "Unknown",
+                                    ProductName: order.MaterialName ?? "Unknown",
+                                    Quantity: (double)(order.OrderedQuantity ?? 1),
+                                    UnitPrice: (double)(order.QuotedAmount ?? 0) / (double)(order.OrderedQuantity ?? 1),
+                                    LineTotal: (double)(order.QuotedAmount ?? 0)
+                                )
+                            ]
                         )
                     ), cancellationToken);
                     break;

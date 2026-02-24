@@ -1,4 +1,5 @@
 using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.OrderService.Api.Consumers;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
