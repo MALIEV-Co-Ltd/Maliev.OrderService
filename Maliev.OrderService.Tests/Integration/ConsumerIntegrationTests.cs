@@ -1,4 +1,4 @@
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Uploads;
 using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Data;

@@ -1,4 +1,4 @@
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.Services.Business;
@@ -55,7 +55,7 @@ namespace Maliev.OrderService.Api.Consumers
                 // Order not found or invalid state transition
                 Log.FailedToUpdateOrderToPaidStatus(_logger, ex, payload.OrderId, ex.Message);
 
-                // Re-throw to trigger retry/dead-letter. 
+                // Re-throw to trigger retry/dead-letter.
                 // Silently ignoring a payment completion event is a data integrity risk.
                 throw;
             }

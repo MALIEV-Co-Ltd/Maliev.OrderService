@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.OrderService.Api.DTOs.Request;
