@@ -1,7 +1,7 @@
 using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Domain.Entities;
 using System.Security.Claims;
 
 namespace Maliev.OrderService.Api.Services.Business

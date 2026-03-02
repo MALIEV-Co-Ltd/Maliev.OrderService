@@ -1,6 +1,6 @@
 using Maliev.OrderService.Api.Services.External;
-using Maliev.OrderService.Data;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Infrastructure.Persistence;
+using Maliev.OrderService.Domain.Entities;
 using Maliev.OrderService.Tests.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

@@ -4,7 +4,7 @@ using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Api.Services;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
-using Maliev.OrderService.Data;
+using Maliev.OrderService.Infrastructure.Persistence;
 
 // Initialize bootstrap logging
 using ILoggerFactory loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());

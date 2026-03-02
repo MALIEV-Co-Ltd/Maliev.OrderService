@@ -1,4 +1,4 @@
-using Maliev.OrderService.Data;
+using Maliev.OrderService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

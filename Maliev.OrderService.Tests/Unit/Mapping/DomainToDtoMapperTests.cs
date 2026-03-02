@@ -1,6 +1,6 @@
 using Maliev.OrderService.Api.Mapping;
 using Maliev.OrderService.Api.DTOs.Request;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Domain.Entities;
 using Xunit;
 
 namespace Maliev.OrderService.Tests.Unit.Mapping;

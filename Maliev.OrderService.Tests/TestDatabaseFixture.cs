@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Maliev.OrderService.Data;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Infrastructure.Persistence;
+using Maliev.OrderService.Domain.Entities;
 using System.Reflection;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;

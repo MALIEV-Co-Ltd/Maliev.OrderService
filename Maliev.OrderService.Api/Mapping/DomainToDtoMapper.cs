@@ -1,6 +1,6 @@
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Domain.Entities;
 using System.Globalization;
 
 namespace Maliev.OrderService.Api.Mapping

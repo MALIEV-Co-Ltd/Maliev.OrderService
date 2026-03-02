@@ -1,7 +1,7 @@
 using System.Net;
 using Maliev.OrderService.Api.Authorization;
-using Maliev.OrderService.Data.Models;
-using Maliev.OrderService.Data;
+using Maliev.OrderService.Domain.Entities;
+using Maliev.OrderService.Infrastructure.Persistence;
 
 namespace Maliev.OrderService.Tests.Contract
 {

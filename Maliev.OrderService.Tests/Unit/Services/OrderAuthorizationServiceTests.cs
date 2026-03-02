@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Services.Business;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Domain.Entities;
 
 namespace Maliev.OrderService.Tests.Unit.Services
 {
