@@ -1,4 +1,6 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.Services.Business;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +13,6 @@ namespace Maliev.OrderService.Api.Controllers
     [ApiController]
     [ApiVersion("1.0")]
     [Route("order/v{version:apiVersion}/metrics")]
-    [Authorize]
     public class MetricsController : ControllerBase
     {
         private readonly IOrderManagementService _orderManagementService;
@@ -30,6 +31,7 @@ namespace Maliev.OrderService.Api.Controllers
         /// Get the count of active orders.
         /// </summary>
         [HttpGet("active-count")]
+        [RequirePermission(OrderPermissions.ReportsAnalytics)]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetActiveCount(CancellationToken cancellationToken)
         {

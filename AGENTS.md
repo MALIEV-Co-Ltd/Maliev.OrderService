@@ -9,9 +9,12 @@ This file provides context, commands, and strict guidelines for AI agents workin
 - **Database**: PostgreSQL (Npgsql, EF Core 10.0.0). Uses `xmin` system column for optimistic concurrency.
 - **Messaging**: MassTransit (RabbitMQ) with `Maliev.MessagingContracts`.
 - **Integration**: Aspire Service Defaults, Google Secret Manager (`/mnt/secrets`).
+- **Architecture**: Clean Architecture (Api, Application, Domain, Infrastructure, Tests)
 - **Structure**:
-    - `Maliev.OrderService.Api`: Main Web API
-    - `Maliev.OrderService.Data`: EF Core Context, Models, Migrations
+    - `Maliev.OrderService.Api`: Controllers, Middleware
+    - `Maliev.OrderService.Application`: Use cases, handlers, DTOs
+    - `Maliev.OrderService.Domain`: Entities, interfaces
+    - `Maliev.OrderService.Infrastructure`: EF Core, repositories
     - `Maliev.OrderService.Tests`: xUnit, Testcontainers, Integration Tests
 
 ## 2. Build & Test Commands
@@ -79,7 +82,7 @@ dotnet run --project Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
 - **Controllers**: Return `IActionResult` (`Ok`, `NotFound`, `BadRequest`, `Conflict`, `Forbid`).
 - **DTOs**: Use `ErrorMessageResponse` for failures.
 - **Concurrency**: Catch `DbUpdateConcurrencyException` -> return HTTP 409 Conflict.
-- **Validation**: Use FluentValidation or `ModelState.IsValid`.
+- **Validation**: Use Data Annotations (`[Required]`, `[EmailAddress]`) or `ModelState.IsValid`.
 
 ## 4. Architecture & Patterns
 

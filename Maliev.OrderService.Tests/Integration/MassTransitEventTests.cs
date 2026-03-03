@@ -395,6 +395,9 @@ namespace Maliev.OrderService.Tests.Integration
 
                 await harness.Bus.Publish(paymentCompletedEvent);
 
+                // Wait for message to be delivered to consumer
+                await Task.Delay(1000);
+
                 // Wait for consumer to process - check the specific consumer harness
                 var consumerHarness = harness.GetConsumerHarness<Maliev.OrderService.Api.Consumers.PaymentCompletedEventConsumer>();
                 bool consumed = await consumerHarness.Consumed.Any<PaymentCompletedEvent>(x => x.Context.Message.Payload.OrderNumber == createdOrder.OrderId);
