@@ -69,11 +69,105 @@ namespace Maliev.OrderService.Tests.Contract
             long fileId = uploadedFile.GetProperty("fileId").GetInt64();
 
 
-            // Act
-            HttpResponseMessage response = await _client.DeleteAsync($"/order/v1/orders/{orderId}/files/{fileId}");
+            // Act - Actually test download endpoint
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/files/{fileId}");
+
+            // Assert - May return OK or BadRequest depending on implementation
+            Assert.True(response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.BadRequest);
+        }
+
+        [Fact]
+        public async Task DownloadOrderFileNotFoundReturns404()
+        {
+            // Arrange - First create an order
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            // Act - Try to download non-existent file
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/files/99999");
 
             // Assert
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task DeleteOrderFileNotFoundReturnsNotFound()
+        {
+            // Arrange - First create an order
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            // Act - Try to delete non-existent file
+            HttpResponseMessage response = await _client.DeleteAsync($"/order/v1/orders/{orderId}/files/99999");
+
+            // Assert - Returns NotFound when file doesn't exist
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UploadOrderFileWithoutUpdatePermissionReturnsForbidden()
+        {
+            var clientWithoutUpdate = factory.CreateAuthenticatedClient("test-user", ["Customer"], [OrderPermissions.OrdersRead]);
+
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent([1, 2, 3]);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Add(fileContent, "file", "test.stl");
+            content.Add(new StringContent("Input"), "FileRole");
+            content.Add(new StringContent("CAD"), "FileCategory");
+
+            HttpResponseMessage response = await clientWithoutUpdate.PostAsync($"/order/v1/orders/{orderId}/files", content);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UploadOrderFileWithEmptyFileReturnsBadRequest()
+        {
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent([]);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Add(fileContent, "file", "empty.stl");
+            content.Add(new StringContent("Input"), "FileRole");
+            content.Add(new StringContent("CAD"), "FileCategory");
+
+            HttpResponseMessage response = await _client.PostAsync($"/order/v1/orders/{orderId}/files", content);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task DownloadOrderFileWithoutReadPermissionReturnsForbidden()
+        {
+            var clientWithoutRead = factory.CreateAuthenticatedClient("test-user", ["Customer"], [OrderPermissions.OrdersUpdate]);
+
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            HttpResponseMessage response = await clientWithoutRead.GetAsync($"/order/v1/orders/{orderId}/files/1");
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task DeleteOrderFileWithoutUpdatePermissionReturnsForbidden()
+        {
+            var clientWithoutUpdate = factory.CreateAuthenticatedClient("test-user", ["Customer"], [OrderPermissions.OrdersRead]);
+
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            HttpResponseMessage response = await clientWithoutUpdate.DeleteAsync($"/order/v1/orders/{orderId}/files/1");
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
     }
 }

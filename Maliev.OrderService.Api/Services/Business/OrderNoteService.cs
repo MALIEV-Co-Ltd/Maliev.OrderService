@@ -1,8 +1,8 @@
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Mapping;
-using Maliev.OrderService.Data;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Infrastructure.Persistence;
+using Maliev.OrderService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Api.Services.Business

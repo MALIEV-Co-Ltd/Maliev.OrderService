@@ -2,8 +2,8 @@ using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Mapping;
 using Maliev.OrderService.Api.Services.External;
-using Maliev.OrderService.Data;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Infrastructure.Persistence;
+using Maliev.OrderService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Api.Services.Business
@@ -103,7 +103,7 @@ namespace Maliev.OrderService.Api.Services.Business
             file.DeletedAt = DateTime.UtcNow;
             _ = await _context.SaveChangesAsync(cancellationToken);
 
-            // Note: Hard deletion from GCS is typically handled by a background cleanup service 
+            // Note: Hard deletion from GCS is typically handled by a background cleanup service
             // after the retention period (30 days) has passed.
             // Explicit immediate deletion can be awaited if necessary, but we follow the soft-delete policy.
 

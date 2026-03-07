@@ -1,7 +1,7 @@
 using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Uploads;
-using Maliev.OrderService.Data;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Infrastructure.Persistence;
+using Maliev.OrderService.Domain.Entities;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 

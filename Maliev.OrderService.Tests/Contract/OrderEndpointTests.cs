@@ -175,5 +175,173 @@ namespace Maliev.OrderService.Tests.Contract
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
+
+        [Fact]
+        public async Task GetOrdersFilteredByCustomer()
+        {
+            // Create orders with different customers
+            var createRequest1 = new { customerId = "CUST-FILTER-001", customerType = "Customer", serviceCategoryId = 1 };
+            var createRequest2 = new { customerId = "CUST-FILTER-002", customerType = "Customer", serviceCategoryId = 1 };
+
+            await _client.PostAsJsonAsync("/order/v1/orders", createRequest1);
+            await _client.PostAsJsonAsync("/order/v1/orders", createRequest2);
+
+            // Act - Filter by customer
+            HttpResponseMessage response = await _client.GetAsync("/order/v1/orders?customerId=CUST-FILTER-001");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            string content = await response.Content.ReadAsStringAsync();
+            Assert.Contains("CUST-FILTER-001", content);
+        }
+
+        [Fact]
+        public async Task GetOrdersFilteredByStatus()
+        {
+            // Create an order
+            var createRequest = new { customerId = "CUST-STATUS-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            // Update status to Quoted
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewing" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewed" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Quoted" });
+
+            // Act - Filter by status
+            HttpResponseMessage response = await _client.GetAsync("/order/v1/orders?status=Quoted");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetOrdersWithPagination()
+        {
+            // Act
+            HttpResponseMessage response = await _client.GetAsync("/order/v1/orders?page=1&pageSize=10");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            string content = await response.Content.ReadAsStringAsync();
+            Assert.NotEmpty(content);
+        }
+
+        [Fact]
+        public async Task GetOrdersUnauthorizedWithoutToken()
+        {
+            // Arrange - Create unauthenticated client
+            var unauthenticatedFactory = new TestWebApplicationFactory();
+            var unauthenticatedClient = unauthenticatedFactory.CreateClient();
+
+            // Act
+            HttpResponseMessage response = await unauthenticatedClient.GetAsync("/order/v1/orders");
+
+            // Assert - Should return 401 or redirect
+            Assert.True(response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden);
+        }
+
+        [Fact]
+        public async Task PostOrderCancelWithoutCancelPermissionReturnsForbidden()
+        {
+            var clientWithoutCancel = factory.CreateAuthenticatedClient("test-user", ["Manager"], [OrderPermissions.OrdersRead, OrderPermissions.OrdersUpdate]);
+
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
+
+            HttpResponseMessage response = await clientWithoutCancel.DeleteAsync($"/order/v1/orders/{orderId}");
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task PostOrderCancelWithReasonWithoutCancelPermissionReturnsForbidden()
+        {
+            var clientWithoutCancel = factory.CreateAuthenticatedClient("test-user", ["Manager"], [OrderPermissions.OrdersRead, OrderPermissions.OrdersUpdate]);
+
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
+
+            var cancelRequest = new { cancellationReason = "Customer request" };
+            HttpResponseMessage response = await clientWithoutCancel.PostAsJsonAsync($"/order/v1/orders/{orderId}/cancel", cancelRequest);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetOrderByIdDataIsolationCustomerCannotSeeOtherCustomerOrder()
+        {
+            var customerClient = factory.CreateAuthenticatedClient("customer-1", ["Customer"], [OrderPermissions.OrdersRead]);
+
+            var createRequest = new { customerId = "customer-2", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
+
+            HttpResponseMessage response = await customerClient.GetAsync($"/order/v1/orders/{orderId}");
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task CreateOrderWithInvalidCustomerTypeReturnsBadRequest()
+        {
+            var createRequest = new
+            {
+                customerId = "CUST-001",
+                customerType = "InvalidType",
+                serviceCategoryId = 1
+            };
+
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task CreateOrderWithMissingRequiredFieldsReturnsBadRequest()
+        {
+            var createRequest = new
+            {
+                customerId = "CUST-001"
+            };
+
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UpdateOrderNotFoundReturnsNotFound()
+        {
+            var updateRequest = new
+            {
+                version = "1",
+                assignedEmployeeId = "EMP-001"
+            };
+
+            HttpResponseMessage response = await _client.PutAsJsonAsync("/order/v1/orders/NON-EXISTENT-ORDER", updateRequest);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task CancelOrderNotFoundReturnsNotFound()
+        {
+            HttpResponseMessage response = await _client.DeleteAsync("/order/v1/orders/NON-EXISTENT-ORDER");
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task CancelOrderAlreadyCancelledAllowsIdempotentOperation()
+        {
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string? orderId = createdOrder.GetProperty("orderId").GetString();
+
+            await _client.DeleteAsync($"/order/v1/orders/{orderId}");
+
+            HttpResponseMessage response = await _client.DeleteAsync($"/order/v1/orders/{orderId}");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
     }
 }

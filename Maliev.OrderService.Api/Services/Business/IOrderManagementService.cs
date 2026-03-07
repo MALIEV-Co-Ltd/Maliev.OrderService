@@ -1,6 +1,6 @@
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
-using Maliev.OrderService.Data.Models;
+using Maliev.OrderService.Domain.Entities;
 
 namespace Maliev.OrderService.Api.Services.Business
 {
