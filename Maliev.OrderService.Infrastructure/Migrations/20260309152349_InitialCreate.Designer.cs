@@ -3,17 +3,20 @@ using System;
 using Maliev.OrderService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
+namespace Maliev.OrderService.Infrastructure.Migrations
 {
     [DbContext(typeof(OrderDbContext))]
-    partial class OrderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260309152349_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -24,7 +27,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence("order_id_seq");
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.AuditLog", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.AuditLog", b =>
                 {
                     b.Property<long>("AuditId")
                         .ValueGeneratedOnAdd()
@@ -91,7 +94,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.NotificationSubscription", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.NotificationSubscription", b =>
                 {
                     b.Property<int>("SubscriptionId")
                         .ValueGeneratedOnAdd()
@@ -135,7 +138,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_subscriptions", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order", b =>
                 {
                     b.Property<string>("OrderId")
                         .HasMaxLength(50)
@@ -328,7 +331,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("orders", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DDesignAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order3DDesignAttributes", b =>
                 {
                     b.Property<string>("OrderId")
                         .HasMaxLength(50)
@@ -362,7 +365,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_3d_design_attributes", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DPrintingAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order3DPrintingAttributes", b =>
                 {
                     b.Property<string>("OrderId")
                         .HasMaxLength(50)
@@ -398,7 +401,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_3d_printing_attributes", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DScanningAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order3DScanningAttributes", b =>
                 {
                     b.Property<string>("OrderId")
                         .HasMaxLength(50)
@@ -431,7 +434,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_3d_scanning_attributes", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderCncMachiningAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderCncMachiningAttributes", b =>
                 {
                     b.Property<string>("OrderId")
                         .HasMaxLength(50)
@@ -468,7 +471,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_cnc_machining_attributes", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderFile", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderFile", b =>
                 {
                     b.Property<long>("FileId")
                         .ValueGeneratedOnAdd()
@@ -522,6 +525,12 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("file_type");
 
+                    b.Property<bool>("IsPrimary")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_primary");
+
                     b.Property<string>("ObjectPath")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -568,7 +577,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_files", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderNote", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderNote", b =>
                 {
                     b.Property<long>("NoteId")
                         .ValueGeneratedOnAdd()
@@ -624,7 +633,63 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_notes", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderSheetMetalAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderPreviewImage", b =>
+                {
+                    b.Property<long>("PreviewImageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("preview_image_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("PreviewImageId"));
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("generated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("OrderId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("side");
+
+                    b.Property<long?>("SourceFileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_file_id");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("storage_path");
+
+                    b.HasKey("PreviewImageId")
+                        .HasName("pk_order_preview_images");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix__order_preview_image__order_id");
+
+                    b.HasIndex("Side")
+                        .HasDatabaseName("ix__order_preview_image__side");
+
+                    b.HasIndex("SourceFileId")
+                        .HasDatabaseName("ix_order_preview_images_source_file_id");
+
+                    b.HasIndex("OrderId", "Side")
+                        .IsUnique()
+                        .HasDatabaseName("ix__order_preview_image__order_id__side");
+
+                    b.ToTable("order_preview_images", (string)null);
+                });
+
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderSheetMetalAttributes", b =>
                 {
                     b.Property<string>("OrderId")
                         .HasMaxLength(50)
@@ -662,7 +727,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_sheet_metal_attributes", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderStatus", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderStatus", b =>
                 {
                     b.Property<long>("StatusId")
                         .ValueGeneratedOnAdd()
@@ -718,7 +783,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("order_statuses", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.ProcessType", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.ProcessType", b =>
                 {
                     b.Property<int>("ProcessTypeId")
                         .ValueGeneratedOnAdd()
@@ -757,7 +822,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("process_types", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.ServiceCategory", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.ServiceCategory", b =>
                 {
                     b.Property<int>("CategoryId")
                         .ValueGeneratedOnAdd()
@@ -792,9 +857,9 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.ToTable("service_categories", (string)null);
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.AuditLog", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.AuditLog", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithMany("AuditLogs")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -804,15 +869,15 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.ProcessType", "ProcessType")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.ProcessType", "ProcessType")
                         .WithMany("Orders")
                         .HasForeignKey("ProcessTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_orders_process_types_process_type_id");
 
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.ServiceCategory", "ServiceCategory")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.ServiceCategory", "ServiceCategory")
                         .WithMany("Orders")
                         .HasForeignKey("ServiceCategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -824,11 +889,11 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("ServiceCategory");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DDesignAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order3DDesignAttributes", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithOne("DesignAttributes")
-                        .HasForeignKey("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DDesignAttributes", "OrderId")
+                        .HasForeignKey("Maliev.OrderService.Domain.Entities.Order3DDesignAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_3d_design_attributes_orders_order_id");
@@ -836,11 +901,11 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DPrintingAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order3DPrintingAttributes", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithOne("PrintingAttributes")
-                        .HasForeignKey("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DPrintingAttributes", "OrderId")
+                        .HasForeignKey("Maliev.OrderService.Domain.Entities.Order3DPrintingAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_3d_printing_attributes_orders_order_id");
@@ -848,11 +913,11 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DScanningAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order3DScanningAttributes", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithOne("ScanningAttributes")
-                        .HasForeignKey("Maliev.OrderService.Infrastructure.Persistence.Models.Order3DScanningAttributes", "OrderId")
+                        .HasForeignKey("Maliev.OrderService.Domain.Entities.Order3DScanningAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_3d_scanning_attributes_orders_order_id");
@@ -860,11 +925,11 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderCncMachiningAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderCncMachiningAttributes", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithOne("CncAttributes")
-                        .HasForeignKey("Maliev.OrderService.Infrastructure.Persistence.Models.OrderCncMachiningAttributes", "OrderId")
+                        .HasForeignKey("Maliev.OrderService.Domain.Entities.OrderCncMachiningAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_cnc_machining_attributes_orders_order_id");
@@ -872,9 +937,9 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderFile", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderFile", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithMany("OrderFiles")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -884,9 +949,9 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderNote", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderNote", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithMany("OrderNotes")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -896,11 +961,30 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderSheetMetalAttributes", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderPreviewImage", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_preview_images_orders_order_id");
+
+                    b.HasOne("Maliev.OrderService.Domain.Entities.OrderFile", "SourceFile")
+                        .WithMany()
+                        .HasForeignKey("SourceFileId")
+                        .HasConstraintName("fk_order_preview_images_order_files_source_file_id");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("SourceFile");
+                });
+
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderSheetMetalAttributes", b =>
+                {
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithOne("SheetMetalAttributes")
-                        .HasForeignKey("Maliev.OrderService.Infrastructure.Persistence.Models.OrderSheetMetalAttributes", "OrderId")
+                        .HasForeignKey("Maliev.OrderService.Domain.Entities.OrderSheetMetalAttributes", "OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_order_sheet_metal_attributes_orders_order_id");
@@ -908,9 +992,9 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.OrderStatus", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.OrderStatus", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.Order", "Order")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.Order", "Order")
                         .WithMany("OrderStatuses")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -920,9 +1004,9 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.ProcessType", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.ProcessType", b =>
                 {
-                    b.HasOne("Maliev.OrderService.Infrastructure.Persistence.Models.ServiceCategory", "ServiceCategory")
+                    b.HasOne("Maliev.OrderService.Domain.Entities.ServiceCategory", "ServiceCategory")
                         .WithMany("ProcessTypes")
                         .HasForeignKey("ServiceCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -932,7 +1016,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("ServiceCategory");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.Order", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.Order", b =>
                 {
                     b.Navigation("AuditLogs");
 
@@ -953,12 +1037,12 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Migrations
                     b.Navigation("SheetMetalAttributes");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.ProcessType", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.ProcessType", b =>
                 {
                     b.Navigation("Orders");
                 });
 
-            modelBuilder.Entity("Maliev.OrderService.Infrastructure.Persistence.Models.ServiceCategory", b =>
+            modelBuilder.Entity("Maliev.OrderService.Domain.Entities.ServiceCategory", b =>
                 {
                     b.Navigation("Orders");
 

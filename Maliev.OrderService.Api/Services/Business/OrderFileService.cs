@@ -65,6 +65,19 @@ namespace Maliev.OrderService.Api.Services.Business
             orderFile.UploadedAt = DateTime.UtcNow;
 
             _ = _context.OrderFiles.Add(orderFile);
+
+            // Auto-set as primary if this is the first CAD file uploaded
+            if (orderFile.FileCategory == "CAD")
+            {
+                bool hasPrimary = await _context.OrderFiles
+                    .AnyAsync(f => f.OrderId == orderId && f.FileCategory == "CAD" && f.IsPrimary && f.DeletedAt == null, cancellationToken);
+
+                if (!hasPrimary)
+                {
+                    orderFile.IsPrimary = true;
+                }
+            }
+
             _ = await _context.SaveChangesAsync(cancellationToken);
 
             return orderFile.ToOrderFileResponse();
@@ -107,6 +120,34 @@ namespace Maliev.OrderService.Api.Services.Business
             // after the retention period (30 days) has passed.
             // Explicit immediate deletion can be awaited if necessary, but we follow the soft-delete policy.
 
+            return true;
+        }
+
+        /// <inheritdoc />
+        public async Task<bool> SetPrimaryFileAsync(string orderId, long fileId, CancellationToken cancellationToken = default)
+        {
+            OrderFile? file = await _context.OrderFiles
+                .FirstOrDefaultAsync(f => f.OrderId == orderId && f.FileId == fileId && f.DeletedAt == null, cancellationToken);
+
+            if (file == null)
+            {
+                return false;
+            }
+
+            // Clear primary from all other files for this order
+            List<OrderFile> otherFiles = await _context.OrderFiles
+                .Where(f => f.OrderId == orderId && f.FileId != fileId && f.IsPrimary && f.DeletedAt == null)
+                .ToListAsync(cancellationToken);
+
+            foreach (OrderFile f in otherFiles)
+            {
+                f.IsPrimary = false;
+            }
+
+            // Set this file as primary
+            file.IsPrimary = true;
+
+            await _context.SaveChangesAsync(cancellationToken);
             return true;
         }
 

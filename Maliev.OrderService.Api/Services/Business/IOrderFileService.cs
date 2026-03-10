@@ -45,5 +45,14 @@ namespace Maliev.OrderService.Api.Services.Business
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>True if successful, false if not found</returns>
         Task<bool> DeleteOrderFileAsync(string orderId, long fileId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Sets a file as the primary 3D file for the order
+        /// </summary>
+        /// <param name="orderId">The order ID</param>
+        /// <param name="fileId">The file ID</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>True if successful, false if not found</returns>
+        Task<bool> SetPrimaryFileAsync(string orderId, long fileId, CancellationToken cancellationToken = default);
     }
 }

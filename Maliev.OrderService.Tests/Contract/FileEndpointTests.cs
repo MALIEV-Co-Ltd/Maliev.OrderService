@@ -169,5 +169,121 @@ namespace Maliev.OrderService.Tests.Contract
             HttpResponseMessage response = await clientWithoutUpdate.DeleteAsync($"/order/v1/orders/{orderId}/files/1");
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         }
+
+        [Fact]
+        public async Task UploadFirstCadFileSetsAsPrimary()
+        {
+            // Arrange - Create an order
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent([1, 2, 3]);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Add(fileContent, "file", "test.stl");
+            content.Add(new StringContent("Input"), "FileRole");
+            content.Add(new StringContent("CAD"), "FileCategory");
+
+            // Act
+            HttpResponseMessage uploadResponse = await _client.PostAsync($"/order/v1/orders/{orderId}/files", content);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.Created, uploadResponse.StatusCode);
+            var file = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.True(file.GetProperty("isPrimary").GetBoolean(), "First CAD file should be set as primary");
+        }
+
+        [Fact]
+        public async Task SetPrimaryFileUpdatesPrimaryFlag()
+        {
+            // Arrange - Create an order and upload two CAD files
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            // Upload first CAD file
+            using var content1 = new MultipartFormDataContent();
+            var fileContent1 = new ByteArrayContent([1, 2, 3]);
+            fileContent1.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content1.Add(fileContent1, "file", "first.stl");
+            content1.Add(new StringContent("Input"), "FileRole");
+            content1.Add(new StringContent("CAD"), "FileCategory");
+            HttpResponseMessage uploadResponse1 = await _client.PostAsync($"/order/v1/orders/{orderId}/files", content1);
+            var file1 = await uploadResponse1.Content.ReadFromJsonAsync<JsonElement>();
+            long fileId1 = file1.GetProperty("fileId").GetInt64();
+
+            // Upload second CAD file
+            using var content2 = new MultipartFormDataContent();
+            var fileContent2 = new ByteArrayContent([4, 5, 6]);
+            fileContent2.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content2.Add(fileContent2, "file", "second.stl");
+            content2.Add(new StringContent("Input"), "FileRole");
+            content2.Add(new StringContent("CAD"), "FileCategory");
+            HttpResponseMessage uploadResponse2 = await _client.PostAsync($"/order/v1/orders/{orderId}/files", content2);
+            var file2 = await uploadResponse2.Content.ReadFromJsonAsync<JsonElement>();
+            long fileId2 = file2.GetProperty("fileId").GetInt64();
+
+            // Act - Set second file as primary
+            HttpResponseMessage setPrimaryResponse = await _client.PutAsync($"/order/v1/orders/{orderId}/files/{fileId2}/set-primary", null);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, setPrimaryResponse.StatusCode);
+
+            // Verify second file is now primary
+            HttpResponseMessage getFilesResponse = await _client.GetAsync($"/order/v1/orders/{orderId}/files");
+            var files = await getFilesResponse.Content.ReadFromJsonAsync<JsonElement>();
+            var filesList = files.EnumerateArray().ToList();
+            var secondFile = filesList.First(f => f.GetProperty("fileId").GetInt64() == fileId2);
+            Assert.True(secondFile.GetProperty("isPrimary").GetBoolean(), "Second file should be primary");
+
+            var firstFile = filesList.First(f => f.GetProperty("fileId").GetInt64() == fileId1);
+            Assert.False(firstFile.GetProperty("isPrimary").GetBoolean(), "First file should no longer be primary");
+        }
+
+        [Fact]
+        public async Task SetPrimaryFileNotFoundReturns404()
+        {
+            // Arrange - Create an order
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            // Act - Try to set non-existent file as primary
+            HttpResponseMessage response = await _client.PutAsync($"/order/v1/orders/{orderId}/files/99999/set-primary", null);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetPreviewImagesReturnsEmptyListWhenNoImages()
+        {
+            // Arrange - Create an order
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            // Act
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/preview-images");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var images = await response.Content.ReadFromJsonAsync<List<JsonElement>>() ?? [];
+            Assert.Empty(images);
+        }
+
+        [Fact]
+        public async Task SetPrimaryFileWithoutUpdatePermissionReturnsForbidden()
+        {
+            var clientWithoutUpdate = factory.CreateAuthenticatedClient("test-user", ["Customer"], [OrderPermissions.OrdersRead]);
+
+            var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            HttpResponseMessage response = await clientWithoutUpdate.PutAsync($"/order/v1/orders/{orderId}/files/1/set-primary", null);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
     }
 }

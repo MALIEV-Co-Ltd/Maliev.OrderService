@@ -270,7 +270,8 @@ namespace Maliev.OrderService.Api.Mapping
                 DesignUnits = file.DesignUnits,
                 UploadedBy = file.UploadedBy,
                 UploadedAt = file.UploadedAt,
-                DeletedAt = file.DeletedAt
+                DeletedAt = file.DeletedAt,
+                IsPrimary = file.IsPrimary
             };
         }
 

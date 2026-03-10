@@ -29,6 +29,7 @@ namespace Maliev.OrderService.Api.Controllers
         IOrderStatusService statusService,
         IOrderFileService fileService,
         IOrderNoteService noteService,
+        IOrderPreviewImageService previewImageService,
         IAuthorizationService authorizationService,
         ILogger<OrdersController> logger) : ControllerBase
     {
@@ -37,6 +38,7 @@ namespace Maliev.OrderService.Api.Controllers
         private readonly IOrderStatusService _statusService = statusService;
         private readonly IOrderFileService _fileService = fileService;
         private readonly IOrderNoteService _noteService = noteService;
+        private readonly IOrderPreviewImageService _previewImageService = previewImageService;
         private readonly IAuthorizationService _authorizationService = authorizationService; // Added
         private readonly ILogger<OrdersController> _logger = logger;
 
@@ -244,6 +246,35 @@ namespace Maliev.OrderService.Api.Controllers
         {
             List<OrderNoteResponse> notes = await _noteService.GetOrderNotesAsync(orderId, cancellationToken);
             return Ok(notes);
+        }
+
+        /// <summary>
+        /// Get all preview images associated with an order
+        /// </summary>
+        /// <param name="orderId">The order ID</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>List of preview images</returns>
+        [HttpGet("{orderId}/preview-images")]
+        [RequirePermission(OrderPermissions.OrdersRead)]
+        public async Task<IActionResult> GetOrderPreviewImages(string orderId, CancellationToken cancellationToken = default)
+        {
+            List<OrderPreviewImageResponse> previewImages = await _previewImageService.GetOrderPreviewImagesAsync(orderId, cancellationToken);
+            return Ok(previewImages);
+        }
+
+        /// <summary>
+        /// Set a file as the primary 3D file for the order
+        /// </summary>
+        /// <param name="orderId">The order ID</param>
+        /// <param name="fileId">The file ID</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Success or not found</returns>
+        [HttpPut("{orderId}/files/{fileId}/set-primary")]
+        [RequirePermission(OrderPermissions.OrdersUpdate)]
+        public async Task<IActionResult> SetPrimaryFile(string orderId, long fileId, CancellationToken cancellationToken = default)
+        {
+            bool result = await _fileService.SetPrimaryFileAsync(orderId, fileId, cancellationToken);
+            return result ? Ok() : NotFound();
         }
 
         private static partial class Log

@@ -25,6 +25,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Configurations
             _ = builder.Property(of => of.UploadedAt).HasColumnName("uploaded_at").HasDefaultValueSql("CURRENT_TIMESTAMP");
             _ = builder.Property(of => of.UploadedBy).HasColumnName("uploaded_by").HasMaxLength(50).IsRequired();
             _ = builder.Property(of => of.DeletedAt).HasColumnName("deleted_at");
+            _ = builder.Property(of => of.IsPrimary).HasColumnName("is_primary").HasDefaultValue(false);
 
             _ = builder.HasIndex(of => of.OrderId).HasDatabaseName("IX_OrderFile_OrderId");
             _ = builder.HasIndex(of => of.FileRole).HasDatabaseName("IX_OrderFile_FileRole");

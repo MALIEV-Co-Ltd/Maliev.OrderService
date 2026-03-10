@@ -44,6 +44,9 @@ namespace Maliev.OrderService.Domain.Entities
         /// <summary>Gets or sets when the file was soft-deleted (30-day retention).</summary>
         public DateTime? DeletedAt { get; set; }
 
+        /// <summary>Gets or sets whether this is the primary 3D file for the order (used for job tickets).</summary>
+        public bool IsPrimary { get; set; }
+
         // Navigation Properties
         /// <summary>Gets or sets the parent order navigation property.</summary>
         public Order Order { get; set; } = null!;

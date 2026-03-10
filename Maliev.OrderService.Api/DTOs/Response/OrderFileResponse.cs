@@ -43,5 +43,8 @@ namespace Maliev.OrderService.Api.DTOs.Response
 
         /// <summary>Gets or sets when this file was deleted (soft delete)</summary>
         public DateTime? DeletedAt { get; set; }
+
+        /// <summary>Gets or sets whether this is the primary 3D file for the order</summary>
+        public bool IsPrimary { get; set; }
     }
 }

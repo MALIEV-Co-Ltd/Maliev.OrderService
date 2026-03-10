@@ -35,6 +35,8 @@ namespace Maliev.OrderService.Infrastructure.Persistence
         public DbSet<Order3DScanningAttributes> Order3DScanningAttributes { get; set; } = null!;
         /// <summary>Gets or sets the 3D design attributes.</summary>
         public DbSet<Order3DDesignAttributes> Order3DDesignAttributes { get; set; } = null!;
+        /// <summary>Gets or sets the preview images.</summary>
+        public DbSet<OrderPreviewImage> OrderPreviewImages { get; set; } = null!;
 
         /// <inheritdoc/>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -60,6 +62,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence
             _ = modelBuilder.ApplyConfiguration(new OrderSheetMetalAttributesConfiguration());
             _ = modelBuilder.ApplyConfiguration(new Order3DScanningAttributesConfiguration());
             _ = modelBuilder.ApplyConfiguration(new Order3DDesignAttributesConfiguration());
+            _ = modelBuilder.ApplyConfiguration(new OrderPreviewImageConfiguration());
 
             // Apply PostgreSQL snake_case naming convention globally to all tables and columns
             SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);

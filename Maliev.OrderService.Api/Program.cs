@@ -32,6 +32,7 @@ try
     {
         _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
         _ = cfg.AddConsumer<FileDeletedEventConsumer>();
+        _ = cfg.AddConsumer<PreviewImagesGeneratedEventConsumer>();
     }); // RabbitMQ message bus with consumers
     _ = builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
@@ -67,6 +68,7 @@ try
     _ = builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
     _ = builder.Services.AddScoped<IOrderFileService, OrderFileService>();
     _ = builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
+    _ = builder.Services.AddScoped<IOrderPreviewImageService, OrderPreviewImageService>();
 
     // Rate Limiting (memory-optimized for low-spec nodes)
     _ = builder.AddStandardRateLimiting();
