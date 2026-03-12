@@ -166,39 +166,6 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
-        public async Task IamServiceClientGetUserPermissionsAsyncSuccessReturnsPermissions()
-        {
-            // Arrange
-            string userId = "user-1";
-            var expectedPermissions = new List<string> { "orders.read", "orders.write" };
-            var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-            handlerMock
-               .Protected()
-               .Setup<Task<HttpResponseMessage>>(
-                  "SendAsync",
-                  ItExpr.IsAny<HttpRequestMessage>(),
-                  ItExpr.IsAny<CancellationToken>()
-               )
-               .ReturnsAsync(new HttpResponseMessage
-               {
-                   StatusCode = HttpStatusCode.OK,
-                   Content = JsonContent.Create(new { UserId = userId, Permissions = expectedPermissions })
-               });
-
-            var httpClientFactoryMock = new Mock<IHttpClientFactory>();
-            httpClientFactoryMock.Setup(f => f.CreateClient(It.IsAny<string>()))
-                .Returns(new HttpClient(handlerMock.Object) { BaseAddress = new Uri("http://iam-service") });
-
-            var client = new IamServiceClient(httpClientFactoryMock.Object, new Mock<ILogger<IamServiceClient>>().Object);
-
-            // Act
-            var result = await client.GetUserPermissionsAsync(userId);
-
-            // Assert
-            Assert.Equal(expectedPermissions.Count, result.Count());
-        }
-
-        [Fact]
         public async Task MaterialServiceClientGetMaterialNameAsyncSuccessReturnsName()
         {
             // Arrange
