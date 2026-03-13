@@ -27,7 +27,9 @@ namespace Maliev.OrderService.Tests
         /// </summary>
         public async Task InitializeAsync()
         {
-            _postgresContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine")
+            _postgresContainer = 
+                #pragma warning disable CS0618
+        new PostgreSqlBuilder().WithImage("postgres:18-alpine")
                 .WithDatabase("order_test_db")
                 .WithUsername("postgres")
                 .WithPassword("test_password")
@@ -38,6 +40,7 @@ namespace Maliev.OrderService.Tests
 
             _rabbitmqContainer = new RabbitMqBuilder().WithImage("rabbitmq:4.2-alpine")
                 .Build();
+#pragma warning restore CS0618
 
             // Start all containers in parallel
             await Task.WhenAll(
@@ -207,3 +210,7 @@ namespace Maliev.OrderService.Tests
         }
     }
 }
+
+
+
+
