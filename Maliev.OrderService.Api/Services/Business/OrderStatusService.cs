@@ -1,4 +1,3 @@
-using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
@@ -31,13 +30,13 @@ namespace Maliev.OrderService.Api.Services.Business
         private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
 
         // Static readonly arrays for ConsumedBy lists to avoid CA1861
-        private static readonly List<string> GenericStatusChangeConsumers = new List<string> { "NotificationService", "InvoiceService" };
-        private static readonly List<string> QuotedConsumers = new List<string> { "NotificationService", "InvoiceService" };
-        private static readonly List<string> AcceptedConsumers = new List<string> { "PaymentService", "NotificationService" };
-        private static readonly List<string> PaidConsumers = new List<string> { "InvoiceService", "NotificationService" };
-        private static readonly List<string> NotificationOnlyConsumers = new List<string> { "NotificationService" };
-        private static readonly List<string> CompletedConsumers = new List<string> { "NotificationService", "InvoiceService" };
-        private static readonly List<string> CancelledConsumers = new List<string> { "PaymentService", "NotificationService" };
+        private static readonly List<string> _genericStatusChangeConsumers = ["NotificationService", "InvoiceService"];
+        private static readonly List<string> _quotedConsumers = ["NotificationService", "InvoiceService"];
+        private static readonly List<string> _acceptedConsumers = ["PaymentService", "NotificationService"];
+        private static readonly List<string> _paidConsumers = ["InvoiceService", "NotificationService"];
+        private static readonly List<string> _notificationOnlyConsumers = ["NotificationService"];
+        private static readonly List<string> _completedConsumers = ["NotificationService", "InvoiceService"];
+        private static readonly List<string> _cancelledConsumers = ["PaymentService", "NotificationService"];
 
         /// <inheritdoc />
         public async Task<List<OrderStatusResponse>> GetOrderStatusHistoryAsync(string orderId, CancellationToken cancellationToken = default)
@@ -158,7 +157,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 MessageType: MessageType.Event,
                 MessageVersion: "1.0.0",
                 PublishedBy: "OrderService",
-                ConsumedBy: GenericStatusChangeConsumers,
+                ConsumedBy: _genericStatusChangeConsumers,
                 CorrelationId: Guid.NewGuid(),
                 CausationId: null,
                 OccurredAtUtc: now,
@@ -184,7 +183,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: QuotedConsumers,
+                        ConsumedBy: _quotedConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -208,7 +207,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: AcceptedConsumers,
+                        ConsumedBy: _acceptedConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -231,7 +230,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: PaidConsumers,
+                        ConsumedBy: _paidConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -254,7 +253,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: NotificationOnlyConsumers,
+                        ConsumedBy: _notificationOnlyConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -277,7 +276,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: CompletedConsumers,
+                        ConsumedBy: _completedConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -299,9 +298,9 @@ namespace Maliev.OrderService.Api.Services.Business
                                     ProductId: order.MaterialId.HasValue ? StringToGuid(order.MaterialId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) : Guid.Empty,
                                     ProductCode: order.MaterialName ?? "Unknown",
                                     ProductName: order.MaterialName ?? "Unknown",
-                                    Quantity: (double)(order.OrderedQuantity ?? 1),
-                                    UnitPrice: (double)(order.QuotedAmount ?? 0) / (double)(order.OrderedQuantity ?? 1),
-                                    LineTotal: (double)(order.QuotedAmount ?? 0)
+                                    Quantity: Convert.ToDouble(order.OrderedQuantity ?? 1),
+                                    UnitPrice: Convert.ToDouble(order.QuotedAmount ?? 0) / Convert.ToDouble(order.OrderedQuantity ?? 1),
+                                    LineTotal: Convert.ToDouble(order.QuotedAmount ?? 0)
                                 )
                             ]
                         )
@@ -315,7 +314,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: NotificationOnlyConsumers,
+                        ConsumedBy: _notificationOnlyConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -338,7 +337,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: CancelledConsumers,
+                        ConsumedBy: _cancelledConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -361,7 +360,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: NotificationOnlyConsumers,
+                        ConsumedBy: _notificationOnlyConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -383,7 +382,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: NotificationOnlyConsumers,
+                        ConsumedBy: _notificationOnlyConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
@@ -405,7 +404,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         MessageType: MessageType.Event,
                         MessageVersion: "1.0.0",
                         PublishedBy: "OrderService",
-                        ConsumedBy: NotificationOnlyConsumers,
+                        ConsumedBy: _notificationOnlyConsumers,
                         CorrelationId: Guid.NewGuid(),
                         CausationId: null,
                         OccurredAtUtc: now,
