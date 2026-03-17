@@ -17,7 +17,7 @@ namespace Maliev.OrderService.Api.Controllers
     /// Initializes a new instance of the <see cref="OrderStatusController"/> class
     /// </remarks>
     [ApiController]
-    [ApiVersion("1.0")]
+    [ApiVersion("1")]
     [Route("order/v{version:apiVersion}/orders/{orderId}/statuses")]
     [Produces("application/json")]
     public class OrderStatusController(

@@ -11,7 +11,7 @@ namespace Maliev.OrderService.Api.Controllers
     /// Lightweight business metrics for dashboards.
     /// </summary>
     [ApiController]
-    [ApiVersion("1.0")]
+    [ApiVersion("1")]
     [Route("order/v{version:apiVersion}/metrics")]
     public class MetricsController : ControllerBase
     {

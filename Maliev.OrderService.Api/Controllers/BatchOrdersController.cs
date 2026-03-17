@@ -25,7 +25,7 @@ namespace Maliev.OrderService.Api.Controllers
     /// Initializes a new instance of the <see cref="BatchOrdersController"/> class
     /// </remarks>
     [ApiController]
-    [ApiVersion("1.0")]
+    [ApiVersion("1")]
     [Authorize]
     [Route("order/v{version:apiVersion}/orders/batch")]
     [EnableRateLimiting(RateLimitPolicies.Batch)]

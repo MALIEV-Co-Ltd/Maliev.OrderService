@@ -19,7 +19,7 @@ namespace Maliev.OrderService.Api.Controllers
     /// Initializes a new instance of the <see cref="OrderFilesController"/> class
     /// </remarks>
     [ApiController]
-    [ApiVersion("1.0")]
+    [ApiVersion("1")]
     [Route("order/v{version:apiVersion}/orders/{orderId}/files")]
     [Authorize]
     [EnableRateLimiting(RateLimitPolicies.Api)]
