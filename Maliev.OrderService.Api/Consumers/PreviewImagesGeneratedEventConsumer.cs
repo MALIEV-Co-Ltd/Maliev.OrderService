@@ -46,12 +46,12 @@ namespace Maliev.OrderService.Api.Consumers;
 
         var sides = new (string Side, string? Path)[]
         {
-            ("Front", previewImages.Front),
-            ("Left", previewImages.Left),
-            ("Right", previewImages.Right),
-            ("Back", previewImages.Back),
-            ("Top", previewImages.Top),
-            ("Bottom", previewImages.Bottom)
+            ("Front", previewImages.FrontSmall),
+            ("Left", previewImages.LeftSmall),
+            ("Right", previewImages.RightSmall),
+            ("Back", previewImages.BackSmall),
+            ("Top", previewImages.TopSmall),
+            ("Bottom", previewImages.BottomSmall)
         };
 
         List<OrderPreviewImage> existingPreviews = await _dbContext.OrderPreviewImages
