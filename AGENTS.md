@@ -117,6 +117,26 @@ dotnet run --project Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
 - **Configuration**: `TestDatabaseFixture` builds config from `appsettings.Testing.json` -> User Secrets -> Env Vars.
 - **Mocking**: Use `Moq` sparingly, primarily for external HTTP services or unit tests.
 
+### Testing Strategy (4-Tier Pyramid Context)
+
+This service's tests cover **Tier 1 (Unit)** and **Tier 2 (Service Integration)** of the Maliev testing pyramid:
+
+| Tier | What to Test | Infrastructure |
+|------|-------------|---------------|
+| **Unit** | Business logic, domain models, service methods with mocked dependencies | None (mocks only) |
+| **Service Integration** | API endpoints, database persistence, permission enforcement, input validation | `BaseIntegrationTestFactory` + Testcontainers (Postgres/Redis/RabbitMQ) |
+
+**Tier 3 (System Integration)** — cross-service workflows and event chains — is tested in `Maliev.Aspire.Tests/`.
+
+#### Key Rules
+- Use `BaseIntegrationTestFactory<TProgram, TDbContext>` for integration tests (real Testcontainers, never InMemoryDatabase)
+- Every MassTransit consumer MUST have a consumer test using `services.AddMassTransitTestHarness()`
+- Test naming: `MethodName_StateUnderTest_ExpectedBehavior`
+- Minimum 80% code coverage
+- Use `[Fact]` for single cases, `[Theory]` for parameterized tests
+
+> Full ecosystem test strategy: `Maliev.Aspire.Tests/TEST_PLAN.md`
+
 ## 5. Security & Safety
 - **Secrets**: Never commit `.env` or secrets.
 - **Validation**: Validate all inputs.
