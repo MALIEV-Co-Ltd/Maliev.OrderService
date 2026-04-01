@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Maliev.OrderService.Api.Controllers
 {
     /// <summary>
-    /// Lightweight business metrics for dashboards.
+    /// Lightweight business metrics for dashboards (active-count, on-hold-count).
     /// </summary>
     [ApiController]
     [ApiVersion("1")]
@@ -35,14 +35,29 @@ namespace Maliev.OrderService.Api.Controllers
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetActiveCount(CancellationToken cancellationToken)
         {
-            // Use GetOrdersAsync with status filter to count active orders
-            // For OrderService, "Active" status might depend on the implementation.
-            // We'll filter by "Open" or similar if possible, or just get the count from total.
             var response = await _orderManagementService.GetOrdersAsync(
                 page: 1,
-                pageSize: 1, // We only need the totalCount
+                pageSize: 1,
                 user: User,
-                status: "Open", // Assuming "Open" is an active status
+                status: "Open",
+                cancellationToken: cancellationToken);
+
+            return Ok(new { count = response.TotalCount });
+        }
+
+        /// <summary>
+        /// Get the count of on-hold orders.
+        /// </summary>
+        [HttpGet("on-hold-count")]
+        [RequirePermission(OrderPermissions.ReportsAnalytics)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetOnHoldCount(CancellationToken cancellationToken)
+        {
+            var response = await _orderManagementService.GetOrdersAsync(
+                page: 1,
+                pageSize: 1,
+                user: User,
+                status: "OnHold",
                 cancellationToken: cancellationToken);
 
             return Ok(new { count = response.TotalCount });
