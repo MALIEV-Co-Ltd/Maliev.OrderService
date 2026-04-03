@@ -17,25 +17,40 @@ This file provides context, commands, and strict guidelines for AI agents workin
     - `Maliev.OrderService.Infrastructure`: EF Core, repositories
     - `Maliev.OrderService.Tests`: xUnit, Testcontainers, Integration Tests
 
-## 2. Build & Test Commands
+---
 
-Always verify changes before submitting.
+## 2. Build, Test & Lint Commands
+
+All commands run from within this service directory (`B:\maliev\Maliev.OrderService`).
 
 ### Build
-```bash
-dotnet build Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
+```powershell
+dotnet build Maliev.OrderService.slnx
 ```
 
 ### Run Tests
-**Run all tests (Integration & Unit):**
-```bash
-dotnet test Maliev.OrderService.Tests/Maliev.OrderService.Tests.csproj
+```powershell
+# Run all tests
+dotnet test Maliev.OrderService.slnx --verbosity normal
+
+# Run a single test method
+dotnet test --filter "FullyQualifiedName~OrdersControllerTests.GetOrders_ReturnsOk"
+
+# Run all tests in a class
+dotnet test --filter "FullyQualifiedName~OrdersControllerTests"
+
+# Run with code coverage
+dotnet test Maliev.OrderService.slnx --collect:"XPlat Code Coverage"
 ```
 
-**Run a single test (CRITICAL for iteration):**
-Use `--filter` with the fully qualified name.
-```bash
-dotnet test Maliev.OrderService.Tests/Maliev.OrderService.Tests.csproj --filter "FullyQualifiedName~Maliev.OrderService.Tests.Controllers.OrdersControllerTests.GetOrders_ReturnsOk"
+### Format Check
+```powershell
+dotnet format Maliev.OrderService.slnx
+```
+
+### EF Core Migrations (Infrastructure project only)
+```powershell
+dotnet ef migrations add <Name> --project Maliev.OrderService.Infrastructure --startup-project Maliev.OrderService.Infrastructure
 ```
 
 ### Run Application
@@ -43,32 +58,45 @@ dotnet test Maliev.OrderService.Tests/Maliev.OrderService.Tests.csproj --filter 
 dotnet run --project Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
 ```
 
+---
+
 ## 3. Code Style & Conventions
 
-### General
-- **Nullable**: `<Nullable>enable</Nullable>` is on. Handle nulls explicitly.
-- **Warnings**: Treat warnings as errors. No unused variables or missing awaits.
-- **Implicit Usings**: Enabled. Do not add `using System;` etc. explicitly if covered.
-- **File-Scoped Namespaces**: Use `namespace Maliev.OrderService.Api.Services;` (no braces).
+### Workspace Structure
+```
+Maliev.OrderService/
+├── Maliev.OrderService.Api/           # Controllers, Consumers, Middleware
+├── Maliev.OrderService.Application/   # Use cases, DTOs, Interfaces, Handlers
+├── Maliev.OrderService.Domain/        # Entities, value objects, domain interfaces
+├── Maliev.OrderService.Infrastructure/ # EF Core DbContext, repositories, HTTP clients
+├── Maliev.OrderService.Tests/         # Unit + Integration tests (xUnit)
+├── Directory.Build.props              # Central package versioning
+└── Maliev.OrderService.slnx          # Solution file (.slnx preferred over .sln)
+```
 
-### Modern C# Features (Mandatory)
-- **Primary Constructors**: Use for DI.
+### C# Naming & Formatting
+- **Namespaces**: File-scoped (`namespace Maliev.OrderService.Domain.Entities;`)
+- **Classes/Methods/Properties**: `PascalCase`
+- **Private fields**: `_camelCase` (underscore prefix)
+- **Parameters/locals**: `camelCase`
+- **Async methods**: Suffix with `Async` (e.g., `GetOrderAsync`)
+- **Interfaces**: Prefix with `I` (e.g., `IOrderService`)
+- **Permissions**: GCP-style `{domain}.{plural-resource}.{action}` as `public const string` in a `Permissions` static class
+  - Valid: `order.orders.create`, `order.orders.update`
+  - Invalid: `order.order.create` (singular), `order.create` (missing resource)
+- **XML docs**: Required on ALL public methods and properties
+- **Nullable**: Enabled (`<Nullable>enable</Nullable>`). Use `?` explicitly
+- **Imports**: System first, then third-party, then local. Alphabetize within groups. Remove unused `using`
+- **Braces**: Allman style (new line) for methods and control structures. Expression-bodied for properties/accessors
+- **Indentation**: 4 spaces, LF line endings, UTF-8, trim trailing whitespace
+
+### C# Patterns
+- **DI**: Constructor injection with `private readonly` fields. Primary constructors are also used in this service:
     ```csharp
     public partial class OrderService(OrderDbContext context, ILogger<OrderService> logger) : IOrderService { ... }
     ```
-- **Async/Await**: Always pass `CancellationToken` as the last optional parameter.
-    ```csharp
-    public async Task<Order?> GetAsync(string id, CancellationToken cancellationToken = default) { ... }
-    ```
-- **Collection Expressions**: Use `[]` for arrays/lists.
-    ```csharp
-    List<string> items = ["a", "b"];
-    return [.. existingItems, newItem];
-    ```
-
-### Logging
-- **Source Generated Logging**: **DO NOT** use `logger.LogInformation(...)`.
-- Create a `private static partial class Log` inside the class.
+- **Controllers**: `[ApiController]`, `[ApiVersion("1")]`, `[Route("order/v{version:apiVersion}")]`
+- **Logging**: Source-generated logging is used in this service:
     ```csharp
     private static partial class Log
     {
@@ -77,12 +105,18 @@ dotnet run --project Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
     }
     // Usage: Log.OrderCreated(_logger, orderId);
     ```
+- **Error handling**: Global exception middleware. Return `ProblemDetails` / `ErrorResponse` DTOs. Never expose stack traces
+- **JSON**: Check existing conventions in this service for naming policy
+- **Manual mapping**: Static extension methods (`ToDto()`, `ToEntity()`). AutoMapper is banned
+- **Validation**: `System.ComponentModel.DataAnnotations` on DTOs. FluentValidation is banned
+- **Collection Expressions**: Use `[]` for arrays/lists.
+    ```csharp
+    List<string> items = ["a", "b"];
+    return [.. existingItems, newItem];
+    ```
+- **Async/Await**: Always pass `CancellationToken` as the last optional parameter.
 
-### Error Handling & Results
-- **Controllers**: Return `IActionResult` (`Ok`, `NotFound`, `BadRequest`, `Conflict`, `Forbid`).
-- **DTOs**: Use `ErrorMessageResponse` for failures.
-- **Concurrency**: Catch `DbUpdateConcurrencyException` -> return HTTP 409 Conflict.
-- **Validation**: Use Data Annotations (`[Required]`, `[EmailAddress]`) or `ModelState.IsValid`.
+---
 
 ## 4. Architecture & Patterns
 
@@ -112,10 +146,29 @@ dotnet run --project Maliev.OrderService.Api/Maliev.OrderService.Api.csproj
 - **Naming**: `Jwt__SecurityKey` in secrets becomes `Jwt:SecurityKey` in config.
 - **External Services**: Use `ExternalServiceOptions` pattern (BaseUrl, Timeout).
 
-### Testing Strategy
-- **Integration First**: Prefer integration tests using `Testcontainers` (Postgres, RabbitMQ).
-- **Configuration**: `TestDatabaseFixture` builds config from `appsettings.Testing.json` -> User Secrets -> Env Vars.
-- **Mocking**: Use `Moq` sparingly, primarily for external HTTP services or unit tests.
+---
+
+## 5. Banned Libraries (Build Will Fail)
+
+| Banned | Use Instead |
+|--------|-------------|
+| AutoMapper | Manual mapping extensions |
+| FluentValidation | DataAnnotations or manual validation |
+| FluentAssertions | Standard xUnit `Assert.*` |
+| Swashbuckle/Swagger | Scalar (at `/order/scalar`) |
+| InMemoryDatabase (EF Core) | Testcontainers with real PostgreSQL |
+
+---
+
+## 6. Testing Rules
+
+- **Framework**: xUnit with standard `Assert` (`Assert.Equal`, `Assert.NotNull`, etc.)
+- **Naming**: `MethodName_StateUnderTest_ExpectedBehavior` or `HTTP_METHOD_Path_Scenario_ExpectedStatus`
+- **Coverage**: Minimum 80% per service
+- **Integration tests**: `BaseIntegrationTestFactory<TProgram, TDbContext>` with Testcontainers (PostgreSQL, Redis, RabbitMQ). Never InMemoryDatabase
+- **System tests** (Tier 3): `AspireTestFixture` with `[Collection("AspireDomainTests")]` — shared AppHost, never one per class
+- **Eventual consistency**: Use `TestHelpers.WaitForAsync`. Never `Task.Delay`
+- **MassTransit consumers**: Must have consumer tests using `AddMassTransitTestHarness()`
 
 ### Testing Strategy (4-Tier Pyramid Context)
 
@@ -128,32 +181,28 @@ This service's tests cover **Tier 1 (Unit)** and **Tier 2 (Service Integration)*
 
 **Tier 3 (System Integration)** — cross-service workflows and event chains — is tested in `Maliev.Aspire.Tests/`.
 
-#### Key Rules
-- Use `BaseIntegrationTestFactory<TProgram, TDbContext>` for integration tests (real Testcontainers, never InMemoryDatabase)
-- Every MassTransit consumer MUST have a consumer test using `services.AddMassTransitTestHarness()`
-- Test naming: `MethodName_StateUnderTest_ExpectedBehavior`
-- Minimum 80% code coverage
-- Use `[Fact]` for single cases, `[Theory]` for parameterized tests
-
 > Full ecosystem test strategy: `Maliev.Aspire.Tests/TEST_PLAN.md`
-
-## 5. Security & Safety
-- **Secrets**: Never commit `.env` or secrets.
-- **Validation**: Validate all inputs.
-- **Crypto**: Use platform-provided crypto.
 
 ---
 
-## Git & Version Control — Mandatory Rules
+## 7. Mandatory Rules
 
-### 🚨 CRITICAL: Always Commit Code Changes (Non-Negotiable)
-- **You MUST commit your changes to the local repository after completing any meaningful unit of work.**
-- **Never accumulate uncommitted changes.** Do not wait until end of session or until something breaks.
-- **Commit early and often** — if a change is meaningful (even a small fix or refactor), commit it.
-- **You do NOT need to push to remote** — local commits are sufficient to protect against accidental loss.
-- **If you are unsure whether to commit, commit anyway.** Extra commits are harmless; lost work is irreversible.
-- This rule applies even if you are just "testing" or "exploring" — use git branches to isolate experimental work and commit those changes too.
+- **`TreatWarningsAsErrors = true`**: Zero warnings allowed. No suppression
+- **`[RequirePermission("order.resources.action")]`**: On all endpoints, not plain `[Authorize]`
+- **API versioning**: All routes versioned (`v1/`)
+- **Service prefix**: Routes prefixed with `/order`
+- **Scalar docs**: Configured at `/order/scalar`
+- **Secrets**: Never hardcoded. Use GCP Secret Manager or environment variables
+- **Async/await**: All the way down. Pass `CancellationToken`
+- **EF Core Design package**: Only in Infrastructure project, never in Api
+- **PostgreSQL xmin**: Shadow property only — `entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion()`. Never add entity property
+- **Temporary files**: Generate in `/temp` folder, clean up afterwards
 
-### 🚨 CRITICAL: Never Use `git checkout` to Restore Broken Files
-- **NEVER use `git checkout` to restore or recover files.** This operation discards uncommitted changes permanently and will result in data loss.
-- **To undo/recover from broken files: first commit your current changes, then use `git revert` or `git reset --soft` to safely undo.**
+---
+
+## 8. Git Rules
+
+- Each `Maliev.*` folder is an independent git repo. `cd` into it before git commands
+- **Commit early and often** after every meaningful unit of work. Do not accumulate changes
+- **Never use `git checkout` to restore files** — commit first, then `git revert` or `git reset --soft`
+- Feature branches merged to `develop` via PR. Do not push without being asked
