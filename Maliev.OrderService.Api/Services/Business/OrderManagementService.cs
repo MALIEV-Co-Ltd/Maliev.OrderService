@@ -256,6 +256,58 @@ namespace Maliev.OrderService.Api.Services.Business
             return true;
         }
 
+        /// <inheritdoc />
+        public async Task<OrderResponse> UpdateOutsourcingAsync(string orderId, UpdateOutsourcingRequest request, string actorId, CancellationToken cancellationToken = default)
+        {
+            Order? order = await _context.Orders.FindAsync([orderId], cancellationToken) ?? throw new InvalidOperationException($"Order {orderId} not found");
+
+            order.IsOutsourced = request.IsOutsourced;
+            order.SupplierCostTHB = request.SupplierCostTHB;
+            order.SupplierName = request.SupplierName;
+            order.SupplierEstimatedDelivery = request.SupplierEstimatedDelivery;
+            order.UpdatedBy = actorId;
+            order.UpdatedAt = DateTime.UtcNow;
+
+            _ = _context.AuditLogs.Add(new AuditLog
+            {
+                OrderId = order.OrderId,
+                Action = "OrderOutsourcingChanged",
+                PerformedBy = actorId,
+                PerformedAt = DateTime.UtcNow,
+                EntityType = "Order",
+                EntityId = order.OrderId,
+                ChangeDetails = System.Text.Json.JsonSerializer.Serialize(new { request.IsOutsourced, request.SupplierCostTHB, request.SupplierName, request.SupplierEstimatedDelivery })
+            });
+
+            _ = await _context.SaveChangesAsync(cancellationToken);
+
+            await _publishEndpoint.Publish(new OrderOutsourcingChangedEvent(
+                MessageId: Guid.NewGuid(),
+                MessageName: nameof(OrderOutsourcingChangedEvent),
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "OrderService",
+                ConsumedBy: OutsourcingChangedConsumers,
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new OrderOutsourcingChangedEventPayload(
+                    OrderId: StringToGuid(order.OrderId),
+                    IsOutsourced: order.IsOutsourced,
+                    SupplierName: order.SupplierName,
+                    SupplierCostTHB: (double?)order.SupplierCostTHB,
+                    ChangedBy: StringToGuid(actorId),
+                    ChangedAtUtc: DateTimeOffset.UtcNow
+                )
+            ), cancellationToken);
+
+            Log.OutsourcingChangedEventPublished(_logger, orderId);
+
+            uint? xmin = _context.Entry(order).Property<uint>("xmin").CurrentValue;
+            return order.ToOrderResponse(xmin);
+        }
+
         private async Task<string> GenerateOrderIdAsync(CancellationToken cancellationToken)
         {
             int year = DateTime.UtcNow.Year;
@@ -279,6 +331,7 @@ namespace Maliev.OrderService.Api.Services.Business
 
         // Static readonly list for ConsumedBy list to avoid CA1861
         private static readonly List<string> OrderCreatedConsumers = new List<string> { "InvoiceService", "NotificationService" };
+        private static readonly List<string> OutsourcingChangedConsumers = new List<string> { "JobService", "NotificationService" };
 
         private static partial class Log
         {
@@ -287,6 +340,9 @@ namespace Maliev.OrderService.Api.Services.Business
 
             [LoggerMessage(Level = LogLevel.Information, Message = "Published OrderCreatedEvent for order {OrderId}")]
             public static partial void OrderCreatedEventPublished(ILogger logger, string orderId);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "Published OrderOutsourcingChangedEvent for order {OrderId}")]
+            public static partial void OutsourcingChangedEventPublished(ILogger logger, string orderId);
         }
     }
 }

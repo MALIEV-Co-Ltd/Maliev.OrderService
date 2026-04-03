@@ -21,7 +21,6 @@ namespace Maliev.OrderService.Api.Controllers
     [ApiController]
     [ApiVersion("1")]
     [Route("order/v{version:apiVersion}/orders/{orderId}/files")]
-    [Authorize]
     [EnableRateLimiting(RateLimitPolicies.Api)]
     public class OrderFilesController(
         IOrderFileService fileService,

@@ -63,6 +63,12 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Configurations
             _ = builder.Property(o => o.CustomerPoNumber).HasColumnName("customer_po_number").HasMaxLength(50);
             _ = builder.Property(o => o.CustomerPoFileId).HasColumnName("customer_po_file_id");
 
+            // Outsourcing fields
+            _ = builder.Property(o => o.IsOutsourced).HasColumnName("is_outsourced").HasDefaultValue(false);
+            _ = builder.Property(o => o.SupplierCostTHB).HasColumnName("supplier_cost_thb").HasColumnType("decimal(10,2)");
+            _ = builder.Property(o => o.SupplierName).HasColumnName("supplier_name").HasMaxLength(200);
+            _ = builder.Property(o => o.SupplierEstimatedDelivery).HasColumnName("supplier_estimated_delivery");
+
             // Indexes
             _ = builder.HasIndex(o => o.CustomerId).HasDatabaseName("IX_Order_CustomerId");
             _ = builder.HasIndex(o => o.AssignedEmployeeId).HasDatabaseName("IX_Order_AssignedEmployeeId");

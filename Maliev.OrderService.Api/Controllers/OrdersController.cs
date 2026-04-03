@@ -277,6 +277,38 @@ namespace Maliev.OrderService.Api.Controllers
             return result ? Ok() : NotFound();
         }
 
+        /// <summary>
+        /// Updates the outsourcing status of an order.
+        /// When marking as outsourced, all associated jobs are also flagged via event.
+        /// </summary>
+        /// <param name="orderId">The order ID</param>
+        /// <param name="request">The outsourcing update request</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>The updated order</returns>
+        [HttpPatch("{orderId}/outsourcing")]
+        [RequirePermission(OrderPermissions.OrdersUpdate)]
+        public async Task<IActionResult> UpdateOutsourcing(
+            string orderId,
+            [FromBody] UpdateOutsourcingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                string actorId = User.GetUserId();
+                OrderResponse order = await _orderService.UpdateOutsourcingAsync(orderId, request, actorId, cancellationToken);
+                return Ok(order);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new ErrorMessageResponse { Message = ex.Message });
+            }
+        }
+
         private static partial class Log
         {
             [LoggerMessage(Level = LogLevel.Warning, Message = "User {UserId} attempted to access unauthorized order {OrderId}")]

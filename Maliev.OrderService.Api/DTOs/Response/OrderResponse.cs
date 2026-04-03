@@ -95,6 +95,18 @@ namespace Maliev.OrderService.Api.DTOs.Response
         /// <summary>Gets or sets the department ID</summary>
         public string? DepartmentId { get; set; }
 
+        /// <summary>Gets or sets whether this order is outsourced to an external supplier</summary>
+        public bool IsOutsourced { get; set; }
+
+        /// <summary>Gets or sets the supplier cost in THB (null for in-house orders)</summary>
+        public decimal? SupplierCostTHB { get; set; }
+
+        /// <summary>Gets or sets the supplier name (null for in-house orders)</summary>
+        public string? SupplierName { get; set; }
+
+        /// <summary>Gets or sets the estimated delivery date from the supplier</summary>
+        public DateTime? SupplierEstimatedDelivery { get; set; }
+
         /// <summary>Gets or sets the order version (Base64-encoded RowVersion for concurrency control)</summary>
         public required string Version { get; set; }
 

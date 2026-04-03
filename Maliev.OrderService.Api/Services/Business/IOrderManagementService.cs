@@ -66,5 +66,15 @@ namespace Maliev.OrderService.Api.Services.Business
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>True if successful, false if not found</returns>
         Task<bool> CancelOrderAsync(string orderId, string cancelledBy, string? reason = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Updates the outsourcing status of an order.
+        /// </summary>
+        /// <param name="orderId">The order ID.</param>
+        /// <param name="request">The outsourcing update request.</param>
+        /// <param name="actorId">The user performing the update.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The updated order response.</returns>
+        Task<OrderResponse> UpdateOutsourcingAsync(string orderId, UpdateOutsourcingRequest request, string actorId, CancellationToken cancellationToken = default);
     }
 }

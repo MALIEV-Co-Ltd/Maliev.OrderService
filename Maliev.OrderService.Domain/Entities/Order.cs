@@ -98,6 +98,31 @@ namespace Maliev.OrderService.Domain.Entities
         /// <summary>Gets or sets the order requirements and specifications.</summary>
         public string? Requirements { get; set; }
 
+        // Outsourcing Information
+        /// <summary>
+        /// Gets or sets a value indicating whether this order is outsourced to an external manufacturing partner.
+        /// Employee-only field — never exposed to customers.
+        /// </summary>
+        public bool IsOutsourced { get; set; }
+
+        /// <summary>
+        /// Gets or sets the cost charged by the outsourcing supplier (in THB).
+        /// Used for margin tracking (customer price should be ≥ 2× this value).
+        /// Null for in-house orders.
+        /// </summary>
+        public decimal? SupplierCostTHB { get; set; }
+
+        /// <summary>
+        /// Gets or sets the name of the outsourcing supplier. Null for in-house orders.
+        /// </summary>
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string? SupplierName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the estimated delivery date from the supplier. Null for in-house orders.
+        /// </summary>
+        public DateTime? SupplierEstimatedDelivery { get; set; }
+
         // Audit Fields
         /// <summary>Gets or sets when the order was created.</summary>
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

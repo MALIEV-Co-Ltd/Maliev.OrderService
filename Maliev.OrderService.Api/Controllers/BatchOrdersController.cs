@@ -26,7 +26,6 @@ namespace Maliev.OrderService.Api.Controllers
     /// </remarks>
     [ApiController]
     [ApiVersion("1")]
-    [Authorize]
     [Route("order/v{version:apiVersion}/orders/batch")]
     [EnableRateLimiting(RateLimitPolicies.Batch)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
