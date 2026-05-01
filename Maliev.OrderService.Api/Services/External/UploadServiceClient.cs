@@ -18,17 +18,58 @@ namespace Maliev.OrderService.Api.Services.External
         {
             try
             {
-                using var content = new MultipartFormDataContent();
-                var streamContent = new StreamContent(fileStream);
-                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-                content.Add(streamContent, "file", objectPath);
-                content.Add(new StringContent(objectPath), "objectPath");
+                if (!fileStream.CanSeek)
+                {
+                    throw new InvalidOperationException("Direct GCS uploads require a seekable stream.");
+                }
 
-                HttpResponseMessage response = await _httpClient.PostAsync("/api/v1/files/upload", content, cancellationToken);
+                var initiateRequest = new InitiateResumableUploadRequest(
+                    Path: objectPath,
+                    FileName: Path.GetFileName(objectPath),
+                    ServiceName: "OrderService",
+                    ContentType: contentType,
+                    TotalSize: fileStream.Length,
+                    Overwrite: true);
+
+                HttpResponseMessage initiateResponse = await _httpClient.PostAsJsonAsync(
+                    "/upload/v1/uploads/resumable",
+                    initiateRequest,
+                    cancellationToken);
+                _ = initiateResponse.EnsureSuccessStatusCode();
+
+                InitiateResumableUploadResponse session = await initiateResponse.Content
+                    .ReadFromJsonAsync<InitiateResumableUploadResponse>(cancellationToken: cancellationToken)
+                    ?? throw new InvalidOperationException("Upload service returned null resumable session");
+
+                fileStream.Position = 0;
+                using var gcsClient = new HttpClient();
+                using var streamContent = new StreamContent(fileStream);
+                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+                streamContent.Headers.ContentLength = fileStream.Length;
+                streamContent.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(0, fileStream.Length - 1, fileStream.Length);
+
+                HttpResponseMessage gcsResponse = await gcsClient.PutAsync(session.SessionUri, streamContent, cancellationToken);
+                _ = gcsResponse.EnsureSuccessStatusCode();
+
+                HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
+                    $"/upload/v1/uploads/resumable/{session.UploadId}/complete",
+                    new { },
+                    cancellationToken);
                 _ = response.EnsureSuccessStatusCode();
 
-                UploadFileResult? result = await response.Content.ReadFromJsonAsync<UploadFileResult>(cancellationToken: cancellationToken);
-                return result ?? throw new InvalidOperationException("Upload service returned null result");
+                UploadServiceResponse? result = await response.Content.ReadFromJsonAsync<UploadServiceResponse>(cancellationToken: cancellationToken);
+                if (result == null)
+                {
+                    throw new InvalidOperationException("Upload service returned null result");
+                }
+
+                return new UploadFileResult
+                {
+                    ObjectPath = result.StoragePath,
+                    FileSizeBytes = result.FileSize,
+                    ContentType = result.ContentType,
+                    UploadedAt = result.UploadedAt
+                };
             }
             catch (HttpRequestException ex)
             {
@@ -81,5 +122,25 @@ namespace Maliev.OrderService.Api.Services.External
             [LoggerMessage(Level = LogLevel.Error, Message = "Failed to delete file at {ObjectPath}")]
             public static partial void FailedToDeleteFile(ILogger logger, string objectPath, Exception ex);
         }
+
+        private sealed record InitiateResumableUploadRequest(
+            string Path,
+            string FileName,
+            string ServiceName,
+            string ContentType,
+            long TotalSize,
+            bool Overwrite);
+
+        private sealed record InitiateResumableUploadResponse(
+            string UploadId,
+            string SessionUri,
+            DateTime ExpiresAt,
+            long TotalSize);
+
+        private sealed record UploadServiceResponse(
+            string StoragePath,
+            long FileSize,
+            string ContentType,
+            DateTime UploadedAt);
     }
 }
