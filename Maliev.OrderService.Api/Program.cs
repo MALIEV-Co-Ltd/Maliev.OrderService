@@ -61,6 +61,7 @@ try
     _ = builder.AddServiceClient<IAuthServiceClient, AuthServiceClient>("AuthService");
     _ = builder.AddServiceClient<IEmployeeServiceClient, EmployeeServiceClient>("EmployeeService");
     _ = builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
+    _ = builder.AddServiceClient<IGeometryServiceClient, GeometryServiceClient>("GeometryService");
 
     // Business Services
     _ = builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
