@@ -8,18 +8,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Maliev.OrderService.Api.Consumers;
 
-    /// <summary>
-    /// Consumes PreviewImagesGeneratedEvent from GeometryService to store preview image metadata.
-    /// </summary>
-    public partial class PreviewImagesGeneratedEventConsumer(OrderDbContext dbContext, ILogger<PreviewImagesGeneratedEventConsumer> logger) : IConsumer<PreviewImagesGeneratedEvent>
-    {
-        private readonly OrderDbContext _dbContext = dbContext;
-        private readonly ILogger<PreviewImagesGeneratedEventConsumer> _logger = logger;
+/// <summary>
+/// Consumes PreviewImagesGeneratedEvent from GeometryService to store preview image metadata.
+/// </summary>
+public partial class PreviewImagesGeneratedEventConsumer(OrderDbContext dbContext, ILogger<PreviewImagesGeneratedEventConsumer> logger) : IConsumer<PreviewImagesGeneratedEvent>
+{
+    private readonly OrderDbContext _dbContext = dbContext;
+    private readonly ILogger<PreviewImagesGeneratedEventConsumer> _logger = logger;
 
-        /// <summary>
-        /// Consumes a PreviewImagesGeneratedEvent and stores the preview image metadata.
-        /// </summary>
-        public async Task Consume(ConsumeContext<PreviewImagesGeneratedEvent> context)
+    /// <summary>
+    /// Consumes a PreviewImagesGeneratedEvent and stores the preview image metadata.
+    /// </summary>
+    public async Task Consume(ConsumeContext<PreviewImagesGeneratedEvent> context)
     {
         PreviewImagesGeneratedEvent @event = context.Message;
         PreviewImagesGeneratedEventPayload payload = @event.Payload;
