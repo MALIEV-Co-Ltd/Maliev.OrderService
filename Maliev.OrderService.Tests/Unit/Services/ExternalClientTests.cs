@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Sockets;
+using System.Text;
 using Maliev.OrderService.Api.Services.External;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -252,11 +254,51 @@ namespace Maliev.OrderService.Tests.Unit.Services
         {
             // Arrange
             var expected = new UploadFileResult { ObjectPath = "path/to/file", FileSizeBytes = 10, ContentType = "application/pdf", UploadedAt = DateTime.UtcNow };
+            using var uploadSink = new TcpListener(IPAddress.Loopback, 0);
+            uploadSink.Start();
+            var uploadPort = ((IPEndPoint)uploadSink.LocalEndpoint).Port;
+            var sessionUri = new Uri($"http://127.0.0.1:{uploadPort}/resumable-session");
+            var uploadSinkTask = AcceptSuccessfulPutAsync(uploadSink);
+
             var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
             handlerMock
                .Protected()
-               .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
-               .ReturnsAsync(new HttpResponseMessage { StatusCode = HttpStatusCode.OK, Content = JsonContent.Create(expected) });
+               .Setup<Task<HttpResponseMessage>>(
+                   "SendAsync",
+                   ItExpr.Is<HttpRequestMessage>(request =>
+                       request.Method == HttpMethod.Post &&
+                       request.RequestUri!.AbsolutePath == "/upload/v1/uploads/resumable"),
+                   ItExpr.IsAny<CancellationToken>())
+               .ReturnsAsync(new HttpResponseMessage
+               {
+                   StatusCode = HttpStatusCode.OK,
+                   Content = JsonContent.Create(new
+                   {
+                       uploadId = "upload-1",
+                       sessionUri = sessionUri.ToString(),
+                       expiresAt = DateTime.UtcNow.AddMinutes(15),
+                       totalSize = 3
+                   })
+               });
+            handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                   "SendAsync",
+                   ItExpr.Is<HttpRequestMessage>(request =>
+                       request.Method == HttpMethod.Post &&
+                       request.RequestUri!.AbsolutePath == "/upload/v1/uploads/resumable/upload-1/complete"),
+                   ItExpr.IsAny<CancellationToken>())
+               .ReturnsAsync(new HttpResponseMessage
+               {
+                   StatusCode = HttpStatusCode.OK,
+                   Content = JsonContent.Create(new
+                   {
+                       storagePath = expected.ObjectPath,
+                       fileSize = expected.FileSizeBytes,
+                       contentType = expected.ContentType,
+                       uploadedAt = expected.UploadedAt
+                   })
+               });
 
             var httpClient = new HttpClient(handlerMock.Object) { BaseAddress = new Uri("http://upload-service") };
             var client = new UploadServiceClient(httpClient, _uploadLoggerMock.Object);
@@ -264,9 +306,27 @@ namespace Maliev.OrderService.Tests.Unit.Services
             // Act
             using var stream = new MemoryStream(new byte[] { 1, 2, 3 });
             var result = await client.UploadFileAsync("path/to/file", stream, "application/pdf");
+            await uploadSinkTask.WaitAsync(TimeSpan.FromSeconds(5));
 
             // Assert
             Assert.Equal(expected.ObjectPath, result.ObjectPath);
+        }
+
+        private static async Task AcceptSuccessfulPutAsync(TcpListener listener)
+        {
+            using var client = await listener.AcceptTcpClientAsync();
+            await using var stream = client.GetStream();
+            using var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
+
+            string? requestLine = await reader.ReadLineAsync();
+            Assert.StartsWith("PUT /resumable-session HTTP/", requestLine);
+
+            while (!string.IsNullOrEmpty(await reader.ReadLineAsync()))
+            {
+            }
+
+            byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            await stream.WriteAsync(response);
         }
     }
 }
