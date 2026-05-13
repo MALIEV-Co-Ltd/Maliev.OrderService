@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Aspire.ServiceDefaults;
+using Maliev.OrderService.Api.Authorization;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Services.External;
@@ -21,6 +22,7 @@ namespace Maliev.OrderService.Api.Controllers;
 [ApiVersion("1")]
 [Route("geometryanalysis/v{version:apiVersion}/[controller]")]
 [EnableRateLimiting(RateLimitPolicies.Api)]
+[RequirePermission(OrderPermissions.OrdersUpdate)]
 public partial class GeometryAnalysisController(
     IGeometryServiceClient geometryServiceClient,
     ILogger<GeometryAnalysisController> logger) : ControllerBase
@@ -40,6 +42,8 @@ public partial class GeometryAnalysisController(
     /// <response code="500">Internal server error</response>
     [HttpPost("{uploadId}/quality-check")]
     [ProducesResponseType(typeof(QualityCheckResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorMessageResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorMessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<QualityCheckResponse>> QualityCheck(
@@ -119,6 +123,8 @@ public partial class GeometryAnalysisController(
     /// <response code="500">Internal server error</response>
     [HttpPost("{uploadId}/dfm/{processCode}")]
     [ProducesResponseType(typeof(DfmAnalysisResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorMessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorMessageResponse), StatusCodes.Status504GatewayTimeout)]
     [ProducesResponseType(typeof(ErrorMessageResponse), StatusCodes.Status500InternalServerError)]
@@ -214,6 +220,8 @@ public partial class GeometryAnalysisController(
     /// <response code="500">Internal server error</response>
     [HttpDelete("{uploadId}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ErrorMessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorMessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> CleanupUpload(
