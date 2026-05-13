@@ -6,7 +6,7 @@ using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Api.Services.Business;
-using Microsoft.AspNetCore.Authorization;
+using Maliev.OrderService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -23,9 +23,13 @@ namespace Maliev.OrderService.Api.Controllers
     [Route("order/v{version:apiVersion}/orders/{orderId}/files")]
     [EnableRateLimiting(RateLimitPolicies.Api)]
     public class OrderFilesController(
+        IOrderAuthorizationService orderAuthService,
+        OrderDbContext context,
         IOrderFileService fileService,
         ILogger<OrderFilesController> logger) : ControllerBase
     {
+        private readonly IOrderAuthorizationService _orderAuthService = orderAuthService;
+        private readonly OrderDbContext _context = context;
         private readonly IOrderFileService _fileService = fileService;
         private readonly ILogger<OrderFilesController> _logger = logger;
 
@@ -58,6 +62,18 @@ namespace Maliev.OrderService.Api.Controllers
             if (file.Length > 100 * 1024 * 1024) // 100MB
             {
                 return BadRequest(new { message = "File size exceeds 100MB limit" });
+            }
+
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken,
+                notFoundAsBadRequest: true);
+            if (accessError != null)
+            {
+                return accessError;
             }
 
             try
@@ -94,6 +110,17 @@ namespace Maliev.OrderService.Api.Controllers
             long fileId,
             CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             (Stream? fileStream, string? fileName, string? contentType) = await _fileService.DownloadOrderFileAsync(orderId, fileId, cancellationToken);
 
             return fileStream == null ? NotFound(new { message = "File not found" }) : File(fileStream, contentType, fileName);
@@ -113,6 +140,17 @@ namespace Maliev.OrderService.Api.Controllers
             long fileId,
             CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             bool result = await _fileService.DeleteOrderFileAsync(orderId, fileId, cancellationToken);
 
             if (!result)

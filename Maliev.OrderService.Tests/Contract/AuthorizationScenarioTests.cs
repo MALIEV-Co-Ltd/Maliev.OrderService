@@ -40,6 +40,7 @@ namespace Maliev.OrderService.Tests.Contract
         {
             var client = _factory.CreateAuthenticatedClient(
                 "user-without-approve",
+                roles: ["Manager"],
                 permissions: [OrderPermissions.OrdersRead, OrderPermissions.OrdersCreate, OrderPermissions.OrdersUpdate]);
 
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
@@ -59,6 +60,7 @@ namespace Maliev.OrderService.Tests.Contract
         {
             var client = _factory.CreateAuthenticatedClient(
                 "user-without-approve",
+                roles: ["Manager"],
                 permissions: [OrderPermissions.OrdersRead, OrderPermissions.OrdersCreate, OrderPermissions.OrdersUpdate]);
 
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };

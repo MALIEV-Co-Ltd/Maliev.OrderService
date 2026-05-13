@@ -9,7 +9,6 @@ using Maliev.OrderService.Api.Mapping;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Infrastructure.Persistence;
 using Maliev.OrderService.Domain.Entities;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -32,10 +31,12 @@ namespace Maliev.OrderService.Api.Controllers
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public partial class BatchOrdersController(
         IOrderManagementService orderService,
+        IOrderAuthorizationService orderAuthService,
         OrderDbContext context,
         ILogger<BatchOrdersController> logger) : ControllerBase
     {
         private readonly IOrderManagementService _orderService = orderService;
+        private readonly IOrderAuthorizationService _orderAuthService = orderAuthService;
         private readonly OrderDbContext _context = context;
         private readonly ILogger<BatchOrdersController> _logger = logger;
 
@@ -140,6 +141,21 @@ namespace Maliev.OrderService.Api.Controllers
                 }
             }
 
+            foreach (BatchUpdateOrderRequest request in requests)
+            {
+                IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                    this,
+                    _context,
+                    _orderAuthService,
+                    request.OrderId,
+                    cancellationToken,
+                    notFoundAsBadRequest: true);
+                if (accessError != null)
+                {
+                    return accessError;
+                }
+            }
+
             // Use execution strategy for retry logic with transactions
             IExecutionStrategy strategy = _context.Database.CreateExecutionStrategy();
 
@@ -206,6 +222,20 @@ namespace Maliev.OrderService.Api.Controllers
             if (orderIds == null || orderIds.Length == 0)
             {
                 return BadRequest(new ErrorMessageResponse { Message = "Order IDs are required" });
+            }
+
+            foreach (string orderId in orderIds)
+            {
+                IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                    this,
+                    _context,
+                    _orderAuthService,
+                    orderId,
+                    cancellationToken);
+                if (accessError != null)
+                {
+                    return accessError;
+                }
             }
 
             // Use execution strategy for retry logic with transactions

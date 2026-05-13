@@ -48,6 +48,7 @@ To maintain high performance and low complexity, the following are **NOT** used:
 - **Smart Batch Operations**: High-performance, transactional batch create/update/cancel for enterprise-scale ordering.
 - **Optimistic Concurrency**: Precise conflict detection using RowVersion ensures data integrity during high-concurrency operations.
 - **Sequential ID Generation**: Guaranteed atomic order numbering (ORD-YYYY-XXXXX) with annual resets for clear tracking.
+- **Order Data Isolation**: Order details, subresources, batch mutations, files, notes, statuses, preview images, and outsourcing changes enforce the same per-order access guard.
 - **Rich Technical Attributes**: Specialized metadata handling for diverse service categories (3D Printing, CNC, Design, Scanning).
 
 ---
@@ -100,6 +101,15 @@ All endpoints are prefixed with `/order/v1/`.
 | POST | `/orders` | Create a new manufacturing order |
 | POST | `/orders/batch` | Transactional batch order creation |
 | POST | `/orders/{id}/statuses` | Trigger a workflow state transition |
+
+### Authorization Model
+
+- Every order endpoint uses `[RequirePermission]` for the action permission.
+- Object routes also load the target order and call `IOrderAuthorizationService.CanViewOrder` before reading or mutating subresources.
+- `roles.order.creator` is scoped to orders whose `CustomerId` matches the authenticated user id.
+- `roles.order.fulfillment` is scoped to orders assigned to the authenticated employee id.
+- `roles.order.admin` and `roles.order.manager` can access all orders.
+- Batch update/cancel validates every target order before opening the transaction.
 
 ---
 

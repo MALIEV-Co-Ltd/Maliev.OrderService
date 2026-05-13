@@ -128,6 +128,8 @@ Maliev.OrderService/
 ### Authorization (RBAC & Data Isolation)
 - **Attributes**: Use `[RequirePermission(OrderPermissions.X)]` on endpoints.
 - **Data Isolation**: Use `IOrderAuthorizationService.ApplyDataIsolationFilter(User, query)` to restrict data access based on UserType (Customer/Employee/Manager).
+- **Object routes**: Any route with `{orderId}` must load the order and enforce `IOrderAuthorizationService.CanViewOrder(User, order)` before returning or mutating statuses, files, notes, preview images, outsourcing data, batch updates, or cancellations.
+- **Batch operations**: Validate every target order's object access before starting the transaction; do not partially apply authorized items when another item is forbidden.
 - **Claims**: User context is derived from JWT claims (`uid`, `role`, `userType`).
 
 ### Database & Persistence

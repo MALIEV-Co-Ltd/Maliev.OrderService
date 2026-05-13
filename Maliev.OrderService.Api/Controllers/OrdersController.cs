@@ -6,6 +6,7 @@ using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Api.Services.Business;
+using Maliev.OrderService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -26,6 +27,7 @@ namespace Maliev.OrderService.Api.Controllers
     public partial class OrdersController(
         IOrderManagementService orderService,
         IOrderAuthorizationService orderAuthService,
+        OrderDbContext context,
         IOrderStatusService statusService,
         IOrderFileService fileService,
         IOrderNoteService noteService,
@@ -35,6 +37,7 @@ namespace Maliev.OrderService.Api.Controllers
     {
         private readonly IOrderManagementService _orderService = orderService;
         private readonly IOrderAuthorizationService _orderAuthService = orderAuthService;
+        private readonly OrderDbContext _context = context;
         private readonly IOrderStatusService _statusService = statusService;
         private readonly IOrderFileService _fileService = fileService;
         private readonly IOrderNoteService _noteService = noteService;
@@ -134,6 +137,17 @@ namespace Maliev.OrderService.Api.Controllers
                 return BadRequest(ModelState);
             }
 
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             // Field-level check: Pricing updates require higher permissions
             if (request.QuotedAmount.HasValue || !string.IsNullOrEmpty(request.QuoteCurrency))
             {
@@ -176,6 +190,17 @@ namespace Maliev.OrderService.Api.Controllers
         [RequirePermission(OrderPermissions.OrdersCancel)]
         public async Task<IActionResult> CancelOrder(string orderId, CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             string cancelledBy = User.GetUserId();
             bool result = await _orderService.CancelOrderAsync(orderId, cancelledBy, cancellationToken: cancellationToken);
 
@@ -198,6 +223,17 @@ namespace Maliev.OrderService.Api.Controllers
             [FromBody] CancelOrderRequest request,
             CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             string cancelledBy = User.GetUserId();
             bool result = await _orderService.CancelOrderAsync(orderId, cancelledBy, request.CancellationReason, cancellationToken);
 
@@ -216,6 +252,17 @@ namespace Maliev.OrderService.Api.Controllers
         [RequirePermission(OrderPermissions.OrdersRead)]
         public async Task<IActionResult> GetOrderStatuses(string orderId, CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             List<OrderStatusResponse> statuses = await _statusService.GetOrderStatusHistoryAsync(orderId, cancellationToken);
             return Ok(statuses);
         }
@@ -230,6 +277,17 @@ namespace Maliev.OrderService.Api.Controllers
         [RequirePermission(OrderPermissions.OrdersRead)]
         public async Task<IActionResult> GetOrderFiles(string orderId, CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             List<OrderFileResponse> files = await _fileService.GetOrderFilesAsync(orderId, cancellationToken);
             return Ok(files);
         }
@@ -244,6 +302,17 @@ namespace Maliev.OrderService.Api.Controllers
         [RequirePermission(OrderPermissions.OrdersRead)]
         public async Task<IActionResult> GetOrderNotes(string orderId, CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             List<OrderNoteResponse> notes = await _noteService.GetOrderNotesAsync(orderId, cancellationToken);
             return Ok(notes);
         }
@@ -258,6 +327,17 @@ namespace Maliev.OrderService.Api.Controllers
         [RequirePermission(OrderPermissions.OrdersRead)]
         public async Task<IActionResult> GetOrderPreviewImages(string orderId, CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             List<OrderPreviewImageResponse> previewImages = await _previewImageService.GetOrderPreviewImagesAsync(orderId, cancellationToken);
             return Ok(previewImages);
         }
@@ -273,6 +353,17 @@ namespace Maliev.OrderService.Api.Controllers
         [RequirePermission(OrderPermissions.OrdersUpdate)]
         public async Task<IActionResult> SetPrimaryFile(string orderId, long fileId, CancellationToken cancellationToken = default)
         {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
             bool result = await _fileService.SetPrimaryFileAsync(orderId, fileId, cancellationToken);
             return result ? Ok() : NotFound();
         }
@@ -295,6 +386,17 @@ namespace Maliev.OrderService.Api.Controllers
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
+            }
+
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
             }
 
             try

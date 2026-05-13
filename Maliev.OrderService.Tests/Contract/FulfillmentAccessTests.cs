@@ -66,6 +66,7 @@ namespace Maliev.OrderService.Tests.Contract
                 CustomerType = "Customer",
                 ServiceCategoryId = 1,
                 ProcessTypeId = 1,
+                AssignedEmployeeId = "fulfillment-user",
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = "system",
                 UpdatedBy = "system"

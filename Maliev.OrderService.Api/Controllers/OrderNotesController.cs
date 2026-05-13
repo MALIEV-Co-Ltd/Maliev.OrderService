@@ -5,6 +5,7 @@ using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Api.Services.Business;
+using Maliev.OrderService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.OrderService.Api.Controllers
@@ -20,9 +21,13 @@ namespace Maliev.OrderService.Api.Controllers
     [Route("order/v{version:apiVersion}/orders/{orderId}/notes")]
     [Produces("application/json")]
     public class OrderNotesController(
+        IOrderAuthorizationService orderAuthService,
+        OrderDbContext context,
         IOrderNoteService noteService,
         ILogger<OrderNotesController> logger) : ControllerBase
     {
+        private readonly IOrderAuthorizationService _orderAuthService = orderAuthService;
+        private readonly OrderDbContext _context = context;
         private readonly IOrderNoteService _noteService = noteService;
         private readonly ILogger<OrderNotesController> _logger = logger;
 
@@ -43,6 +48,18 @@ namespace Maliev.OrderService.Api.Controllers
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
+            }
+
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken,
+                notFoundAsBadRequest: true);
+            if (accessError != null)
+            {
+                return accessError;
             }
 
             try
