@@ -61,14 +61,17 @@ namespace Maliev.OrderService.Tests.Integration
             });
 
             // 3. Assert - Wait for consumer and check DB
-            // (In a real harness test we'd wait, but here we just check DB after a short delay or use harness.Consumed)
-            await Task.Delay(1000);
+            var consumerHarness = harness.GetConsumerHarness<Maliev.OrderService.Api.Consumers.FileDeletedEventConsumer>();
+            Assert.True(
+                await consumerHarness.Consumed.Any<FileDeletedEvent>(),
+                "FileDeletedEvent should be consumed.");
 
             using (var scope = _factory.Services.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
                 var file = await context.OrderFiles.FirstOrDefaultAsync(f => f.ObjectPath == "storage/path/1");
-                // Assert.NotNull(file?.DeletedAt); // Might need more time for async consumer
+                Assert.NotNull(file?.DeletedAt);
+                Assert.Equal(DateTimeKind.Utc, file!.DeletedAt!.Value.Kind);
             }
         }
     }

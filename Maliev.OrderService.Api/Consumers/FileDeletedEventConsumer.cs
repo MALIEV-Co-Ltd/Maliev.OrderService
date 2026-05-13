@@ -47,7 +47,7 @@ namespace Maliev.OrderService.Api.Consumers
             {
                 foreach (OrderFile? file in orderFiles)
                 {
-                    file.DeletedAt = payload.DeletedAt.DateTime;
+                    file.DeletedAt = payload.DeletedAt.UtcDateTime;
                 }
 
                 _ = await _dbContext.SaveChangesAsync(context.CancellationToken);

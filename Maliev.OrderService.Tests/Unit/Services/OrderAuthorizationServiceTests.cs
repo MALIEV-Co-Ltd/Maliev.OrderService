@@ -39,6 +39,20 @@ namespace Maliev.OrderService.Tests.Unit.Services
         }
 
         [Fact]
+        public void CanViewOrderWildcardPermissionReturnsTrue()
+        {
+            // Arrange
+            var user = CreateUserWithPermissions("*");
+            var order = new Order { CustomerId = "other-user" };
+
+            // Act
+            var result = _service.CanViewOrder(user, order);
+
+            // Assert
+            Assert.True(result);
+        }
+
+        [Fact]
         public void CanViewOrderCreatorRoleOwnOrderReturnsTrue()
         {
             // Arrange
@@ -140,12 +154,41 @@ namespace Maliev.OrderService.Tests.Unit.Services
             Assert.Empty(result);
         }
 
+        [Fact]
+        public void ApplyDataIsolationFilterWildcardPermissionReturnsAll()
+        {
+            // Arrange
+            var user = CreateUserWithPermissions("*");
+            var orders = new List<Order>
+            {
+                new Order { OrderId = "1", CustomerId = "customer-1" },
+                new Order { OrderId = "2", CustomerId = "customer-2" }
+            }.AsQueryable();
+
+            // Act
+            var result = _service.ApplyDataIsolationFilter(user, orders).ToList();
+
+            // Assert
+            Assert.Equal(2, result.Count);
+        }
+
         private static ClaimsPrincipal CreateUserWithRoles(string role, string userId = "test-user")
         {
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, userId),
                 new Claim(ClaimTypes.Role, role)
+            };
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            return new ClaimsPrincipal(identity);
+        }
+
+        private static ClaimsPrincipal CreateUserWithPermissions(string permission, string userId = "test-user")
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId),
+                new Claim("permissions", permission)
             };
             var identity = new ClaimsIdentity(claims, "TestAuth");
             return new ClaimsPrincipal(identity);

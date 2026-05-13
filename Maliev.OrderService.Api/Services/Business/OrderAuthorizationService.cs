@@ -17,6 +17,11 @@ namespace Maliev.OrderService.Api.Services.Business
             IEnumerable<string> roles = user.GetRoles();
             string userId = user.GetUserId();
 
+            if (user.HasPermission("*"))
+            {
+                return true;
+            }
+
             // Admin and Manager can see all orders (supporting both full and simple role names for tests)
             if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains(OrderPredefinedRoles.Manager, StringComparer.OrdinalIgnoreCase) ||
@@ -42,6 +47,11 @@ namespace Maliev.OrderService.Api.Services.Business
             IEnumerable<string> roles = user.GetRoles();
             string userId = user.GetUserId();
 
+            if (user.HasPermission("*"))
+            {
+                return true;
+            }
+
             // Admin and Manager can see all orders (supporting both full and simple role names for tests)
             if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
                 roles.Contains(OrderPredefinedRoles.Manager, StringComparer.OrdinalIgnoreCase) ||
@@ -66,6 +76,11 @@ namespace Maliev.OrderService.Api.Services.Business
         {
             IEnumerable<string> roles = user.GetRoles();
             string userId = user.GetUserId();
+
+            if (user.HasPermission("*"))
+            {
+                return query;
+            }
 
             // Admin and Manager can see all orders (no filter needed)
             if (roles.Contains(OrderPredefinedRoles.Admin, StringComparer.OrdinalIgnoreCase) ||
