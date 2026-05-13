@@ -83,6 +83,11 @@ try
 
     // --- Database Migrations ---
     await app.MigrateDatabaseAsync<OrderDbContext>();
+    using (IServiceScope seedScope = app.Services.CreateScope())
+    {
+        OrderDbContext dbContext = seedScope.ServiceProvider.GetRequiredService<OrderDbContext>();
+        await OrderReferenceDataSeeder.SeedAsync(dbContext);
+    }
 
     // Middleware Pipeline
     _ = app.UseStandardMiddleware();
