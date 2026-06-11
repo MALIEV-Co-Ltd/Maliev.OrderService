@@ -388,6 +388,7 @@ namespace Maliev.OrderService.Tests.Integration
                     Payload: new PaymentCompletedEventPayload(
                         OrderId: orderGuid,
                         OrderNumber: createdOrder.OrderId,
+                        CustomerId: createdOrder.CustomerId,
                         PaymentId: paymentId,
                         Amount: 1500.00,
                         Currency: "THB"
