@@ -86,6 +86,8 @@ namespace Maliev.OrderService.Api.Services.Business
             newStatus.UpdatedBy = updatedBy;
             newStatus.Timestamp = DateTime.UtcNow;
 
+            ApplyOrderPaymentState(order, toStatus, request.PaymentId);
+
             _ = _context.OrderStatuses.Add(newStatus);
 
             // Add Audit Log
@@ -238,7 +240,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         Payload: new OrderPaidEventPayload(
                             OrderId: orderGuid,
                             OrderNumber: order.OrderId,
-                            PaymentId: order.PaymentId != null ? StringToGuid(order.PaymentId) : Guid.Empty,
+                            PaymentId: ResolvePaymentId(order.PaymentId),
                             PaidAmount: (double)(order.QuotedAmount ?? 0),
                             Currency: order.QuoteCurrency ?? "THB",
                             PaidAt: now
@@ -437,6 +439,43 @@ namespace Maliev.OrderService.Api.Services.Business
             string prevStatusStr = previousStatus.ToString();
             string newStatusStr = newStatus.ToString();
             Log.StatusChangeEventsPublished(_logger, order.OrderId, prevStatusStr, newStatusStr);
+        }
+
+        private static void ApplyOrderPaymentState(Order order, OrderStatusValue toStatus, string? paymentId)
+        {
+            switch (toStatus)
+            {
+                case OrderStatusValue.Paid:
+                    order.PaymentStatus = "Paid";
+                    if (!string.IsNullOrWhiteSpace(paymentId))
+                    {
+                        order.PaymentId = paymentId;
+                    }
+                    break;
+                case OrderStatusValue.POIssued:
+                    order.PaymentStatus = "POIssued";
+                    break;
+                case OrderStatusValue.Cancelled:
+                    if (order.PaymentStatus != "Paid")
+                    {
+                        order.PaymentStatus = "Cancelled";
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private static Guid ResolvePaymentId(string? paymentId)
+        {
+            if (string.IsNullOrWhiteSpace(paymentId))
+            {
+                return Guid.Empty;
+            }
+
+            return Guid.TryParse(paymentId, out var parsedPaymentId)
+                ? parsedPaymentId
+                : StringToGuid(paymentId);
         }
 
         /// <summary>

@@ -39,7 +39,8 @@ namespace Maliev.OrderService.Api.Consumers
                 var statusRequest = new CreateOrderStatusRequest
                 {
                     Status = "Paid",
-                    InternalNotes = $"Payment {payload.PaymentId} completed - Amount: {payload.Amount} {payload.Currency}"
+                    InternalNotes = $"Payment {payload.PaymentId} completed - Amount: {payload.Amount} {payload.Currency}",
+                    PaymentId = payload.PaymentId.ToString()
                 };
 
                 _ = await _orderStatusService.CreateOrderStatusAsync(

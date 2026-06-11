@@ -20,5 +20,9 @@ namespace Maliev.OrderService.Api.DTOs.Request
         /// <summary>Gets or sets customer-facing notes</summary>
         [MaxLength(2000, ErrorMessage = "Customer Notes must not exceed 2000 characters")]
         public string? CustomerNotes { get; set; }
+
+        /// <summary>Gets or sets the payment transaction identifier for paid transitions.</summary>
+        [MaxLength(100, ErrorMessage = "Payment ID must not exceed 100 characters")]
+        public string? PaymentId { get; set; }
     }
 }

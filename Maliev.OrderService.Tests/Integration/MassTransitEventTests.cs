@@ -373,6 +373,7 @@ namespace Maliev.OrderService.Tests.Integration
                 Guid orderGuid = new(hash);
 
                 // Act - Publish PaymentCompletedEvent
+                var paymentId = Guid.NewGuid();
                 var paymentCompletedEvent = new PaymentCompletedEvent(
                     MessageId: Guid.NewGuid(),
                     MessageName: "PaymentCompletedEvent",
@@ -387,7 +388,7 @@ namespace Maliev.OrderService.Tests.Integration
                     Payload: new PaymentCompletedEventPayload(
                         OrderId: orderGuid,
                         OrderNumber: createdOrder.OrderId,
-                        PaymentId: Guid.NewGuid(),
+                        PaymentId: paymentId,
                         Amount: 1500.00,
                         Currency: "THB"
                     )
@@ -431,6 +432,15 @@ namespace Maliev.OrderService.Tests.Integration
                 // Verify OrderPaidEvent was also published
                 Assert.True(await harness.Published.Any<OrderPaidEvent>(),
                     "OrderPaidEvent should be published after consuming PaymentCompletedEvent");
+
+                IPublishedMessage<OrderPaidEvent>? orderPaidEvent = harness.Published.Select<OrderPaidEvent>().FirstOrDefault();
+                Assert.NotNull(orderPaidEvent);
+                Assert.Equal(paymentId, orderPaidEvent.Context.Message.Payload.PaymentId);
+
+                OrderResponse? paidOrder = await _client.GetFromJsonAsync<OrderResponse>($"/order/v1/orders/{createdOrder.OrderId}");
+                Assert.NotNull(paidOrder);
+                Assert.Equal(paymentId.ToString(), paidOrder.PaymentId);
+                Assert.Equal("Paid", paidOrder.PaymentStatus);
             }
             finally
             {
