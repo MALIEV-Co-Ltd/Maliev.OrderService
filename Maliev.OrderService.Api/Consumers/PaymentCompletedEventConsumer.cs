@@ -53,6 +53,12 @@ namespace Maliev.OrderService.Api.Consumers
             }
             catch (InvalidOperationException ex)
             {
+                if (await IsDuplicatePaidEventAsync(payload, context.CancellationToken))
+                {
+                    Log.DuplicatePaymentCompletedEventIgnored(_logger, payload.OrderId, payload.PaymentId);
+                    return;
+                }
+
                 // Order not found or invalid state transition
                 Log.FailedToUpdateOrderToPaidStatus(_logger, ex, payload.OrderId, ex.Message);
 
@@ -65,6 +71,27 @@ namespace Maliev.OrderService.Api.Consumers
                 Log.UnexpectedErrorProcessingPaymentCompletedEvent(_logger, ex, payload.OrderId);
                 throw; // Rethrow to trigger retry/dead-letter
             }
+        }
+
+        private async Task<bool> IsDuplicatePaidEventAsync(
+            PaymentCompletedEventPayload payload,
+            CancellationToken cancellationToken)
+        {
+            List<DTOs.Response.OrderStatusResponse> history;
+            try
+            {
+                history = await _orderStatusService.GetOrderStatusHistoryAsync(payload.OrderNumber, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Log.PaymentStatusHistoryLookupFailed(_logger, ex, payload.OrderId, payload.PaymentId);
+                return false;
+            }
+
+            var paymentId = payload.PaymentId.ToString();
+            return history?.Any(status =>
+                string.Equals(status.Status, "Paid", StringComparison.OrdinalIgnoreCase) &&
+                status.InternalNotes?.Contains(paymentId, StringComparison.OrdinalIgnoreCase) == true) == true;
         }
 
         private static partial class Log
@@ -80,6 +107,12 @@ namespace Maliev.OrderService.Api.Consumers
 
             [LoggerMessage(Level = LogLevel.Error, Message = "Unexpected error processing PaymentCompletedEvent for order {OrderId}")]
             public static partial void UnexpectedErrorProcessingPaymentCompletedEvent(ILogger logger, Exception exception, Guid orderId);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "Ignoring duplicate PaymentCompletedEvent for order {OrderId}, payment {PaymentId}")]
+            public static partial void DuplicatePaymentCompletedEventIgnored(ILogger logger, Guid orderId, Guid paymentId);
+
+            [LoggerMessage(Level = LogLevel.Warning, Message = "Could not inspect status history while checking duplicate PaymentCompletedEvent for order {OrderId}, payment {PaymentId}")]
+            public static partial void PaymentStatusHistoryLookupFailed(ILogger logger, Exception exception, Guid orderId, Guid paymentId);
         }
     }
 }
