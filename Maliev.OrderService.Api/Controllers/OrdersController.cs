@@ -10,7 +10,10 @@ using Maliev.OrderService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Maliev.OrderService.Api.Controllers
 {
@@ -95,6 +98,53 @@ namespace Maliev.OrderService.Api.Controllers
             }
 
             return Ok(order);
+        }
+
+        /// <summary>
+        /// Get production line items for an order.
+        /// </summary>
+        /// <param name="orderId">The order ID</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>The production line items for the order</returns>
+        [HttpGet("{orderId}/items")]
+        [RequirePermission(OrderPermissions.LineItemsRead)]
+        public async Task<IActionResult> GetOrderItems(string orderId, CancellationToken cancellationToken = default)
+        {
+            IActionResult? accessError = await OrderAccessGuard.EnsureCanAccessOrderAsync(
+                this,
+                _context,
+                _orderAuthService,
+                orderId,
+                cancellationToken);
+            if (accessError != null)
+            {
+                return accessError;
+            }
+
+            var order = await _context.Orders
+                .AsNoTracking()
+                .Include(o => o.ServiceCategory)
+                .Include(o => o.ProcessType)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
+            if (order == null)
+            {
+                return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
+            }
+
+            var item = new OrderLineItemResponse
+            {
+                OrderItemId = StableGuid($"order-item:{order.OrderId}:1"),
+                MaterialId = order.MaterialId.HasValue
+                    ? StableGuid($"material:{order.MaterialId.Value}")
+                    : Guid.Empty,
+                Technology = order.ProcessType?.Name ?? order.ServiceCategory.Name,
+                VolumeCm3 = 0,
+                Quantity = Math.Max(1, order.OrderedQuantity ?? 1),
+                EstimatedPrintTimeMinutes = 0,
+                DeliveryDate = order.PromisedDeliveryDate
+            };
+
+            return Ok(new[] { item });
         }
 
         /// <summary>
@@ -418,6 +468,12 @@ namespace Maliev.OrderService.Api.Controllers
 
             [LoggerMessage(Level = LogLevel.Warning, Message = "User {UserId} attempted unauthorized pricing update for order {OrderId}")]
             public static partial void UnauthorizedPricingUpdate(ILogger logger, string userId, string orderId);
+        }
+
+        private static Guid StableGuid(string value)
+        {
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+            return new Guid(hash.AsSpan(0, 16));
         }
     }
 }

@@ -67,6 +67,39 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
+        public async Task GetOrderItemsReturnsProductionLineItem()
+        {
+            DateTime promisedDeliveryDate = DateTime.UtcNow.Date.AddDays(7);
+            var createRequest = new
+            {
+                customerId = "CUST-ITEMS-001",
+                customerType = "Customer",
+                serviceCategoryId = 1,
+                processTypeId = 1,
+                materialId = 1,
+                orderedQuantity = 3,
+                promisedDeliveryDate
+            };
+
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string orderId = createdOrder.GetProperty("orderId").GetString()!;
+
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/items");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            JsonElement items = await response.Content.ReadFromJsonAsync<JsonElement>();
+            JsonElement item = items.EnumerateArray().Single();
+            Assert.True(item.GetProperty("orderItemId").GetGuid() != Guid.Empty);
+            Assert.True(item.GetProperty("materialId").GetGuid() != Guid.Empty);
+            Assert.Equal(3, item.GetProperty("quantity").GetInt32());
+            Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("technology").GetString()));
+            Assert.Equal(0, item.GetProperty("estimatedPrintTimeMinutes").GetInt32());
+        }
+
+        [Fact]
         public async Task GetOrderByIdNotFoundReturns404()
         {
             HttpResponseMessage response = await _client.GetAsync("/order/v1/orders/NON-EXISTENT-ID");
