@@ -494,6 +494,7 @@ namespace Maliev.OrderService.Tests.Integration
 
                 OrderPaidEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderPaidEvent", @event.MessageName);
+                Assert.Contains("JobService", @event.ConsumedBy);
                 Assert.NotNull(@event.Payload);
                 Assert.Equal("THB", @event.Payload.Currency);
             }

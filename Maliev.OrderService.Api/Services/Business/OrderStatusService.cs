@@ -33,7 +33,7 @@ namespace Maliev.OrderService.Api.Services.Business
         private static readonly List<string> _genericStatusChangeConsumers = ["NotificationService", "InvoiceService"];
         private static readonly List<string> _quotedConsumers = ["NotificationService", "InvoiceService"];
         private static readonly List<string> _acceptedConsumers = ["PaymentService", "NotificationService"];
-        private static readonly List<string> _paidConsumers = ["InvoiceService", "NotificationService"];
+        private static readonly List<string> _paidConsumers = ["JobService", "InvoiceService", "NotificationService"];
         private static readonly List<string> _notificationOnlyConsumers = ["NotificationService"];
         private static readonly List<string> _completedConsumers = ["NotificationService", "InvoiceService"];
         private static readonly List<string> _cancelledConsumers = ["PaymentService", "NotificationService"];
