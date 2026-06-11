@@ -643,6 +643,7 @@ namespace Maliev.OrderService.Tests.Integration
                 OrderCompletedEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderCompletedEvent", @event.MessageName);
                 Assert.NotNull(@event.Payload);
+                Assert.NotEqual(Guid.Empty, @event.Payload.CustomerId);
                 Assert.NotEqual(default, @event.Payload.CompletedAt);
             }
             finally

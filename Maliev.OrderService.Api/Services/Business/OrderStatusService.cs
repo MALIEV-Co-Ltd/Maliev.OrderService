@@ -286,6 +286,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         Payload: new OrderCompletedEventPayload(
                             OrderId: orderGuid,
                             OrderNumber: order.OrderId,
+                            CustomerId: customerGuid,
                             QuotationId: Guid.Empty,
                             OrderCreatedAt: new DateTimeOffset(order.CreatedAt, TimeSpan.Zero),
                             CompletedAt: now,
@@ -324,6 +325,7 @@ namespace Maliev.OrderService.Api.Services.Business
                         Payload: new OrderShippedEventPayload(
                             OrderId: orderGuid,
                             OrderNumber: order.OrderId,
+                            CustomerId: customerGuid,
                             ShippedAt: now,
                             TrackingNumber: null,
                             Carrier: null,
