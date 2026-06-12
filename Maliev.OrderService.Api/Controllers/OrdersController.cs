@@ -147,6 +147,8 @@ namespace Maliev.OrderService.Api.Controllers
             OrderLineItemResponse item = new()
             {
                 OrderItemId = StableGuid($"order-item:{order.OrderId}:1"),
+                CustomerId = order.CustomerId,
+                CustomerName = ResolveCustomerName(order),
                 MaterialId = order.MaterialId.HasValue
                     ? StableGuid($"material:{order.MaterialId.Value}")
                     : Guid.Empty,
@@ -173,16 +175,15 @@ namespace Maliev.OrderService.Api.Controllers
                 order.ProductionItemsJson,
                 _productionItemJsonOptions);
 
-            if (items is null || items.Count == 0)
-            {
-                return null;
-            }
-
-            return [.. items.Select((item, index) => new OrderLineItemResponse
+            return items is null || items.Count == 0
+                ? null
+                : [.. items.Select((item, index) => new OrderLineItemResponse
             {
                 OrderItemId = StableGuid($"order-item:{order.OrderId}:{item.SourceProjectPartId?.ToString("D") ?? index.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
                 SourceProjectId = item.SourceProjectId,
                 SourceProjectPartId = item.SourceProjectPartId,
+                CustomerId = order.CustomerId,
+                CustomerName = ResolveCustomerName(order),
                 MaterialId = item.MaterialId,
                 MaterialSnapshotJson = item.MaterialSnapshotJson,
                 ConfigurationSnapshotJson = item.ConfigurationSnapshotJson,
@@ -192,6 +193,15 @@ namespace Maliev.OrderService.Api.Controllers
                 EstimatedPrintTimeMinutes = item.EstimatedPrintTimeMinutes,
                 DeliveryDate = item.DeliveryDate ?? order.PromisedDeliveryDate
             })];
+        }
+
+        private static string? ResolveCustomerName(Order order)
+        {
+            return !string.IsNullOrWhiteSpace(order.BillingCompanyName)
+                ? order.BillingCompanyName
+                : string.IsNullOrWhiteSpace(order.DeliveryContactName)
+                    ? null
+                    : order.DeliveryContactName;
         }
 
         private static string BuildMaterialSnapshotJson(Order order)

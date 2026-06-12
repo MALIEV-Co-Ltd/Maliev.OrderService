@@ -14,6 +14,12 @@ namespace Maliev.OrderService.Api.DTOs.Response
         /// <summary>Gets or sets the originating project part identifier, when known.</summary>
         public Guid? SourceProjectPartId { get; set; }
 
+        /// <summary>Gets or sets the customer identifier associated with the order.</summary>
+        public required string CustomerId { get; set; }
+
+        /// <summary>Gets or sets the customer display name snapshot when known.</summary>
+        public string? CustomerName { get; set; }
+
         /// <summary>Gets or sets the material identifier used by production.</summary>
         public required Guid MaterialId { get; set; }
 
