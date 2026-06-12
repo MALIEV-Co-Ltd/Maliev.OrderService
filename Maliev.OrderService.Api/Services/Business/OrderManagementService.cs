@@ -1,4 +1,3 @@
-using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
@@ -98,46 +97,45 @@ namespace Maliev.OrderService.Api.Services.Business
         public async Task<OrderResponse> CreateOrderAsync(CreateOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
         {
             Order order = await PrepareOrderEntityForCreationAsync(request, createdBy, cancellationToken);
-            _ = await _context.SaveChangesAsync(cancellationToken);
 
-            // Now map to response with the REAL xmin from the DB
-            uint? xmin = _context.Entry(order).Property<uint>("xmin").CurrentValue;
-            var response = order.ToOrderResponse(xmin);
-
-            // Publish OrderCreatedEvent
             await _publishEndpoint.Publish(new OrderCreatedEvent(
                 MessageId: Guid.NewGuid(),
                 MessageName: nameof(OrderCreatedEvent),
                 MessageType: MessageType.Event,
                 MessageVersion: "1.0.0",
                 PublishedBy: "OrderService",
-                ConsumedBy: OrderCreatedConsumers,
+                ConsumedBy: _orderCreatedConsumers,
                 CorrelationId: Guid.NewGuid(),
                 CausationId: null,
                 OccurredAtUtc: DateTimeOffset.UtcNow,
                 IsPublic: false,
                 Payload: new OrderCreatedEventPayload(
-                    OrderId: StringToGuid(response.OrderId),
-                    OrderNumber: response.OrderId,
-                    CustomerId: StringToGuid(response.CustomerId),
-                    TotalAmount: (double)(response.QuotedAmount ?? 0),
-                    Currency: response.QuoteCurrency ?? "THB",
-                    CreatedAt: new DateTimeOffset(response.CreatedAt, TimeSpan.Zero),
-                    AssignedEmployeeId: response.AssignedEmployeeId != null ? StringToGuid(response.AssignedEmployeeId) : null,
+                    OrderId: StringToGuid(order.OrderId),
+                    OrderNumber: order.OrderId,
+                    CustomerId: StringToGuid(order.CustomerId),
+                    TotalAmount: (double)(order.QuotedAmount ?? 0),
+                    Currency: order.QuoteCurrency ?? "THB",
+                    CreatedAt: new DateTimeOffset(order.CreatedAt, TimeSpan.Zero),
+                    AssignedEmployeeId: order.AssignedEmployeeId != null ? StringToGuid(order.AssignedEmployeeId) : null,
                     Items: [
                         new OrderCreatedEventPayloadItemsItem(
-                            ProductId: response.MaterialId.HasValue ? StringToGuid(response.MaterialId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) : Guid.Empty,
-                            ProductCode: response.MaterialName ?? "Unknown",
-                            ProductName: response.MaterialName ?? "Unknown",
-                            Quantity: (double)(response.OrderedQuantity ?? 1),
-                            UnitPrice: (double)(response.QuotedAmount ?? 0) / (double)(response.OrderedQuantity ?? 1),
-                            LineTotal: (double)(response.QuotedAmount ?? 0)
+                            ProductId: order.MaterialId.HasValue ? StringToGuid(order.MaterialId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) : Guid.Empty,
+                            ProductCode: order.MaterialName ?? "Unknown",
+                            ProductName: order.MaterialName ?? "Unknown",
+                            Quantity: order.OrderedQuantity ?? 1,
+                            UnitPrice: (double)((order.QuotedAmount ?? 0) / (order.OrderedQuantity ?? 1)),
+                            LineTotal: (double)(order.QuotedAmount ?? 0)
                         )
                     ]
                 )
             ), cancellationToken);
 
-            Log.OrderCreatedEventPublished(_logger, response.OrderId);
+            _ = await _context.SaveChangesAsync(cancellationToken);
+
+            uint? xmin = _context.Entry(order).Property<uint>("xmin").CurrentValue;
+            var response = order.ToOrderResponse(xmin);
+
+            Log.OrderCreatedEventPublished(_logger, order.OrderId);
 
             return response;
         }
@@ -279,15 +277,13 @@ namespace Maliev.OrderService.Api.Services.Business
                 ChangeDetails = System.Text.Json.JsonSerializer.Serialize(new { request.IsOutsourced, request.SupplierCostTHB, request.SupplierName, request.SupplierEstimatedDelivery })
             });
 
-            _ = await _context.SaveChangesAsync(cancellationToken);
-
             await _publishEndpoint.Publish(new OrderOutsourcingChangedEvent(
                 MessageId: Guid.NewGuid(),
                 MessageName: nameof(OrderOutsourcingChangedEvent),
                 MessageType: MessageType.Event,
                 MessageVersion: "1.0.0",
                 PublishedBy: "OrderService",
-                ConsumedBy: OutsourcingChangedConsumers,
+                ConsumedBy: _outsourcingChangedConsumers,
                 CorrelationId: Guid.NewGuid(),
                 CausationId: null,
                 OccurredAtUtc: DateTimeOffset.UtcNow,
@@ -301,6 +297,8 @@ namespace Maliev.OrderService.Api.Services.Business
                     ChangedAtUtc: DateTimeOffset.UtcNow
                 )
             ), cancellationToken);
+
+            _ = await _context.SaveChangesAsync(cancellationToken);
 
             Log.OutsourcingChangedEventPublished(_logger, orderId);
 
@@ -329,9 +327,8 @@ namespace Maliev.OrderService.Api.Services.Business
             return new Guid(hash);
         }
 
-        // Static readonly list for ConsumedBy list to avoid CA1861
-        private static readonly List<string> OrderCreatedConsumers = new List<string> { "InvoiceService", "NotificationService" };
-        private static readonly List<string> OutsourcingChangedConsumers = new List<string> { "JobService", "NotificationService" };
+        private static readonly List<string> _orderCreatedConsumers = ["InvoiceService", "NotificationService"];
+        private static readonly List<string> _outsourcingChangedConsumers = ["JobService", "NotificationService"];
 
         private static partial class Log
         {
