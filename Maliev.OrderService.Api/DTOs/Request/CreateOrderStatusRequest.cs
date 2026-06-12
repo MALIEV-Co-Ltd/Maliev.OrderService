@@ -24,5 +24,13 @@ namespace Maliev.OrderService.Api.DTOs.Request
         /// <summary>Gets or sets the payment transaction identifier for paid transitions.</summary>
         [MaxLength(100, ErrorMessage = "Payment ID must not exceed 100 characters")]
         public string? PaymentId { get; set; }
+
+        /// <summary>Gets or sets the actual amount received for paid transitions.</summary>
+        [Range(0, double.MaxValue, ErrorMessage = "Paid amount must be greater than or equal to 0")]
+        public decimal? PaidAmount { get; set; }
+
+        /// <summary>Gets or sets the currency code for the actual payment received.</summary>
+        [MaxLength(3, ErrorMessage = "Payment currency must not exceed 3 characters")]
+        public string? PaymentCurrency { get; set; }
     }
 }

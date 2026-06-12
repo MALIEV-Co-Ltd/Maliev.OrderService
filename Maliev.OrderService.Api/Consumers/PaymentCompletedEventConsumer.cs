@@ -1,4 +1,3 @@
-using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.Services.Business;
@@ -40,7 +39,9 @@ namespace Maliev.OrderService.Api.Consumers
                 {
                     Status = "Paid",
                     InternalNotes = $"Payment {payload.PaymentId} completed - Amount: {payload.Amount} {payload.Currency}",
-                    PaymentId = payload.PaymentId.ToString()
+                    PaymentId = payload.PaymentId.ToString(),
+                    PaidAmount = Convert.ToDecimal(payload.Amount),
+                    PaymentCurrency = payload.Currency
                 };
 
                 _ = await _orderStatusService.CreateOrderStatusAsync(
@@ -88,7 +89,7 @@ namespace Maliev.OrderService.Api.Consumers
                 return false;
             }
 
-            var paymentId = payload.PaymentId.ToString();
+            string paymentId = payload.PaymentId.ToString();
             return history?.Any(status =>
                 string.Equals(status.Status, "Paid", StringComparison.OrdinalIgnoreCase) &&
                 status.InternalNotes?.Contains(paymentId, StringComparison.OrdinalIgnoreCase) == true) == true;

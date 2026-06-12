@@ -109,6 +109,8 @@ namespace Maliev.OrderService.Api.Services.Business
                 toStatus,
                 updatedBy,
                 request.InternalNotes,
+                request.PaidAmount,
+                request.PaymentCurrency,
                 cancellationToken);
 
             _ = await _context.SaveChangesAsync(cancellationToken);
@@ -146,6 +148,8 @@ namespace Maliev.OrderService.Api.Services.Business
             OrderStatusValue newStatus,
             string changedBy,
             string? reason,
+            decimal? paidAmount,
+            string? paymentCurrency,
             CancellationToken cancellationToken)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -241,8 +245,8 @@ namespace Maliev.OrderService.Api.Services.Business
                             OrderId: orderGuid,
                             OrderNumber: order.OrderId,
                             PaymentId: ResolvePaymentId(order.PaymentId),
-                            PaidAmount: (double)(order.QuotedAmount ?? 0),
-                            Currency: order.QuoteCurrency ?? "THB",
+                            PaidAmount: Convert.ToDouble(paidAmount ?? order.QuotedAmount ?? 0),
+                            Currency: string.IsNullOrWhiteSpace(paymentCurrency) ? order.QuoteCurrency ?? "THB" : paymentCurrency,
                             PaidAt: now
                         )
                     ), cancellationToken);
@@ -463,6 +467,19 @@ namespace Maliev.OrderService.Api.Services.Business
                         order.PaymentStatus = "Cancelled";
                     }
                     break;
+                case OrderStatusValue.New:
+                case OrderStatusValue.Reviewing:
+                case OrderStatusValue.Rejected:
+                case OrderStatusValue.Reviewed:
+                case OrderStatusValue.Quoted:
+                case OrderStatusValue.Declined:
+                case OrderStatusValue.Accepted:
+                case OrderStatusValue.Expired:
+                case OrderStatusValue.InProgress:
+                case OrderStatusValue.OnHold:
+                case OrderStatusValue.Finished:
+                case OrderStatusValue.Shipped:
+                case OrderStatusValue.Reopen:
                 default:
                     break;
             }
@@ -470,14 +487,11 @@ namespace Maliev.OrderService.Api.Services.Business
 
         private static Guid ResolvePaymentId(string? paymentId)
         {
-            if (string.IsNullOrWhiteSpace(paymentId))
-            {
-                return Guid.Empty;
-            }
-
-            return Guid.TryParse(paymentId, out var parsedPaymentId)
-                ? parsedPaymentId
-                : StringToGuid(paymentId);
+            return string.IsNullOrWhiteSpace(paymentId)
+                ? Guid.Empty
+                : Guid.TryParse(paymentId, out Guid parsedPaymentId)
+                    ? parsedPaymentId
+                    : StringToGuid(paymentId);
         }
 
         /// <summary>

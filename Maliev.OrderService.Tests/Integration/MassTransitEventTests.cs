@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.MessagingContracts.Contracts.Payments;
+using Maliev.OrderService.Api.Consumers;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using MassTransit.Testing;
@@ -359,7 +359,7 @@ namespace Maliev.OrderService.Tests.Integration
                 new CreateOrderStatusRequest { Status = "Accepted" });
 
             // Verify it's actually Accepted before proceeding
-            var history = await _client.GetFromJsonAsync<List<OrderStatusResponse>>($"/order/v1/orders/{createdOrder.OrderId}/statuses");
+            List<OrderStatusResponse>? history = await _client.GetFromJsonAsync<List<OrderStatusResponse>>($"/order/v1/orders/{createdOrder.OrderId}/statuses");
             Assert.Contains(history!, s => s.Status == "Accepted");
 
             ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
@@ -374,7 +374,7 @@ namespace Maliev.OrderService.Tests.Integration
 
                 // Act - Publish PaymentCompletedEvent
                 var paymentId = Guid.NewGuid();
-                var paymentCompletedEvent = new PaymentCompletedEvent(
+                PaymentCompletedEvent paymentCompletedEvent = new(
                     MessageId: Guid.NewGuid(),
                     MessageName: "PaymentCompletedEvent",
                     MessageType: MessageType.Event,
@@ -401,7 +401,7 @@ namespace Maliev.OrderService.Tests.Integration
                 await Task.Delay(1000);
 
                 // Wait for consumer to process - check the specific consumer harness
-                var consumerHarness = harness.GetConsumerHarness<Maliev.OrderService.Api.Consumers.PaymentCompletedEventConsumer>();
+                IConsumerTestHarness<PaymentCompletedEventConsumer> consumerHarness = harness.GetConsumerHarness<PaymentCompletedEventConsumer>();
                 bool consumed = await consumerHarness.Consumed.Any<PaymentCompletedEvent>(x => x.Context.Message.Payload.OrderNumber == createdOrder.OrderId);
 
                 if (!consumed)
@@ -437,6 +437,8 @@ namespace Maliev.OrderService.Tests.Integration
                 IPublishedMessage<OrderPaidEvent>? orderPaidEvent = harness.Published.Select<OrderPaidEvent>().FirstOrDefault();
                 Assert.NotNull(orderPaidEvent);
                 Assert.Equal(paymentId, orderPaidEvent.Context.Message.Payload.PaymentId);
+                Assert.Equal(1500.00, orderPaidEvent.Context.Message.Payload.PaidAmount);
+                Assert.Equal("THB", orderPaidEvent.Context.Message.Payload.Currency);
 
                 OrderResponse? paidOrder = await _client.GetFromJsonAsync<OrderResponse>($"/order/v1/orders/{createdOrder.OrderId}");
                 Assert.NotNull(paidOrder);
