@@ -30,6 +30,12 @@ namespace Maliev.OrderService.Api.Consumers
             PaymentCompletedEvent @event = context.Message;
             PaymentCompletedEventPayload payload = @event.Payload;
 
+            if (!IsRoutedToOrderService(@event))
+            {
+                Log.IgnoringUntargetedPaymentCompletedEvent(_logger, payload.OrderId, payload.PaymentId);
+                return;
+            }
+
             Log.ConsumingPaymentCompletedEvent(_logger, payload.OrderId, payload.PaymentId);
 
             try
@@ -96,8 +102,17 @@ namespace Maliev.OrderService.Api.Consumers
                 status.InternalNotes?.Contains(paymentId, StringComparison.OrdinalIgnoreCase) == true) == true;
         }
 
+        private static bool IsRoutedToOrderService(PaymentCompletedEvent message)
+        {
+            return message.ConsumedBy.Any(
+                consumer => consumer.Equals("OrderService", StringComparison.OrdinalIgnoreCase));
+        }
+
         private static partial class Log
         {
+            [LoggerMessage(Level = LogLevel.Debug, Message = "Ignoring untargeted PaymentCompletedEvent for order {OrderId}, payment {PaymentId}")]
+            public static partial void IgnoringUntargetedPaymentCompletedEvent(ILogger logger, Guid orderId, Guid paymentId);
+
             [LoggerMessage(Level = LogLevel.Information, Message = "Consuming PaymentCompletedEvent for order {OrderId}, payment {PaymentId}")]
             public static partial void ConsumingPaymentCompletedEvent(ILogger logger, Guid orderId, Guid paymentId);
 

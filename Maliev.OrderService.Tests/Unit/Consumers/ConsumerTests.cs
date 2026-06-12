@@ -27,6 +27,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
             var orderId = Guid.NewGuid();
             var message = new PaymentCompletedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new PaymentCompletedEventPayload
                 {
                     OrderId = orderId,
@@ -75,6 +76,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
 
             var message = new PaymentCompletedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new PaymentCompletedEventPayload { OrderId = Guid.NewGuid(), OrderNumber = "1" }
             };
             _ = contextMock.Setup(c => c.Message).Returns(message);
@@ -99,6 +101,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
             var paymentId = Guid.NewGuid();
             var message = new PaymentCompletedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new PaymentCompletedEventPayload
                 {
                     OrderId = orderId,
@@ -139,6 +142,34 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
             _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(
                 orderId.ToString(),
                 It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task PaymentCompletedEventConsumerWithoutOrderServiceRoutingIsIgnored()
+        {
+            var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentCompletedEvent
+            {
+                ConsumedBy = ["InvoiceService", "NotificationService"],
+                Payload = new PaymentCompletedEventPayload
+                {
+                    OrderId = Guid.NewGuid(),
+                    OrderNumber = "ORD-123",
+                    PaymentId = Guid.NewGuid(),
+                    Amount = 100,
+                    Currency = "THB"
+                }
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]
