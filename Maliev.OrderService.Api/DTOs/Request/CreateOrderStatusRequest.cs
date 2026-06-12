@@ -32,5 +32,9 @@ namespace Maliev.OrderService.Api.DTOs.Request
         /// <summary>Gets or sets the currency code for the actual payment received.</summary>
         [MaxLength(3, ErrorMessage = "Payment currency must not exceed 3 characters")]
         public string? PaymentCurrency { get; set; }
+
+        /// <summary>Gets or sets the payment provider for paid transitions.</summary>
+        [MaxLength(100, ErrorMessage = "Payment provider name must not exceed 100 characters")]
+        public string? PaymentProviderName { get; set; }
     }
 }

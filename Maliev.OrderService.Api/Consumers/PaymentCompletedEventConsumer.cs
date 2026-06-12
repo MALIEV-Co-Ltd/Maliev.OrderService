@@ -41,7 +41,8 @@ namespace Maliev.OrderService.Api.Consumers
                     InternalNotes = $"Payment {payload.PaymentId} completed - Amount: {payload.Amount} {payload.Currency}",
                     PaymentId = payload.PaymentId.ToString(),
                     PaidAmount = Convert.ToDecimal(payload.Amount),
-                    PaymentCurrency = payload.Currency
+                    PaymentCurrency = payload.Currency,
+                    PaymentProviderName = payload.ProviderName
                 };
 
                 _ = await _orderStatusService.CreateOrderStatusAsync(

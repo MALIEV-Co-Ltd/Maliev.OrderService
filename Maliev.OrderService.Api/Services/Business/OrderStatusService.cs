@@ -111,6 +111,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 request.InternalNotes,
                 request.PaidAmount,
                 request.PaymentCurrency,
+                request.PaymentProviderName,
                 cancellationToken);
 
             _ = await _context.SaveChangesAsync(cancellationToken);
@@ -151,6 +152,7 @@ namespace Maliev.OrderService.Api.Services.Business
             string? reason,
             decimal? paidAmount,
             string? paymentCurrency,
+            string? paymentProviderName,
             CancellationToken cancellationToken)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -250,6 +252,9 @@ namespace Maliev.OrderService.Api.Services.Business
                             Currency: string.IsNullOrWhiteSpace(paymentCurrency) ? order.QuoteCurrency ?? "THB" : paymentCurrency,
                             PaidAt: now
                         )
+                        {
+                            ProviderName = paymentProviderName ?? string.Empty
+                        }
                     ), cancellationToken);
                     break;
 

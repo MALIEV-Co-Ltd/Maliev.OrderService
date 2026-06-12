@@ -393,6 +393,9 @@ namespace Maliev.OrderService.Tests.Integration
                         Amount: 1500.00,
                         Currency: "THB"
                     )
+                    {
+                        ProviderName = "omise"
+                    }
                 );
 
                 await harness.Bus.Publish(paymentCompletedEvent);
@@ -439,6 +442,7 @@ namespace Maliev.OrderService.Tests.Integration
                 Assert.Equal(paymentId, orderPaidEvent.Context.Message.Payload.PaymentId);
                 Assert.Equal(1500.00, orderPaidEvent.Context.Message.Payload.PaidAmount);
                 Assert.Equal("THB", orderPaidEvent.Context.Message.Payload.Currency);
+                Assert.Equal("omise", orderPaidEvent.Context.Message.Payload.ProviderName);
 
                 OrderResponse? paidOrder = await _client.GetFromJsonAsync<OrderResponse>($"/order/v1/orders/{createdOrder.OrderId}");
                 Assert.NotNull(paidOrder);
