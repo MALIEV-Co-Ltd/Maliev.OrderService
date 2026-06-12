@@ -6,6 +6,7 @@ using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Api.Services.Business;
+using Maliev.OrderService.Domain.Entities;
 using Maliev.OrderService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Maliev.OrderService.Api.Controllers
 {
@@ -121,7 +123,7 @@ namespace Maliev.OrderService.Api.Controllers
                 return accessError;
             }
 
-            var order = await _context.Orders
+            Order? order = await _context.Orders
                 .AsNoTracking()
                 .Include(o => o.ServiceCategory)
                 .Include(o => o.ProcessType)
@@ -137,6 +139,8 @@ namespace Maliev.OrderService.Api.Controllers
                 MaterialId = order.MaterialId.HasValue
                     ? StableGuid($"material:{order.MaterialId.Value}")
                     : Guid.Empty,
+                MaterialSnapshotJson = BuildMaterialSnapshotJson(order),
+                ConfigurationSnapshotJson = BuildConfigurationSnapshotJson(order),
                 Technology = order.ProcessType?.Name ?? order.ServiceCategory.Name,
                 VolumeCm3 = 0,
                 Quantity = Math.Max(1, order.OrderedQuantity ?? 1),
@@ -145,6 +149,40 @@ namespace Maliev.OrderService.Api.Controllers
             };
 
             return Ok(new[] { item });
+        }
+
+        private static string BuildMaterialSnapshotJson(Order order)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                materialId = order.MaterialId,
+                materialName = order.MaterialName,
+                colorId = order.ColorId,
+                colorName = order.ColorName,
+                surfaceFinishingId = order.SurfaceFinishingId,
+                surfaceFinishingName = order.SurfaceFinishingName,
+                materialCacheUpdatedAt = order.MaterialCacheUpdatedAt
+            });
+        }
+
+        private static string BuildConfigurationSnapshotJson(Order order)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                orderId = order.OrderId,
+                serviceCategoryId = order.ServiceCategoryId,
+                serviceCategoryName = order.ServiceCategory.Name,
+                processTypeId = order.ProcessTypeId,
+                processTypeName = order.ProcessType?.Name,
+                orderedQuantity = Math.Max(1, order.OrderedQuantity ?? 1),
+                leadTimeDays = order.LeadTimeDays,
+                promisedDeliveryDate = order.PromisedDeliveryDate,
+                requirements = order.Requirements,
+                isConfidential = order.IsConfidential,
+                isOutsourced = order.IsOutsourced,
+                quotedAmount = order.QuotedAmount,
+                quoteCurrency = order.QuoteCurrency
+            });
         }
 
         /// <summary>
@@ -224,7 +262,7 @@ namespace Maliev.OrderService.Api.Controllers
                     ? BadRequest(new ErrorMessageResponse { Message = ex.Message })
                     : NotFound(new ErrorMessageResponse { Message = ex.Message });
             }
-            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException)
             {
                 return Conflict(new ErrorMessageResponse { Message = "Order has been modified by another user. Please refresh and try again." });
             }

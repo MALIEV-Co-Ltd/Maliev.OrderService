@@ -97,6 +97,12 @@ namespace Maliev.OrderService.Tests.Contract
             Assert.Equal(3, item.GetProperty("quantity").GetInt32());
             Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("technology").GetString()));
             Assert.Equal(0, item.GetProperty("estimatedPrintTimeMinutes").GetInt32());
+
+            string materialSnapshotJson = item.GetProperty("materialSnapshotJson").GetString()!;
+            string configurationSnapshotJson = item.GetProperty("configurationSnapshotJson").GetString()!;
+            Assert.Contains("\"materialId\":1", materialSnapshotJson);
+            Assert.Contains("\"orderedQuantity\":3", configurationSnapshotJson);
+            Assert.Contains("\"serviceCategoryId\":1", configurationSnapshotJson);
         }
 
         [Fact]
