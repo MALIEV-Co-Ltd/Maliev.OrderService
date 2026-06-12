@@ -1,4 +1,4 @@
-using Maliev.MessagingContracts;
+using Maliev.MessagingContracts.Contracts.Jobs;
 using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.OrderService.Api.Consumers;
 using Maliev.OrderService.Api.DTOs.Request;
@@ -14,12 +14,13 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
     {
         private readonly Mock<IOrderStatusService> _statusServiceMock = new();
         private readonly Mock<ILogger<PaymentCompletedEventConsumer>> _paymentLoggerMock = new();
+        private readonly Mock<ILogger<JobStatusChangedEventConsumer>> _jobStatusLoggerMock = new();
 
         [Fact]
         public async Task PaymentCompletedEventConsumerSuccessUpdatesStatus()
         {
             // Arrange
-            _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
+            _ = _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
             var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
             var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
 
@@ -35,9 +36,9 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                     Currency = "USD"
                 }
             };
-            contextMock.Setup(c => c.Message).Returns(message);
+            _ = contextMock.Setup(c => c.Message).Returns(message);
 
-            _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
                 It.IsAny<string>(),
                 It.IsAny<CreateOrderStatusRequest>(),
                 It.IsAny<string>(),
@@ -68,7 +69,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         public async Task PaymentCompletedEventConsumerErrorThrows()
         {
             // Arrange
-            _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Warning)).Returns(true);
+            _ = _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Warning)).Returns(true);
             var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
             var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
 
@@ -76,21 +77,21 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
             {
                 Payload = new PaymentCompletedEventPayload { OrderId = Guid.NewGuid(), OrderNumber = "1" }
             };
-            contextMock.Setup(c => c.Message).Returns(message);
+            _ = contextMock.Setup(c => c.Message).Returns(message);
 
-            _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(It.IsAny<string>(), It.IsAny<CreateOrderStatusRequest>(), It.IsAny<string>(), default))
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(It.IsAny<string>(), It.IsAny<CreateOrderStatusRequest>(), It.IsAny<string>(), default))
                 .ThrowsAsync(new InvalidOperationException("Order not found"));
 
             // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() => consumer.Consume(contextMock.Object));
+            _ = await Assert.ThrowsAsync<InvalidOperationException>(() => consumer.Consume(contextMock.Object));
         }
 
         [Fact]
         public async Task PaymentCompletedEventConsumerDuplicatePaidStatusForSamePaymentDoesNotThrow()
         {
             // Arrange
-            _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
-            _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Warning)).Returns(true);
+            _ = _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
+            _ = _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Warning)).Returns(true);
             var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
             var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
 
@@ -107,19 +108,19 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                     Currency = "USD"
                 }
             };
-            contextMock.Setup(c => c.Message).Returns(message);
-            contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+            _ = contextMock.Setup(c => c.Message).Returns(message);
+            _ = contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
 
-            _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
                 It.IsAny<string>(),
                 It.IsAny<CreateOrderStatusRequest>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("Invalid transition from Paid to Paid"));
 
-            _statusServiceMock.Setup(s => s.GetOrderStatusHistoryAsync(orderId.ToString(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new List<OrderStatusResponse>
-                {
+            _ = _statusServiceMock.Setup(s => s.GetOrderStatusHistoryAsync(orderId.ToString(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(
+                [
                     new()
                     {
                         StatusId = 12,
@@ -129,7 +130,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                         UpdatedBy = "System-PaymentService",
                         Timestamp = DateTime.UtcNow
                     }
-                });
+                ]);
 
             // Act
             await consumer.Consume(contextMock.Object);
@@ -138,6 +139,156 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
             _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(
                 orderId.ToString(),
                 It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task JobStatusChangedEventConsumerCompletedStatusUpdatesOrderToFinished()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+            var jobId = Guid.NewGuid();
+            var orderId = Guid.NewGuid();
+            const string orderNumber = "ORD-2026-00456";
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = jobId,
+                    OrderId = orderId,
+                    OrderNumber = orderNumber,
+                    PreviousStatus = "Finishing",
+                    NewStatus = "Completed",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                orderNumber,
+                It.IsAny<CreateOrderStatusRequest>(),
+                "System-JobService",
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderStatusResponse
+                {
+                    StatusId = 2,
+                    OrderId = orderNumber,
+                    Status = "Finished",
+                    UpdatedBy = "System-JobService",
+                    Timestamp = DateTime.UtcNow
+                });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                orderNumber,
+                It.Is<CreateOrderStatusRequest>(r =>
+                    r.Status == "Finished" &&
+                    r.InternalNotes != null &&
+                    r.InternalNotes.Contains(jobId.ToString(), StringComparison.Ordinal)),
+                "System-JobService",
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task JobStatusChangedEventConsumerNonCompletedStatusDoesNotUpdateOrder()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = Guid.NewGuid(),
+                    OrderId = Guid.NewGuid(),
+                    OrderNumber = "ORD-2026-00457",
+                    PreviousStatus = "Queued",
+                    NewStatus = "InProgress",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task JobStatusChangedEventConsumerCompletedStatusWithoutOrderNumberThrows()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = Guid.NewGuid(),
+                    OrderId = Guid.NewGuid(),
+                    PreviousStatus = "Finishing",
+                    NewStatus = "Completed",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            _ = await Assert.ThrowsAsync<InvalidOperationException>(() => consumer.Consume(contextMock.Object));
+        }
+
+        [Fact]
+        public async Task JobStatusChangedEventConsumerDuplicateFinishedStatusDoesNotThrow()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+            const string orderNumber = "ORD-2026-00458";
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = Guid.NewGuid(),
+                    OrderId = Guid.NewGuid(),
+                    OrderNumber = orderNumber,
+                    PreviousStatus = "Finishing",
+                    NewStatus = "Completed",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                orderNumber,
+                It.IsAny<CreateOrderStatusRequest>(),
+                "System-JobService",
+                It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Invalid transition from Finished to Finished"));
+
+            _ = _statusServiceMock.Setup(s => s.GetOrderStatusHistoryAsync(orderNumber, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(
+                [
+                    new()
+                    {
+                        StatusId = 3,
+                        OrderId = orderNumber,
+                        Status = "Finished",
+                        UpdatedBy = "System-JobService",
+                        Timestamp = DateTime.UtcNow
+                    }
+                ]);
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(orderNumber, It.IsAny<CancellationToken>()), Times.Once);
         }
     }
 }

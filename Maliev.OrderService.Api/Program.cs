@@ -39,6 +39,7 @@ try
         _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
         _ = cfg.AddConsumer<FileDeletedEventConsumer>();
         _ = cfg.AddConsumer<PreviewImagesGeneratedEventConsumer>();
+        _ = cfg.AddConsumer<JobStatusChangedEventConsumer>();
     }); // RabbitMQ message bus with consumers
     _ = builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
