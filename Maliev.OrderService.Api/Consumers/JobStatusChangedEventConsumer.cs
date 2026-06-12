@@ -29,6 +29,12 @@ namespace Maliev.OrderService.Api.Consumers
         public async Task Consume(ConsumeContext<JobStatusChangedEvent> context)
         {
             JobStatusChangedEventPayload payload = context.Message.Payload;
+            if (string.Equals(payload.NewStatus, "InProgress", StringComparison.OrdinalIgnoreCase))
+            {
+                await MarkOrderInProgressAsync(payload, context.CancellationToken);
+                return;
+            }
+
             if (!string.Equals(payload.NewStatus, "Completed", StringComparison.OrdinalIgnoreCase))
             {
                 Log.IgnoringNonCompletedJobStatus(_logger, payload.JobId, payload.NewStatus);
@@ -69,6 +75,52 @@ namespace Maliev.OrderService.Api.Consumers
             }
         }
 
+        private async Task MarkOrderInProgressAsync(JobStatusChangedEventPayload payload, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(payload.OrderNumber))
+            {
+                Log.MissingOrderNumber(_logger, payload.JobId, payload.OrderId);
+                throw new InvalidOperationException($"Job status event {payload.JobId} is missing orderNumber.");
+            }
+
+            try
+            {
+                _ = await _orderStatusService.CreateOrderStatusAsync(
+                    payload.OrderNumber,
+                    new CreateOrderStatusRequest
+                    {
+                        Status = "InProgress",
+                        InternalNotes = $"Production started after job {payload.JobId} moved to InProgress.",
+                        CustomerNotes = "Production has started."
+                    },
+                    updatedBy: "System-JobService",
+                    cancellationToken);
+
+                Log.OrderMarkedInProgress(_logger, payload.OrderNumber, payload.JobId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                if (await IsProductionStartAlreadyRecordedAsync(payload.OrderNumber, cancellationToken))
+                {
+                    Log.DuplicateProductionStartIgnored(_logger, payload.OrderNumber, payload.JobId);
+                    return;
+                }
+
+                Log.FailedToMarkOrderInProgress(_logger, ex, payload.OrderNumber, payload.JobId, ex.Message);
+                throw;
+            }
+        }
+
+        private async Task<bool> IsProductionStartAlreadyRecordedAsync(string orderNumber, CancellationToken cancellationToken)
+        {
+            List<OrderStatusResponse> history = await _orderStatusService.GetOrderStatusHistoryAsync(orderNumber, cancellationToken);
+            return history.Any(status =>
+                string.Equals(status.Status, "InProgress", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status.Status, "Finished", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status.Status, "QualityReleased", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status.Status, "Shipped", StringComparison.OrdinalIgnoreCase));
+        }
+
         private async Task<bool> IsCompletionAlreadyRecordedAsync(string orderNumber, CancellationToken cancellationToken)
         {
             List<OrderStatusResponse> history = await _orderStatusService.GetOrderStatusHistoryAsync(orderNumber, cancellationToken);
@@ -89,11 +141,20 @@ namespace Maliev.OrderService.Api.Consumers
             [LoggerMessage(Level = LogLevel.Information, Message = "Marked order {OrderNumber} finished after job {JobId} completed")]
             public static partial void OrderMarkedFinished(ILogger logger, string orderNumber, Guid jobId);
 
+            [LoggerMessage(Level = LogLevel.Information, Message = "Marked order {OrderNumber} in progress after job {JobId} started")]
+            public static partial void OrderMarkedInProgress(ILogger logger, string orderNumber, Guid jobId);
+
             [LoggerMessage(Level = LogLevel.Information, Message = "Ignoring duplicate job completion for order {OrderNumber}, job {JobId}")]
             public static partial void DuplicateCompletionIgnored(ILogger logger, string orderNumber, Guid jobId);
 
+            [LoggerMessage(Level = LogLevel.Information, Message = "Ignoring duplicate production start for order {OrderNumber}, job {JobId}")]
+            public static partial void DuplicateProductionStartIgnored(ILogger logger, string orderNumber, Guid jobId);
+
             [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to mark order {OrderNumber} finished after job {JobId}: {Message}")]
             public static partial void FailedToMarkOrderFinished(ILogger logger, Exception exception, string orderNumber, Guid jobId, string message);
+
+            [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to mark order {OrderNumber} in progress after job {JobId}: {Message}")]
+            public static partial void FailedToMarkOrderInProgress(ILogger logger, Exception exception, string orderNumber, Guid jobId, string message);
         }
     }
 }

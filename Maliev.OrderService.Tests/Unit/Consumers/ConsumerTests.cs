@@ -192,7 +192,59 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
-        public async Task JobStatusChangedEventConsumerNonCompletedStatusDoesNotUpdateOrder()
+        public async Task JobStatusChangedEventConsumerInProgressStatusUpdatesOrderToInProgress()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+            var jobId = Guid.NewGuid();
+            var orderId = Guid.NewGuid();
+            const string orderNumber = "ORD-2026-00459";
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = jobId,
+                    OrderId = orderId,
+                    OrderNumber = orderNumber,
+                    PreviousStatus = "Queued",
+                    NewStatus = "InProgress",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                orderNumber,
+                It.IsAny<CreateOrderStatusRequest>(),
+                "System-JobService",
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderStatusResponse
+                {
+                    StatusId = 2,
+                    OrderId = orderNumber,
+                    Status = "InProgress",
+                    UpdatedBy = "System-JobService",
+                    Timestamp = DateTime.UtcNow
+                });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                orderNumber,
+                It.Is<CreateOrderStatusRequest>(r =>
+                    r.Status == "InProgress" &&
+                    r.InternalNotes != null &&
+                    r.InternalNotes.Contains(jobId.ToString(), StringComparison.Ordinal) &&
+                    r.CustomerNotes != null &&
+                    r.CustomerNotes.Contains("Production has started", StringComparison.Ordinal)),
+                "System-JobService",
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task JobStatusChangedEventConsumerUnhandledStatusDoesNotUpdateOrder()
         {
             var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
             var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
@@ -204,8 +256,8 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                     JobId = Guid.NewGuid(),
                     OrderId = Guid.NewGuid(),
                     OrderNumber = "ORD-2026-00457",
-                    PreviousStatus = "Queued",
-                    NewStatus = "InProgress",
+                    PreviousStatus = "InProgress",
+                    NewStatus = "Finishing",
                     Technology = "FDM",
                     ChangedAt = DateTimeOffset.UtcNow,
                     ChangedBy = "scanner-operator"
@@ -219,6 +271,53 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                 It.IsAny<CreateOrderStatusRequest>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task JobStatusChangedEventConsumerDuplicateInProgressStatusDoesNotThrow()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+            const string orderNumber = "ORD-2026-00460";
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = Guid.NewGuid(),
+                    OrderId = Guid.NewGuid(),
+                    OrderNumber = orderNumber,
+                    PreviousStatus = "Queued",
+                    NewStatus = "InProgress",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                orderNumber,
+                It.IsAny<CreateOrderStatusRequest>(),
+                "System-JobService",
+                It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Invalid transition from InProgress to InProgress"));
+
+            _ = _statusServiceMock.Setup(s => s.GetOrderStatusHistoryAsync(orderNumber, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(
+                [
+                    new()
+                    {
+                        StatusId = 3,
+                        OrderId = orderNumber,
+                        Status = "InProgress",
+                        UpdatedBy = "System-JobService",
+                        Timestamp = DateTime.UtcNow
+                    }
+                ]);
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(orderNumber, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
