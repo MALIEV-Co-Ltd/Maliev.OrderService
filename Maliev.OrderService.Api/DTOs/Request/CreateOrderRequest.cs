@@ -100,6 +100,14 @@ namespace Maliev.OrderService.Api.DTOs.Request
         [MaxLength(100, ErrorMessage = "Shipping Country must not exceed 100 characters")]
         public string? ShippingCountry { get; set; }
 
+        /// <summary>Gets or sets the legal company name used for billing</summary>
+        [MaxLength(200, ErrorMessage = "Billing Company Name must not exceed 200 characters")]
+        public string? BillingCompanyName { get; set; }
+
+        /// <summary>Gets or sets the VAT or tax identifier used for billing</summary>
+        [MaxLength(50, ErrorMessage = "Billing VAT Number must not exceed 50 characters")]
+        public string? BillingVatNumber { get; set; }
+
         /// <summary>Gets or sets the delivery contact name snapshot</summary>
         [MaxLength(200, ErrorMessage = "Delivery Contact Name must not exceed 200 characters")]
         public string? DeliveryContactName { get; set; }

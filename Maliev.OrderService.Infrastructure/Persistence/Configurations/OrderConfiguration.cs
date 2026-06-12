@@ -72,6 +72,8 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Configurations
             _ = builder.Property(o => o.ShippingProvince).HasColumnName("shipping_province").HasMaxLength(200);
             _ = builder.Property(o => o.ShippingPostalCode).HasColumnName("shipping_postal_code").HasMaxLength(20);
             _ = builder.Property(o => o.ShippingCountry).HasColumnName("shipping_country").HasMaxLength(100);
+            _ = builder.Property(o => o.BillingCompanyName).HasColumnName("billing_company_name").HasMaxLength(200);
+            _ = builder.Property(o => o.BillingVatNumber).HasColumnName("billing_vat_number").HasMaxLength(50);
             _ = builder.Property(o => o.DeliveryContactName).HasColumnName("delivery_contact_name").HasMaxLength(200);
             _ = builder.Property(o => o.DeliveryContactPhone).HasColumnName("delivery_contact_phone").HasMaxLength(50);
             _ = builder.Property(o => o.DeliveryContactEmail).HasColumnName("delivery_contact_email").HasMaxLength(200);

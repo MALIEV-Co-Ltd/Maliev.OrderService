@@ -112,6 +112,12 @@ namespace Maliev.OrderService.Domain.Entities
         /// <summary>Gets or sets the shipping country snapshot.</summary>
         public string? ShippingCountry { get; set; }
 
+        /// <summary>Gets or sets the legal company name used for billing at checkout.</summary>
+        public string? BillingCompanyName { get; set; }
+
+        /// <summary>Gets or sets the VAT or tax identifier used for billing at checkout.</summary>
+        public string? BillingVatNumber { get; set; }
+
         /// <summary>Gets or sets the delivery contact name snapshot.</summary>
         public string? DeliveryContactName { get; set; }
 

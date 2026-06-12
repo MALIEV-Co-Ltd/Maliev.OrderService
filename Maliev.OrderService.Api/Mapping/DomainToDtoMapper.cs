@@ -48,6 +48,8 @@ namespace Maliev.OrderService.Api.Mapping
                 ShippingProvince = order.ShippingProvince,
                 ShippingPostalCode = order.ShippingPostalCode,
                 ShippingCountry = order.ShippingCountry,
+                BillingCompanyName = order.BillingCompanyName,
+                BillingVatNumber = order.BillingVatNumber,
                 DeliveryContactName = order.DeliveryContactName,
                 DeliveryContactPhone = order.DeliveryContactPhone,
                 DeliveryContactEmail = order.DeliveryContactEmail,
@@ -103,6 +105,8 @@ namespace Maliev.OrderService.Api.Mapping
                 ShippingProvince = request.ShippingProvince,
                 ShippingPostalCode = request.ShippingPostalCode,
                 ShippingCountry = request.ShippingCountry,
+                BillingCompanyName = request.BillingCompanyName,
+                BillingVatNumber = request.BillingVatNumber,
                 DeliveryContactName = request.DeliveryContactName,
                 DeliveryContactPhone = request.DeliveryContactPhone,
                 DeliveryContactEmail = request.DeliveryContactEmail
@@ -226,6 +230,16 @@ namespace Maliev.OrderService.Api.Mapping
             if (request.ShippingCountry != null)
             {
                 order.ShippingCountry = request.ShippingCountry;
+            }
+
+            if (request.BillingCompanyName != null)
+            {
+                order.BillingCompanyName = request.BillingCompanyName;
+            }
+
+            if (request.BillingVatNumber != null)
+            {
+                order.BillingVatNumber = request.BillingVatNumber;
             }
 
             if (request.DeliveryContactName != null)

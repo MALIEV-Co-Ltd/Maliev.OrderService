@@ -84,6 +84,8 @@ namespace Maliev.OrderService.Tests.Contract
                 shippingProvince = "Bangkok",
                 shippingPostalCode = "10310",
                 shippingCountry = "TH",
+                billingCompanyName = "MALIEV Test Buyer Co., Ltd.",
+                billingVatNumber = "TH-0123456789012",
                 deliveryContactName = "Natt Customer",
                 deliveryContactPhone = "+66810000002",
                 deliveryContactEmail = "shipping@example.test"
@@ -101,6 +103,8 @@ namespace Maliev.OrderService.Tests.Contract
             Assert.Equal("Bangkok", createdOrder.GetProperty("shippingProvince").GetString());
             Assert.Equal("10310", createdOrder.GetProperty("shippingPostalCode").GetString());
             Assert.Equal("TH", createdOrder.GetProperty("shippingCountry").GetString());
+            Assert.Equal("MALIEV Test Buyer Co., Ltd.", createdOrder.GetProperty("billingCompanyName").GetString());
+            Assert.Equal("TH-0123456789012", createdOrder.GetProperty("billingVatNumber").GetString());
             Assert.Equal("Natt Customer", createdOrder.GetProperty("deliveryContactName").GetString());
             Assert.Equal("+66810000002", createdOrder.GetProperty("deliveryContactPhone").GetString());
             Assert.Equal("shipping@example.test", createdOrder.GetProperty("deliveryContactEmail").GetString());
@@ -132,6 +136,8 @@ namespace Maliev.OrderService.Tests.Contract
                 shippingProvince = "Bangkok",
                 shippingPostalCode = "10110",
                 shippingCountry = "TH",
+                billingCompanyName = "Updated Buyer Ltd.",
+                billingVatNumber = "TH-9988776655443",
                 deliveryContactName = "Updated Receiver",
                 deliveryContactPhone = "+66819999999",
                 deliveryContactEmail = "receiver@example.test"
@@ -148,6 +154,8 @@ namespace Maliev.OrderService.Tests.Contract
             Assert.Equal("Bangkok", updatedOrder.GetProperty("shippingProvince").GetString());
             Assert.Equal("10110", updatedOrder.GetProperty("shippingPostalCode").GetString());
             Assert.Equal("TH", updatedOrder.GetProperty("shippingCountry").GetString());
+            Assert.Equal("Updated Buyer Ltd.", updatedOrder.GetProperty("billingCompanyName").GetString());
+            Assert.Equal("TH-9988776655443", updatedOrder.GetProperty("billingVatNumber").GetString());
             Assert.Equal("Updated Receiver", updatedOrder.GetProperty("deliveryContactName").GetString());
             Assert.Equal("+66819999999", updatedOrder.GetProperty("deliveryContactPhone").GetString());
             Assert.Equal("receiver@example.test", updatedOrder.GetProperty("deliveryContactEmail").GetString());
