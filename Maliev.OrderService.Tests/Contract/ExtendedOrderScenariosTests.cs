@@ -153,7 +153,7 @@ namespace Maliev.OrderService.Tests.Contract
             string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
 
             // Test all valid status transitions
-            string[] statuses = ["Reviewing", "Reviewed", "Quoted", "Accepted", "Paid", "InProgress", "Finished", "Shipped", "Completed"];
+            string[] statuses = ["Reviewing", "Reviewed", "Quoted", "Accepted", "Paid", "InProgress", "Finished", "QualityReleased", "Shipped"];
 
             foreach (string status in statuses)
             {

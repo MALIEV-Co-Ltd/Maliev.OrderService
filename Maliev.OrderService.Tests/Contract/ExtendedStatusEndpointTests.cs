@@ -118,6 +118,48 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
+        public async Task PostOrderStatusFromFinishedToShippedBeforeQualityReleaseReturnsBadRequest()
+        {
+            var createRequest = new { customerId = "CUST-QC-GATE", customerType = "Customer", serviceCategoryId = 1 };
+            var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewing" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewed" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Quoted" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Accepted" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Paid" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "InProgress" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Finished" });
+
+            var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped" });
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task PostOrderStatusFromQualityReleasedToShipped()
+        {
+            var createRequest = new { customerId = "CUST-QC-RELEASE", customerType = "Customer", serviceCategoryId = 1 };
+            var createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            string? orderId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString();
+
+            Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewing" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reviewed" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Quoted" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Accepted" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Paid" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "InProgress" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Finished" })).StatusCode);
+            var qualityReleasedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "QualityReleased" });
+            Assert.Equal(HttpStatusCode.Created, qualityReleasedResponse.StatusCode);
+
+            var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped" });
+
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
+
+        [Fact]
         public async Task PostOrderStatusFromReopenBackToInProgress()
         {
             var createRequest = new { customerId = "CUST-001", customerType = "Customer", serviceCategoryId = 1 };
@@ -188,6 +230,7 @@ namespace Maliev.OrderService.Tests.Contract
             await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Paid" });
             await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "InProgress" });
             await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Finished" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "QualityReleased" });
 
             var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped", InternalNotes = "Order shipped via Flash Express" });
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -222,6 +265,7 @@ namespace Maliev.OrderService.Tests.Contract
             await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Paid" });
             await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "InProgress" });
             await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Finished" });
+            await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "QualityReleased" });
             await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped" });
 
             var response = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Reopen", InternalNotes = "Customer reported issue" });

@@ -131,7 +131,8 @@ namespace Maliev.OrderService.Api.Services.Business
                 OrderStatusValue.POIssued => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
                 OrderStatusValue.InProgress => to is OrderStatusValue.OnHold or OrderStatusValue.Finished or OrderStatusValue.Cancelled,
                 OrderStatusValue.OnHold => to is OrderStatusValue.InProgress or OrderStatusValue.Cancelled,
-                OrderStatusValue.Finished => to is OrderStatusValue.Shipped or OrderStatusValue.Reopen,
+                OrderStatusValue.Finished => to is OrderStatusValue.QualityReleased or OrderStatusValue.Reopen,
+                OrderStatusValue.QualityReleased => to is OrderStatusValue.Shipped or OrderStatusValue.Reopen,
                 OrderStatusValue.Shipped => to is OrderStatusValue.Reopen,
                 OrderStatusValue.Reopen => to is OrderStatusValue.InProgress,
                 OrderStatusValue.Rejected or OrderStatusValue.Declined or OrderStatusValue.Expired or OrderStatusValue.Cancelled => false,
@@ -275,7 +276,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     ), cancellationToken);
                     break;
 
-                case OrderStatusValue.Finished:
+                case OrderStatusValue.QualityReleased:
                     await _publishEndpoint.Publish(new OrderCompletedEvent(
                         MessageId: Guid.NewGuid(),
                         MessageName: nameof(OrderCompletedEvent),
@@ -438,6 +439,8 @@ namespace Maliev.OrderService.Api.Services.Business
                     break;
                 case OrderStatusValue.POIssued:
                     break;
+                case OrderStatusValue.Finished:
+                    break;
                 default:
                     break;
             }
@@ -478,6 +481,7 @@ namespace Maliev.OrderService.Api.Services.Business
                 case OrderStatusValue.InProgress:
                 case OrderStatusValue.OnHold:
                 case OrderStatusValue.Finished:
+                case OrderStatusValue.QualityReleased:
                 case OrderStatusValue.Shipped:
                 case OrderStatusValue.Reopen:
                 default:

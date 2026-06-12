@@ -60,7 +60,10 @@ namespace Maliev.OrderService.Tests.Contract
             // 8. InProgress -> Finished
             var finishedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Finished" });
             Assert.Equal(HttpStatusCode.Created, finishedResponse.StatusCode);
-            // 9. Finished -> Shipped
+            // 9. Finished -> QualityReleased
+            var qualityReleasedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "QualityReleased" });
+            Assert.Equal(HttpStatusCode.Created, qualityReleasedResponse.StatusCode);
+            // 10. QualityReleased -> Shipped
             var shippedResponse = await _client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", new { Status = "Shipped" });
             Assert.Equal(HttpStatusCode.Created, shippedResponse.StatusCode);
         }

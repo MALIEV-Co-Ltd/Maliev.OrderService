@@ -9,8 +9,8 @@ namespace Maliev.OrderService.Api.DTOs.Request
     {
         /// <summary>Gets or sets the status value</summary>
         [Required(ErrorMessage = "Status is required")]
-        [RegularExpression("^(New|Reviewing|Rejected|Reviewed|Quoted|Declined|Accepted|Expired|Paid|POIssued|InProgress|OnHold|Finished|Shipped|Reopen|Cancelled)$",
-            ErrorMessage = "Status must be one of: New, Reviewing, Rejected, Reviewed, Quoted, Declined, Accepted, Expired, Paid, POIssued, InProgress, OnHold, Finished, Shipped, Reopen, Cancelled")]
+        [RegularExpression("^(New|Reviewing|Rejected|Reviewed|Quoted|Declined|Accepted|Expired|Paid|POIssued|InProgress|OnHold|Finished|QualityReleased|Shipped|Reopen|Cancelled)$",
+            ErrorMessage = "Status must be one of: New, Reviewing, Rejected, Reviewed, Quoted, Declined, Accepted, Expired, Paid, POIssued, InProgress, OnHold, Finished, QualityReleased, Shipped, Reopen, Cancelled")]
         public required string Status { get; set; }
 
         /// <summary>Gets or sets internal notes (only visible to employees)</summary>

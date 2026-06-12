@@ -31,6 +31,8 @@ namespace Maliev.OrderService.Domain.Enums
         OnHold,
         /// <summary>Production finished</summary>
         Finished,
+        /// <summary>Quality control released the order for shipping</summary>
+        QualityReleased,
         /// <summary>Shipped to customer</summary>
         Shipped,
         /// <summary>Reopened for rework</summary>

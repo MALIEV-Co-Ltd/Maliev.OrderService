@@ -585,7 +585,7 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdateStatusToFinishedShouldPublishOrderCompletedEvent()
+        public async Task UpdateStatusToQualityReleasedShouldPublishOrderCompletedEvent()
         {
             // Arrange
             var createRequest = new CreateOrderRequest
@@ -621,11 +621,14 @@ namespace Maliev.OrderService.Tests.Integration
             try
             {
 
-                // Act - Complete the order
+                _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                    new CreateOrderStatusRequest { Status = "Finished", InternalNotes = "Production completed" });
+
+                // Act - Release the order from QC
                 var statusRequest = new CreateOrderStatusRequest
                 {
-                    Status = "Finished",
-                    InternalNotes = "Production completed"
+                    Status = "QualityReleased",
+                    InternalNotes = "QC released for shipping"
                 };
 
                 HttpResponseMessage statusResponse = await _client.PostAsJsonAsync(
