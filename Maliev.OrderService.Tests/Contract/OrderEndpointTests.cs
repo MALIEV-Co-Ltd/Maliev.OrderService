@@ -67,6 +67,93 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
+        public async Task PostOrdersCreatesOrderWithDeliverySnapshot()
+        {
+            var shippingAddressId = Guid.NewGuid();
+            var billingAddressId = Guid.NewGuid();
+            var createRequest = new
+            {
+                customerId = "CUST-SHIP-001",
+                customerType = "Customer",
+                serviceCategoryId = 1,
+                billingAddressId,
+                shippingAddressId,
+                shippingAddressLine1 = "88 Rama IX Road",
+                shippingAddressLine2 = "Floor 12",
+                shippingCity = "Bangkok",
+                shippingProvince = "Bangkok",
+                shippingPostalCode = "10310",
+                shippingCountry = "TH",
+                deliveryContactName = "Natt Customer",
+                deliveryContactPhone = "+66810000002",
+                deliveryContactEmail = "shipping@example.test"
+            };
+
+            HttpResponseMessage response = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            JsonElement createdOrder = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(billingAddressId, createdOrder.GetProperty("billingAddressId").GetGuid());
+            Assert.Equal(shippingAddressId, createdOrder.GetProperty("shippingAddressId").GetGuid());
+            Assert.Equal("88 Rama IX Road", createdOrder.GetProperty("shippingAddressLine1").GetString());
+            Assert.Equal("Floor 12", createdOrder.GetProperty("shippingAddressLine2").GetString());
+            Assert.Equal("Bangkok", createdOrder.GetProperty("shippingCity").GetString());
+            Assert.Equal("Bangkok", createdOrder.GetProperty("shippingProvince").GetString());
+            Assert.Equal("10310", createdOrder.GetProperty("shippingPostalCode").GetString());
+            Assert.Equal("TH", createdOrder.GetProperty("shippingCountry").GetString());
+            Assert.Equal("Natt Customer", createdOrder.GetProperty("deliveryContactName").GetString());
+            Assert.Equal("+66810000002", createdOrder.GetProperty("deliveryContactPhone").GetString());
+            Assert.Equal("shipping@example.test", createdOrder.GetProperty("deliveryContactEmail").GetString());
+        }
+
+        [Fact]
+        public async Task PutOrderUpdatesDeliverySnapshot()
+        {
+            var createRequest = new
+            {
+                customerId = "CUST-SHIP-002",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string orderId = createdOrder.GetProperty("orderId").GetString()!;
+            string version = createdOrder.GetProperty("version").GetString()!;
+            var shippingAddressId = Guid.NewGuid();
+            var billingAddressId = Guid.NewGuid();
+
+            var updateRequest = new
+            {
+                version,
+                billingAddressId,
+                shippingAddressId,
+                shippingAddressLine1 = "99 Sukhumvit Road",
+                shippingCity = "Bangkok",
+                shippingProvince = "Bangkok",
+                shippingPostalCode = "10110",
+                shippingCountry = "TH",
+                deliveryContactName = "Updated Receiver",
+                deliveryContactPhone = "+66819999999",
+                deliveryContactEmail = "receiver@example.test"
+            };
+
+            HttpResponseMessage response = await _client.PutAsJsonAsync($"/order/v1/orders/{orderId}", updateRequest);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            JsonElement updatedOrder = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(billingAddressId, updatedOrder.GetProperty("billingAddressId").GetGuid());
+            Assert.Equal(shippingAddressId, updatedOrder.GetProperty("shippingAddressId").GetGuid());
+            Assert.Equal("99 Sukhumvit Road", updatedOrder.GetProperty("shippingAddressLine1").GetString());
+            Assert.Equal("Bangkok", updatedOrder.GetProperty("shippingCity").GetString());
+            Assert.Equal("Bangkok", updatedOrder.GetProperty("shippingProvince").GetString());
+            Assert.Equal("10110", updatedOrder.GetProperty("shippingPostalCode").GetString());
+            Assert.Equal("TH", updatedOrder.GetProperty("shippingCountry").GetString());
+            Assert.Equal("Updated Receiver", updatedOrder.GetProperty("deliveryContactName").GetString());
+            Assert.Equal("+66819999999", updatedOrder.GetProperty("deliveryContactPhone").GetString());
+            Assert.Equal("receiver@example.test", updatedOrder.GetProperty("deliveryContactEmail").GetString());
+        }
+
+        [Fact]
         public async Task GetOrderItemsReturnsProductionLineItem()
         {
             DateTime promisedDeliveryDate = DateTime.UtcNow.Date.AddDays(7);

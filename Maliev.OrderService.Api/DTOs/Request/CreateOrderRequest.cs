@@ -69,5 +69,47 @@ namespace Maliev.OrderService.Api.DTOs.Request
 
         /// <summary>Gets or sets the customer purchase order file ID</summary>
         public Guid? CustomerPoFileId { get; set; }
+
+        /// <summary>Gets or sets the selected billing address ID</summary>
+        public Guid? BillingAddressId { get; set; }
+
+        /// <summary>Gets or sets the selected shipping address ID</summary>
+        public Guid? ShippingAddressId { get; set; }
+
+        /// <summary>Gets or sets the shipping address line 1 snapshot</summary>
+        [MaxLength(500, ErrorMessage = "Shipping Address Line 1 must not exceed 500 characters")]
+        public string? ShippingAddressLine1 { get; set; }
+
+        /// <summary>Gets or sets the shipping address line 2 snapshot</summary>
+        [MaxLength(500, ErrorMessage = "Shipping Address Line 2 must not exceed 500 characters")]
+        public string? ShippingAddressLine2 { get; set; }
+
+        /// <summary>Gets or sets the shipping city snapshot</summary>
+        [MaxLength(200, ErrorMessage = "Shipping City must not exceed 200 characters")]
+        public string? ShippingCity { get; set; }
+
+        /// <summary>Gets or sets the shipping province snapshot</summary>
+        [MaxLength(200, ErrorMessage = "Shipping Province must not exceed 200 characters")]
+        public string? ShippingProvince { get; set; }
+
+        /// <summary>Gets or sets the shipping postal code snapshot</summary>
+        [MaxLength(20, ErrorMessage = "Shipping Postal Code must not exceed 20 characters")]
+        public string? ShippingPostalCode { get; set; }
+
+        /// <summary>Gets or sets the shipping country snapshot</summary>
+        [MaxLength(100, ErrorMessage = "Shipping Country must not exceed 100 characters")]
+        public string? ShippingCountry { get; set; }
+
+        /// <summary>Gets or sets the delivery contact name snapshot</summary>
+        [MaxLength(200, ErrorMessage = "Delivery Contact Name must not exceed 200 characters")]
+        public string? DeliveryContactName { get; set; }
+
+        /// <summary>Gets or sets the delivery contact phone snapshot</summary>
+        [MaxLength(50, ErrorMessage = "Delivery Contact Phone must not exceed 50 characters")]
+        public string? DeliveryContactPhone { get; set; }
+
+        /// <summary>Gets or sets the delivery contact email snapshot</summary>
+        [MaxLength(200, ErrorMessage = "Delivery Contact Email must not exceed 200 characters")]
+        public string? DeliveryContactEmail { get; set; }
     }
 }

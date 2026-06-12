@@ -83,6 +83,39 @@ namespace Maliev.OrderService.Api.DTOs.Response
         /// <summary>Gets or sets the customer purchase order file ID</summary>
         public Guid? CustomerPoFileId { get; set; }
 
+        /// <summary>Gets or sets the selected billing address ID</summary>
+        public Guid? BillingAddressId { get; set; }
+
+        /// <summary>Gets or sets the selected shipping address ID</summary>
+        public Guid? ShippingAddressId { get; set; }
+
+        /// <summary>Gets or sets the shipping address line 1 snapshot</summary>
+        public string? ShippingAddressLine1 { get; set; }
+
+        /// <summary>Gets or sets the shipping address line 2 snapshot</summary>
+        public string? ShippingAddressLine2 { get; set; }
+
+        /// <summary>Gets or sets the shipping city snapshot</summary>
+        public string? ShippingCity { get; set; }
+
+        /// <summary>Gets or sets the shipping province snapshot</summary>
+        public string? ShippingProvince { get; set; }
+
+        /// <summary>Gets or sets the shipping postal code snapshot</summary>
+        public string? ShippingPostalCode { get; set; }
+
+        /// <summary>Gets or sets the shipping country snapshot</summary>
+        public string? ShippingCountry { get; set; }
+
+        /// <summary>Gets or sets the delivery contact name snapshot</summary>
+        public string? DeliveryContactName { get; set; }
+
+        /// <summary>Gets or sets the delivery contact phone snapshot</summary>
+        public string? DeliveryContactPhone { get; set; }
+
+        /// <summary>Gets or sets the delivery contact email snapshot</summary>
+        public string? DeliveryContactEmail { get; set; }
+
         /// <summary>Gets or sets the payment transaction ID</summary>
         public string? PaymentId { get; set; }
 

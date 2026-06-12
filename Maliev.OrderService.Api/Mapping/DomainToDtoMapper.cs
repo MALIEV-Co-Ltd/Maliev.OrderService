@@ -40,6 +40,17 @@ namespace Maliev.OrderService.Api.Mapping
                 QuoteCurrency = order.QuoteCurrency,
                 CustomerPoNumber = order.CustomerPoNumber,
                 CustomerPoFileId = order.CustomerPoFileId,
+                BillingAddressId = order.BillingAddressId,
+                ShippingAddressId = order.ShippingAddressId,
+                ShippingAddressLine1 = order.ShippingAddressLine1,
+                ShippingAddressLine2 = order.ShippingAddressLine2,
+                ShippingCity = order.ShippingCity,
+                ShippingProvince = order.ShippingProvince,
+                ShippingPostalCode = order.ShippingPostalCode,
+                ShippingCountry = order.ShippingCountry,
+                DeliveryContactName = order.DeliveryContactName,
+                DeliveryContactPhone = order.DeliveryContactPhone,
+                DeliveryContactEmail = order.DeliveryContactEmail,
                 PaymentId = order.PaymentId,
                 PaymentStatus = order.PaymentStatus,
                 AssignedEmployeeId = order.AssignedEmployeeId,
@@ -83,7 +94,18 @@ namespace Maliev.OrderService.Api.Mapping
                 AssignedEmployeeId = request.AssignedEmployeeId,
                 DepartmentId = request.DepartmentId,
                 CustomerPoNumber = request.CustomerPoNumber,
-                CustomerPoFileId = request.CustomerPoFileId
+                CustomerPoFileId = request.CustomerPoFileId,
+                BillingAddressId = request.BillingAddressId,
+                ShippingAddressId = request.ShippingAddressId,
+                ShippingAddressLine1 = request.ShippingAddressLine1,
+                ShippingAddressLine2 = request.ShippingAddressLine2,
+                ShippingCity = request.ShippingCity,
+                ShippingProvince = request.ShippingProvince,
+                ShippingPostalCode = request.ShippingPostalCode,
+                ShippingCountry = request.ShippingCountry,
+                DeliveryContactName = request.DeliveryContactName,
+                DeliveryContactPhone = request.DeliveryContactPhone,
+                DeliveryContactEmail = request.DeliveryContactEmail
             };
         }
 
@@ -164,6 +186,61 @@ namespace Maliev.OrderService.Api.Mapping
             if (request.CustomerPoFileId.HasValue)
             {
                 order.CustomerPoFileId = request.CustomerPoFileId;
+            }
+
+            if (request.BillingAddressId.HasValue)
+            {
+                order.BillingAddressId = request.BillingAddressId;
+            }
+
+            if (request.ShippingAddressId.HasValue)
+            {
+                order.ShippingAddressId = request.ShippingAddressId;
+            }
+
+            if (request.ShippingAddressLine1 != null)
+            {
+                order.ShippingAddressLine1 = request.ShippingAddressLine1;
+            }
+
+            if (request.ShippingAddressLine2 != null)
+            {
+                order.ShippingAddressLine2 = request.ShippingAddressLine2;
+            }
+
+            if (request.ShippingCity != null)
+            {
+                order.ShippingCity = request.ShippingCity;
+            }
+
+            if (request.ShippingProvince != null)
+            {
+                order.ShippingProvince = request.ShippingProvince;
+            }
+
+            if (request.ShippingPostalCode != null)
+            {
+                order.ShippingPostalCode = request.ShippingPostalCode;
+            }
+
+            if (request.ShippingCountry != null)
+            {
+                order.ShippingCountry = request.ShippingCountry;
+            }
+
+            if (request.DeliveryContactName != null)
+            {
+                order.DeliveryContactName = request.DeliveryContactName;
+            }
+
+            if (request.DeliveryContactPhone != null)
+            {
+                order.DeliveryContactPhone = request.DeliveryContactPhone;
+            }
+
+            if (request.DeliveryContactEmail != null)
+            {
+                order.DeliveryContactEmail = request.DeliveryContactEmail;
             }
         }
 

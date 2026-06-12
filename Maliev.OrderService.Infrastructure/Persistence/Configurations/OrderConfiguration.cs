@@ -63,6 +63,19 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Configurations
             _ = builder.Property(o => o.CustomerPoNumber).HasColumnName("customer_po_number").HasMaxLength(50);
             _ = builder.Property(o => o.CustomerPoFileId).HasColumnName("customer_po_file_id");
 
+            // Delivery snapshot fields
+            _ = builder.Property(o => o.BillingAddressId).HasColumnName("billing_address_id");
+            _ = builder.Property(o => o.ShippingAddressId).HasColumnName("shipping_address_id");
+            _ = builder.Property(o => o.ShippingAddressLine1).HasColumnName("shipping_address_line1").HasMaxLength(500);
+            _ = builder.Property(o => o.ShippingAddressLine2).HasColumnName("shipping_address_line2").HasMaxLength(500);
+            _ = builder.Property(o => o.ShippingCity).HasColumnName("shipping_city").HasMaxLength(200);
+            _ = builder.Property(o => o.ShippingProvince).HasColumnName("shipping_province").HasMaxLength(200);
+            _ = builder.Property(o => o.ShippingPostalCode).HasColumnName("shipping_postal_code").HasMaxLength(20);
+            _ = builder.Property(o => o.ShippingCountry).HasColumnName("shipping_country").HasMaxLength(100);
+            _ = builder.Property(o => o.DeliveryContactName).HasColumnName("delivery_contact_name").HasMaxLength(200);
+            _ = builder.Property(o => o.DeliveryContactPhone).HasColumnName("delivery_contact_phone").HasMaxLength(50);
+            _ = builder.Property(o => o.DeliveryContactEmail).HasColumnName("delivery_contact_email").HasMaxLength(200);
+
             // Outsourcing fields
             _ = builder.Property(o => o.IsOutsourced).HasColumnName("is_outsourced").HasDefaultValue(false);
             _ = builder.Property(o => o.SupplierCostTHB).HasColumnName("supplier_cost_thb").HasColumnType("decimal(10,2)");
