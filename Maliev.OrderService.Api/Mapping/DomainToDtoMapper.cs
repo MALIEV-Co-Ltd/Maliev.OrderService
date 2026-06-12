@@ -2,6 +2,7 @@ using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
 using Maliev.OrderService.Domain.Entities;
 using System.Globalization;
+using System.Text.Json;
 
 namespace Maliev.OrderService.Api.Mapping
 {
@@ -10,6 +11,8 @@ namespace Maliev.OrderService.Api.Mapping
     /// </summary>
     public static class DomainToDtoMapper
     {
+        private static readonly JsonSerializerOptions _productionItemJsonOptions = new(JsonSerializerDefaults.Web);
+
         // Order mappings
         /// <summary>Maps an Order domain model to an OrderResponse DTO</summary>
         public static OrderResponse ToOrderResponse(this Order order, uint? xmin = null)
@@ -86,6 +89,9 @@ namespace Maliev.OrderService.Api.Mapping
                 ServiceCategoryId = request.ServiceCategoryId,
                 ProcessTypeId = request.ProcessTypeId,
                 Requirements = request.Requirements,
+                ProductionItemsJson = request.ProductionItems.Count > 0
+                    ? JsonSerializer.Serialize(request.ProductionItems, _productionItemJsonOptions)
+                    : null,
                 IsConfidential = request.IsConfidential,
                 OrderedQuantity = request.OrderedQuantity,
                 MaterialId = request.MaterialId,

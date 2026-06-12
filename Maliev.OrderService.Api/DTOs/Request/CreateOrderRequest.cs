@@ -119,5 +119,51 @@ namespace Maliev.OrderService.Api.DTOs.Request
         /// <summary>Gets or sets the delivery contact email snapshot</summary>
         [MaxLength(200, ErrorMessage = "Delivery Contact Email must not exceed 200 characters")]
         public string? DeliveryContactEmail { get; set; }
+
+        /// <summary>Gets or sets structured production item snapshots for job creation.</summary>
+        public List<CreateOrderProductionItemRequest> ProductionItems { get; set; } = [];
+    }
+
+    /// <summary>
+    /// Structured production item supplied when creating an order from a configured quote.
+    /// </summary>
+    public class CreateOrderProductionItemRequest
+    {
+        /// <summary>Gets or sets the source project or quote identifier.</summary>
+        public Guid? SourceProjectId { get; set; }
+
+        /// <summary>Gets or sets the source part identifier.</summary>
+        public Guid? SourceProjectPartId { get; set; }
+
+        /// <summary>Gets or sets the resolved material identifier used by production.</summary>
+        public required Guid MaterialId { get; set; }
+
+        /// <summary>Gets or sets the locked material snapshot JSON.</summary>
+        [Required]
+        public required string MaterialSnapshotJson { get; set; }
+
+        /// <summary>Gets or sets the locked configuration snapshot JSON.</summary>
+        [Required]
+        public required string ConfigurationSnapshotJson { get; set; }
+
+        /// <summary>Gets or sets the manufacturing technology.</summary>
+        [Required]
+        [MaxLength(80)]
+        public required string Technology { get; set; }
+
+        /// <summary>Gets or sets the part volume in cubic centimeters.</summary>
+        [Range(0, double.MaxValue)]
+        public decimal VolumeCm3 { get; set; }
+
+        /// <summary>Gets or sets the ordered quantity for this item.</summary>
+        [Range(1, int.MaxValue)]
+        public int Quantity { get; set; } = 1;
+
+        /// <summary>Gets or sets the estimated print time in minutes.</summary>
+        [Range(0, int.MaxValue)]
+        public int EstimatedPrintTimeMinutes { get; set; }
+
+        /// <summary>Gets or sets the promised delivery date for this item.</summary>
+        public DateTime? DeliveryDate { get; set; }
     }
 }

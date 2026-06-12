@@ -40,6 +40,11 @@ namespace Maliev.OrderService.Api.Controllers
         IAuthorizationService authorizationService,
         ILogger<OrdersController> logger) : ControllerBase
     {
+        private static readonly JsonSerializerOptions _productionItemJsonOptions = new(JsonSerializerDefaults.Web)
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
         private readonly IOrderManagementService _orderService = orderService;
         private readonly IOrderAuthorizationService _orderAuthService = orderAuthService;
         private readonly OrderDbContext _context = context;
@@ -133,7 +138,13 @@ namespace Maliev.OrderService.Api.Controllers
                 return NotFound(new ErrorMessageResponse { Message = $"Order {orderId} not found" });
             }
 
-            var item = new OrderLineItemResponse
+            IReadOnlyList<OrderLineItemResponse>? productionItems = BuildProductionLineItems(order);
+            if (productionItems is not null)
+            {
+                return Ok(productionItems);
+            }
+
+            OrderLineItemResponse item = new()
             {
                 OrderItemId = StableGuid($"order-item:{order.OrderId}:1"),
                 MaterialId = order.MaterialId.HasValue
@@ -149,6 +160,38 @@ namespace Maliev.OrderService.Api.Controllers
             };
 
             return Ok(new[] { item });
+        }
+
+        private static IReadOnlyList<OrderLineItemResponse>? BuildProductionLineItems(Order order)
+        {
+            if (string.IsNullOrWhiteSpace(order.ProductionItemsJson))
+            {
+                return null;
+            }
+
+            List<CreateOrderProductionItemRequest>? items = JsonSerializer.Deserialize<List<CreateOrderProductionItemRequest>>(
+                order.ProductionItemsJson,
+                _productionItemJsonOptions);
+
+            if (items is null || items.Count == 0)
+            {
+                return null;
+            }
+
+            return [.. items.Select((item, index) => new OrderLineItemResponse
+            {
+                OrderItemId = StableGuid($"order-item:{order.OrderId}:{item.SourceProjectPartId?.ToString("D") ?? index.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
+                SourceProjectId = item.SourceProjectId,
+                SourceProjectPartId = item.SourceProjectPartId,
+                MaterialId = item.MaterialId,
+                MaterialSnapshotJson = item.MaterialSnapshotJson,
+                ConfigurationSnapshotJson = item.ConfigurationSnapshotJson,
+                Technology = item.Technology,
+                VolumeCm3 = item.VolumeCm3,
+                Quantity = Math.Max(1, item.Quantity),
+                EstimatedPrintTimeMinutes = item.EstimatedPrintTimeMinutes,
+                DeliveryDate = item.DeliveryDate ?? order.PromisedDeliveryDate
+            })];
         }
 
         private static string BuildMaterialSnapshotJson(Order order)

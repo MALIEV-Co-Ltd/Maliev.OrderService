@@ -46,6 +46,7 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Configurations
             _ = builder.Property(o => o.DepartmentId).HasColumnName("department_id").HasMaxLength(50);
 
             _ = builder.Property(o => o.Requirements).HasColumnName("requirements").HasColumnType("text");
+            _ = builder.Property(o => o.ProductionItemsJson).HasColumnName("production_items_json").HasColumnType("text");
 
             // Map xmin as a system shadow property for optimistic concurrency
             _ = builder.Property<uint>("xmin")

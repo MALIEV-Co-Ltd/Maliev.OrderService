@@ -201,6 +201,80 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
+        public async Task GetOrderItemsReturnsStructuredProductionItemsFromCreateRequest()
+        {
+            Guid sourceProjectId = Guid.NewGuid();
+            Guid firstPartId = Guid.NewGuid();
+            Guid secondPartId = Guid.NewGuid();
+            Guid firstMaterialId = Guid.NewGuid();
+            Guid secondMaterialId = Guid.NewGuid();
+            object createRequest = new
+            {
+                customerId = "CUST-ITEMS-STRUCTURED",
+                customerType = "Customer",
+                serviceCategoryId = 1,
+                processTypeId = 1,
+                orderedQuantity = 99,
+                productionItems = new[]
+                {
+                    new
+                    {
+                        sourceProjectId,
+                        sourceProjectPartId = firstPartId,
+                        materialId = firstMaterialId,
+                        materialSnapshotJson = JsonSerializer.Serialize(new { materialCode = "pla-black" }),
+                        configurationSnapshotJson = JsonSerializer.Serialize(new { fileName = "gear.step", quantity = 2 }),
+                        technology = "FDM",
+                        volumeCm3 = 12.5m,
+                        quantity = 2,
+                        estimatedPrintTimeMinutes = 40
+                    },
+                    new
+                    {
+                        sourceProjectId,
+                        sourceProjectPartId = secondPartId,
+                        materialId = secondMaterialId,
+                        materialSnapshotJson = JsonSerializer.Serialize(new { materialCode = "resin-clear" }),
+                        configurationSnapshotJson = JsonSerializer.Serialize(new { fileName = "lens.step", quantity = 1 }),
+                        technology = "SLA",
+                        volumeCm3 = 4.25m,
+                        quantity = 1,
+                        estimatedPrintTimeMinutes = 25
+                    }
+                }
+            };
+
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string orderId = createdOrder.GetProperty("orderId").GetString()!;
+
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders/{orderId}/items");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            JsonElement items = await response.Content.ReadFromJsonAsync<JsonElement>();
+            JsonElement[] itemArray = [.. items.EnumerateArray()];
+            Assert.Equal(2, itemArray.Length);
+
+            JsonElement first = itemArray[0];
+            Assert.Equal(firstPartId, first.GetProperty("sourceProjectPartId").GetGuid());
+            Assert.Equal(firstMaterialId, first.GetProperty("materialId").GetGuid());
+            Assert.Equal("FDM", first.GetProperty("technology").GetString());
+            Assert.Equal(2, first.GetProperty("quantity").GetInt32());
+            Assert.Equal(40, first.GetProperty("estimatedPrintTimeMinutes").GetInt32());
+            Assert.Contains("gear.step", first.GetProperty("configurationSnapshotJson").GetString()!);
+
+            JsonElement second = itemArray[1];
+            Assert.Equal(secondPartId, second.GetProperty("sourceProjectPartId").GetGuid());
+            Assert.Equal(secondMaterialId, second.GetProperty("materialId").GetGuid());
+            Assert.Equal("SLA", second.GetProperty("technology").GetString());
+            Assert.Equal(1, second.GetProperty("quantity").GetInt32());
+            Assert.Equal(25, second.GetProperty("estimatedPrintTimeMinutes").GetInt32());
+            Assert.Contains("lens.step", second.GetProperty("configurationSnapshotJson").GetString()!);
+        }
+
+        [Fact]
         public async Task GetOrderByIdNotFoundReturns404()
         {
             HttpResponseMessage response = await _client.GetAsync("/order/v1/orders/NON-EXISTENT-ID");

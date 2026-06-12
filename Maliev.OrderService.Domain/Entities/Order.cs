@@ -138,6 +138,9 @@ namespace Maliev.OrderService.Domain.Entities
         /// <summary>Gets or sets the order requirements and specifications.</summary>
         public string? Requirements { get; set; }
 
+        /// <summary>Gets or sets structured production item snapshots captured at order creation.</summary>
+        public string? ProductionItemsJson { get; set; }
+
         // Outsourcing Information
         /// <summary>
         /// Gets or sets a value indicating whether this order is outsourced to an external manufacturing partner.
