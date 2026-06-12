@@ -35,7 +35,7 @@ namespace Maliev.OrderService.Api.Services.Business
         private static readonly List<string> _acceptedConsumers = ["PaymentService", "NotificationService"];
         private static readonly List<string> _paidConsumers = ["JobService", "InvoiceService", "NotificationService"];
         private static readonly List<string> _notificationOnlyConsumers = ["NotificationService"];
-        private static readonly List<string> _completedConsumers = ["NotificationService", "InvoiceService"];
+        private static readonly List<string> _completedConsumers = ["NotificationService", "InvoiceService", "DeliveryService"];
         private static readonly List<string> _cancelledConsumers = ["PaymentService", "NotificationService"];
 
         /// <inheritdoc />
