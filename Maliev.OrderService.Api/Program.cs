@@ -1,10 +1,10 @@
 using Maliev.Aspire.ServiceDefaults;
 using Maliev.OrderService.Api.Consumers;
-using Maliev.OrderService.Api.Extensions;
 using Maliev.OrderService.Api.Services;
 using Maliev.OrderService.Api.Services.Business;
 using Maliev.OrderService.Api.Services.External;
 using Maliev.OrderService.Infrastructure.Persistence;
+using MassTransit;
 
 // Initialize bootstrap logging
 using ILoggerFactory loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -30,6 +30,12 @@ try
     _ = builder.AddStandardCache("order:"); // Redis + in-memory fallback, memory-optimized
     _ = builder.AddMassTransitWithRabbitMq(cfg =>
     {
+        cfg.AddEntityFrameworkOutbox<OrderDbContext>(options =>
+        {
+            _ = options.UsePostgres();
+            options.UseBusOutbox();
+        });
+
         _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
         _ = cfg.AddConsumer<FileDeletedEventConsumer>();
         _ = cfg.AddConsumer<PreviewImagesGeneratedEventConsumer>();

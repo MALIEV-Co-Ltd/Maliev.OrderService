@@ -1,6 +1,7 @@
 using Maliev.Aspire.ServiceDefaults.Database;
 using Maliev.OrderService.Infrastructure.Persistence.Configurations;
 using Maliev.OrderService.Domain.Entities;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.OrderService.Infrastructure.Persistence
@@ -63,6 +64,10 @@ namespace Maliev.OrderService.Infrastructure.Persistence
             _ = modelBuilder.ApplyConfiguration(new Order3DScanningAttributesConfiguration());
             _ = modelBuilder.ApplyConfiguration(new Order3DDesignAttributesConfiguration());
             _ = modelBuilder.ApplyConfiguration(new OrderPreviewImageConfiguration());
+
+            modelBuilder.AddInboxStateEntity();
+            modelBuilder.AddOutboxMessageEntity();
+            modelBuilder.AddOutboxStateEntity();
 
             // Apply PostgreSQL snake_case naming convention globally to all tables and columns
             SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
