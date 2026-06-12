@@ -28,6 +28,12 @@ namespace Maliev.OrderService.Api.Consumers
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task Consume(ConsumeContext<JobStatusChangedEvent> context)
         {
+            if (!IsRoutedToOrderService(context.Message))
+            {
+                Log.IgnoringUntargetedJobStatus(_logger, context.Message.Payload.JobId, context.Message.Payload.NewStatus);
+                return;
+            }
+
             JobStatusChangedEventPayload payload = context.Message.Payload;
             if (string.Equals(payload.NewStatus, "InProgress", StringComparison.OrdinalIgnoreCase))
             {
@@ -130,8 +136,17 @@ namespace Maliev.OrderService.Api.Consumers
                 string.Equals(status.Status, "Shipped", StringComparison.OrdinalIgnoreCase));
         }
 
+        private static bool IsRoutedToOrderService(JobStatusChangedEvent message)
+        {
+            return message.ConsumedBy.Any(consumer =>
+                string.Equals(consumer, "OrderService", StringComparison.OrdinalIgnoreCase));
+        }
+
         private static partial class Log
         {
+            [LoggerMessage(Level = LogLevel.Debug, Message = "Ignoring untargeted JobStatusChangedEvent for job {JobId} with status {Status}")]
+            public static partial void IgnoringUntargetedJobStatus(ILogger logger, Guid jobId, string status);
+
             [LoggerMessage(Level = LogLevel.Debug, Message = "Ignoring JobStatusChangedEvent for job {JobId} with non-completed status {Status}")]
             public static partial void IgnoringNonCompletedJobStatus(ILogger logger, Guid jobId, string status);
 

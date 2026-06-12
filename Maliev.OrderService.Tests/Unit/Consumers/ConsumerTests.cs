@@ -152,6 +152,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
 
             _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new JobStatusChangedEventPayload
                 {
                     JobId = jobId,
@@ -192,6 +193,40 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
+        public async Task JobStatusChangedEventConsumerCompletedStatusWithoutOrderServiceRoutingIsIgnored()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+            var jobId = Guid.NewGuid();
+            var orderId = Guid.NewGuid();
+            const string orderNumber = "ORD-2026-00458";
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                ConsumedBy = ["NotificationService"],
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = jobId,
+                    OrderId = orderId,
+                    OrderNumber = orderNumber,
+                    PreviousStatus = "Finishing",
+                    NewStatus = "Completed",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
         public async Task JobStatusChangedEventConsumerInProgressStatusUpdatesOrderToInProgress()
         {
             var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
@@ -202,6 +237,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
 
             _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new JobStatusChangedEventPayload
                 {
                     JobId = jobId,
@@ -251,6 +287,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
 
             _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new JobStatusChangedEventPayload
                 {
                     JobId = Guid.NewGuid(),
@@ -282,6 +319,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
 
             _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new JobStatusChangedEventPayload
                 {
                     JobId = Guid.NewGuid(),
@@ -328,6 +366,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
 
             _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new JobStatusChangedEventPayload
                 {
                     JobId = Guid.NewGuid(),
@@ -352,6 +391,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
 
             _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
             {
+                ConsumedBy = ["OrderService"],
                 Payload = new JobStatusChangedEventPayload
                 {
                     JobId = Guid.NewGuid(),
