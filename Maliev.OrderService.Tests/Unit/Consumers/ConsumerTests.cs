@@ -173,6 +173,55 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
+        public async Task PaymentCompletedEventConsumerWithoutPayloadIsIgnored()
+        {
+            var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentCompletedEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = null!
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task PaymentCompletedEventConsumerWithoutRoutingListIsIgnored()
+        {
+            var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentCompletedEvent
+            {
+                ConsumedBy = null!,
+                Payload = new PaymentCompletedEventPayload
+                {
+                    OrderId = Guid.NewGuid(),
+                    OrderNumber = "ORD-2026-NULL-ROUTE",
+                    PaymentId = Guid.NewGuid(),
+                    Amount = 100,
+                    Currency = "THB"
+                }
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
         public async Task JobStatusChangedEventConsumerCompletedStatusUpdatesOrderToFinished()
         {
             var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);

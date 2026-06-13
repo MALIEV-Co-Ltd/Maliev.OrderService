@@ -28,7 +28,13 @@ namespace Maliev.OrderService.Api.Consumers
         public async Task Consume(ConsumeContext<PaymentCompletedEvent> context)
         {
             PaymentCompletedEvent @event = context.Message;
-            PaymentCompletedEventPayload payload = @event.Payload;
+            PaymentCompletedEventPayload? payload = @event.Payload;
+
+            if (payload is null)
+            {
+                Log.PaymentCompletedEventPayloadMissing(_logger);
+                return;
+            }
 
             if (!IsRoutedToOrderService(@event))
             {
@@ -104,12 +110,15 @@ namespace Maliev.OrderService.Api.Consumers
 
         private static bool IsRoutedToOrderService(PaymentCompletedEvent message)
         {
-            return message.ConsumedBy.Any(
-                consumer => consumer.Equals("OrderService", StringComparison.OrdinalIgnoreCase));
+            return message.ConsumedBy?.Any(
+                consumer => consumer.Equals("OrderService", StringComparison.OrdinalIgnoreCase)) == true;
         }
 
         private static partial class Log
         {
+            [LoggerMessage(Level = LogLevel.Warning, Message = "PaymentCompletedEvent received without payload; skipping")]
+            public static partial void PaymentCompletedEventPayloadMissing(ILogger logger);
+
             [LoggerMessage(Level = LogLevel.Debug, Message = "Ignoring untargeted PaymentCompletedEvent for order {OrderId}, payment {PaymentId}")]
             public static partial void IgnoringUntargetedPaymentCompletedEvent(ILogger logger, Guid orderId, Guid paymentId);
 
