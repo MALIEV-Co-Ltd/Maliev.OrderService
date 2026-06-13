@@ -21,6 +21,7 @@ try
 
     // --- Infrastructure & Observability ---
     _ = builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+    _ = builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
     _ = builder.AddStandardMiddleware(options =>
     {
         options.EnableRequestLogging = true;
@@ -45,7 +46,6 @@ try
 
     // --- API Configuration ---
     _ = builder.AddStandardCors(); // CORS with fail-fast validation
-    _ = builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
     _ = builder.AddJwtAuthentication();

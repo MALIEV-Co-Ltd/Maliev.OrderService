@@ -142,6 +142,7 @@ namespace Maliev.OrderService.Tests.Integration
                 Assert.NotNull(@event.Payload);
                 Assert.Equal("New", @event.Payload.PreviousStatus);
                 Assert.Equal("Reviewing", @event.Payload.NewStatus);
+                Assert.Contains("QuoteEngine", @event.ConsumedBy);
             }
             finally
             {

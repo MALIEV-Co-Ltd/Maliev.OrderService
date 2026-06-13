@@ -30,7 +30,7 @@ namespace Maliev.OrderService.Api.Services.Business
         private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
 
         // Static readonly arrays for ConsumedBy lists to avoid CA1861
-        private static readonly List<string> _genericStatusChangeConsumers = ["NotificationService", "InvoiceService"];
+        private static readonly List<string> _genericStatusChangeConsumers = ["NotificationService", "InvoiceService", "QuoteEngine"];
         private static readonly List<string> _quotedConsumers = ["NotificationService", "InvoiceService"];
         private static readonly List<string> _acceptedConsumers = ["PaymentService", "NotificationService"];
         private static readonly List<string> _paidConsumers = ["JobService", "InvoiceService", "NotificationService"];
