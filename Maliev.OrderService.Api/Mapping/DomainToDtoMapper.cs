@@ -103,6 +103,8 @@ namespace Maliev.OrderService.Api.Mapping
                 DepartmentId = request.DepartmentId,
                 CustomerPoNumber = request.CustomerPoNumber,
                 CustomerPoFileId = request.CustomerPoFileId,
+                QuotedAmount = request.QuotedAmount,
+                QuoteCurrency = request.QuoteCurrency,
                 BillingAddressId = request.BillingAddressId,
                 ShippingAddressId = request.ShippingAddressId,
                 ShippingAddressLine1 = request.ShippingAddressLine1,

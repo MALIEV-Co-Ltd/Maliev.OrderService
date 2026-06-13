@@ -70,6 +70,14 @@ namespace Maliev.OrderService.Api.DTOs.Request
         /// <summary>Gets or sets the customer purchase order file ID</summary>
         public Guid? CustomerPoFileId { get; set; }
 
+        /// <summary>Gets or sets the quoted order amount.</summary>
+        [Range(0, 999_999_999.99)]
+        public decimal? QuotedAmount { get; set; }
+
+        /// <summary>Gets or sets the quote currency code.</summary>
+        [StringLength(3, MinimumLength = 3)]
+        public string? QuoteCurrency { get; set; }
+
         /// <summary>Gets or sets the selected billing address ID</summary>
         public Guid? BillingAddressId { get; set; }
 
