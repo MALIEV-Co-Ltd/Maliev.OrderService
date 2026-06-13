@@ -28,13 +28,19 @@ namespace Maliev.OrderService.Api.Consumers
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task Consume(ConsumeContext<JobStatusChangedEvent> context)
         {
-            if (!IsRoutedToOrderService(context.Message))
+            JobStatusChangedEventPayload? payload = context.Message.Payload;
+            if (payload is null)
             {
-                Log.IgnoringUntargetedJobStatus(_logger, context.Message.Payload.JobId, context.Message.Payload.NewStatus);
+                Log.IgnoringMissingPayload(_logger);
                 return;
             }
 
-            JobStatusChangedEventPayload payload = context.Message.Payload;
+            if (!IsRoutedToOrderService(context.Message))
+            {
+                Log.IgnoringUntargetedJobStatus(_logger, payload.JobId, payload.NewStatus);
+                return;
+            }
+
             if (string.Equals(payload.NewStatus, "InProgress", StringComparison.OrdinalIgnoreCase))
             {
                 await MarkOrderInProgressAsync(payload, context.CancellationToken);
@@ -144,6 +150,9 @@ namespace Maliev.OrderService.Api.Consumers
 
         private static partial class Log
         {
+            [LoggerMessage(Level = LogLevel.Warning, Message = "Ignoring JobStatusChangedEvent without payload")]
+            public static partial void IgnoringMissingPayload(ILogger logger);
+
             [LoggerMessage(Level = LogLevel.Debug, Message = "Ignoring untargeted JobStatusChangedEvent for job {JobId} with status {Status}")]
             public static partial void IgnoringUntargetedJobStatus(ILogger logger, Guid jobId, string status);
 

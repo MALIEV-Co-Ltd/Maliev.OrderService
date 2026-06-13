@@ -307,6 +307,27 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
+        public async Task JobStatusChangedEventConsumerWithoutPayloadIsIgnored()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = null!
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
         public async Task JobStatusChangedEventConsumerInProgressStatusUpdatesOrderToInProgress()
         {
             var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
