@@ -14,6 +14,8 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
     {
         private readonly Mock<IOrderStatusService> _statusServiceMock = new();
         private readonly Mock<ILogger<PaymentCompletedEventConsumer>> _paymentLoggerMock = new();
+        private readonly Mock<ILogger<PaymentCancelledEventConsumer>> _paymentCancelledLoggerMock = new();
+        private readonly Mock<ILogger<PaymentExpiredEventConsumer>> _paymentExpiredLoggerMock = new();
         private readonly Mock<ILogger<JobStatusChangedEventConsumer>> _jobStatusLoggerMock = new();
 
         [Fact]
@@ -219,6 +221,184 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                 It.IsAny<CreateOrderStatusRequest>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task PaymentCancelledEventConsumerWithOrderServiceRoutingCancelsOrder()
+        {
+            var consumer = new PaymentCancelledEventConsumer(_statusServiceMock.Object, _paymentCancelledLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCancelledEvent>>();
+            var transactionId = Guid.NewGuid();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentCancelledEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = new PaymentCancelledEventPayload
+                {
+                    TransactionId = transactionId,
+                    IdempotencyKey = "payment-cancelled",
+                    Amount = 100,
+                    Currency = "THB",
+                    CustomerId = "customer-1",
+                    OrderId = "ORD-CANCELLED-1",
+                    ProviderName = "stripe",
+                    Reason = "Customer cancelled checkout",
+                    ProviderEventCode = "checkout.session.expired",
+                    CancelledAt = DateTimeOffset.UtcNow
+                }
+            });
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<CreateOrderStatusRequest>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderStatusResponse
+                {
+                    StatusId = 1,
+                    OrderId = "ORD-CANCELLED-1",
+                    Status = "Cancelled",
+                    UpdatedBy = "System-PaymentService",
+                    Timestamp = DateTime.UtcNow
+                });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                "ORD-CANCELLED-1",
+                It.Is<CreateOrderStatusRequest>(r =>
+                    r.Status == "Cancelled" &&
+                    r.InternalNotes != null &&
+                    r.InternalNotes.Contains(transactionId.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                    r.InternalNotes.Contains("Customer cancelled checkout", StringComparison.OrdinalIgnoreCase)),
+                "System-PaymentService",
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task PaymentCancelledEventConsumerWithoutOrderServiceRoutingIsIgnored()
+        {
+            var consumer = new PaymentCancelledEventConsumer(_statusServiceMock.Object, _paymentCancelledLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCancelledEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentCancelledEvent
+            {
+                ConsumedBy = ["NotificationService"],
+                Payload = new PaymentCancelledEventPayload
+                {
+                    TransactionId = Guid.NewGuid(),
+                    OrderId = "ORD-IGNORED",
+                    Reason = "ignored"
+                }
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task PaymentCancelledEventConsumerDuplicateCancellationForSameTransactionDoesNotThrow()
+        {
+            var consumer = new PaymentCancelledEventConsumer(_statusServiceMock.Object, _paymentCancelledLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCancelledEvent>>();
+            var transactionId = Guid.NewGuid();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentCancelledEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = new PaymentCancelledEventPayload
+                {
+                    TransactionId = transactionId,
+                    OrderId = "ORD-CANCELLED-DUP",
+                    Reason = "Customer cancelled checkout"
+                }
+            });
+            _ = contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<CreateOrderStatusRequest>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Invalid transition from Cancelled to Cancelled"));
+            _ = _statusServiceMock.Setup(s => s.GetOrderStatusHistoryAsync(
+                    "ORD-CANCELLED-DUP",
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(
+                [
+                    new()
+                    {
+                        StatusId = 2,
+                        OrderId = "ORD-CANCELLED-DUP",
+                        Status = "Cancelled",
+                        InternalNotes = $"Payment {transactionId} cancelled - Customer cancelled checkout",
+                        UpdatedBy = "System-PaymentService",
+                        Timestamp = DateTime.UtcNow
+                    }
+                ]);
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(
+                "ORD-CANCELLED-DUP",
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task PaymentExpiredEventConsumerWithOrderServiceRoutingCancelsOrder()
+        {
+            var consumer = new PaymentExpiredEventConsumer(_statusServiceMock.Object, _paymentExpiredLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentExpiredEvent>>();
+            var transactionId = Guid.NewGuid();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentExpiredEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = new PaymentExpiredEventPayload
+                {
+                    TransactionId = transactionId,
+                    IdempotencyKey = "payment-expired",
+                    Amount = 100,
+                    Currency = "THB",
+                    CustomerId = "customer-1",
+                    OrderId = "ORD-EXPIRED-1",
+                    ProviderName = "stripe",
+                    Reason = "Checkout session expired",
+                    ProviderEventCode = "checkout.session.expired",
+                    ExpiredAt = DateTimeOffset.UtcNow
+                }
+            });
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<CreateOrderStatusRequest>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderStatusResponse
+                {
+                    StatusId = 1,
+                    OrderId = "ORD-EXPIRED-1",
+                    Status = "Cancelled",
+                    UpdatedBy = "System-PaymentService",
+                    Timestamp = DateTime.UtcNow
+                });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                "ORD-EXPIRED-1",
+                It.Is<CreateOrderStatusRequest>(r =>
+                    r.Status == "Cancelled" &&
+                    r.InternalNotes != null &&
+                    r.InternalNotes.Contains(transactionId.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                    r.InternalNotes.Contains("Checkout session expired", StringComparison.OrdinalIgnoreCase)),
+                "System-PaymentService",
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
