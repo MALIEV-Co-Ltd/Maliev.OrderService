@@ -5,6 +5,7 @@ using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.OrderService.Api.Consumers;
 using Maliev.OrderService.Api.DTOs.Request;
 using Maliev.OrderService.Api.DTOs.Response;
+using Maliev.OrderService.Tests.Testing;
 using MassTransit.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -399,32 +400,36 @@ namespace Maliev.OrderService.Tests.Integration
                     }
                 );
 
+                IConsumerTestHarness<PaymentCompletedEventConsumer> consumerHarness = harness.GetConsumerHarness<PaymentCompletedEventConsumer>();
                 await harness.Bus.Publish(paymentCompletedEvent);
 
-                // Wait for message to be delivered to consumer
-                await Task.Delay(1000);
-
-                // Wait for consumer to process - check the specific consumer harness
-                IConsumerTestHarness<PaymentCompletedEventConsumer> consumerHarness = harness.GetConsumerHarness<PaymentCompletedEventConsumer>();
-                bool consumed = await consumerHarness.Consumed.Any<PaymentCompletedEvent>(x => x.Context.Message.Payload.OrderNumber == createdOrder.OrderId);
-
-                if (!consumed)
-                {
-                    // Fallback to general harness check if consumer harness failed
-                    consumed = await harness.Consumed.Any<PaymentCompletedEvent>();
-                }
+                bool consumed = await TestHelpers.WaitForAsync(
+                    async ct =>
+                        await consumerHarness.Consumed.Any<PaymentCompletedEvent>(
+                            x => x.Context.Message.Payload.OrderNumber == createdOrder.OrderId,
+                            ct)
+                        || await harness.Consumed.Any<PaymentCompletedEvent>(ct),
+                    static result => result,
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromMilliseconds(100),
+                    $"PaymentCompletedEvent should be consumed. Expected OrderNumber: {createdOrder.OrderId}");
 
                 Assert.True(consumed, $"PaymentCompletedEvent should be consumed. Expected OrderNumber: {createdOrder.OrderId}");
 
-                // Give a bit more time for DB write
-                await Task.Delay(500);
+                List<OrderStatusResponse>? statuses = await TestHelpers.WaitForAsync(
+                    async ct =>
+                    {
+                        HttpResponseMessage statusHistoryResponse = await _client.GetAsync(
+                            $"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                            ct);
+                        Assert.Equal(HttpStatusCode.OK, statusHistoryResponse.StatusCode);
+                        return await statusHistoryResponse.Content.ReadFromJsonAsync<List<OrderStatusResponse>>(cancellationToken: ct);
+                    },
+                    statusHistory => statusHistory?.Any(s => s.Status == "Paid") == true,
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromMilliseconds(100),
+                    $"Paid status should be persisted for order {createdOrder.OrderId}");
 
-                // Assert - Verify order status was updated to "Paid"
-                HttpResponseMessage statusHistoryResponse = await _client.GetAsync(
-                    $"/order/v1/orders/{createdOrder.OrderId}/statuses");
-                Assert.Equal(HttpStatusCode.OK, statusHistoryResponse.StatusCode);
-
-                List<OrderStatusResponse>? statuses = await statusHistoryResponse.Content.ReadFromJsonAsync<List<OrderStatusResponse>>();
                 Assert.NotNull(statuses);
                 Assert.Contains(statuses, s => s.Status == "Paid");
 
