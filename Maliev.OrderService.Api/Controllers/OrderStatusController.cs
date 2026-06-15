@@ -25,14 +25,12 @@ namespace Maliev.OrderService.Api.Controllers
         IOrderAuthorizationService orderAuthService,
         OrderDbContext context,
         IOrderStatusService statusService,
-        IAuthorizationService authorizationService,
-        ILogger<OrderStatusController> logger) : ControllerBase
+        IAuthorizationService authorizationService) : ControllerBase
     {
         private readonly IOrderAuthorizationService _orderAuthService = orderAuthService;
         private readonly OrderDbContext _context = context;
         private readonly IOrderStatusService _statusService = statusService;
         private readonly IAuthorizationService _authorizationService = authorizationService; // Added
-        private readonly ILogger<OrderStatusController> _logger = logger;
 
         /// <summary>
         /// Create a new status entry for an order
@@ -74,6 +72,7 @@ namespace Maliev.OrderService.Api.Controllers
                 }
             }
             else if (string.Equals(request.Status, "Finished", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(request.Status, "QualityReleased", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(request.Status, "Shipped", StringComparison.OrdinalIgnoreCase))
             {
                 if (!(await _authorizationService.AuthorizeAsync(User, "Permission:" + OrderPermissions.OrdersFulfill)).Succeeded)

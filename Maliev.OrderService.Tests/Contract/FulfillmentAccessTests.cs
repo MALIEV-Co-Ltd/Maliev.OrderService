@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Maliev.OrderService.Api.Authorization;
-using Maliev.OrderService.Infrastructure.Persistence;
 using Maliev.OrderService.Domain.Entities;
+using Maliev.OrderService.Infrastructure.Persistence;
 
 namespace Maliev.OrderService.Tests.Contract
 {
@@ -10,17 +10,17 @@ namespace Maliev.OrderService.Tests.Contract
     public class FulfillmentAccessTests(TestWebApplicationFactory factory)
     {
         private readonly TestWebApplicationFactory _factory = factory;
-        private static readonly string[] FulfillmentRoles = ["roles.order.fulfillment"];
-        private static readonly string[] FulfillmentPermissions = [OrderPermissions.OrdersRead, OrderPermissions.OrdersUpdate, OrderPermissions.OrdersFulfill];
-        private static readonly string[] UpdateOnlyPermissions = [OrderPermissions.OrdersUpdate];
+        private static readonly string[] _fulfillmentRoles = ["roles.order.fulfillment"];
+        private static readonly string[] _fulfillmentPermissions = [OrderPermissions.OrdersRead, OrderPermissions.OrdersUpdate, OrderPermissions.OrdersFulfill];
+        private static readonly string[] _updateOnlyPermissions = [OrderPermissions.OrdersUpdate];
 
         [Fact]
         public async Task FulfillmentCanMarkAsFulfilled()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("fulfillment-user",
-                roles: FulfillmentRoles,
-                permissions: FulfillmentPermissions);
+                roles: _fulfillmentRoles,
+                permissions: _fulfillmentPermissions);
 
             string orderId = await CreateTestOrderAsync("InProgress");
 
@@ -34,12 +34,27 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
+        public async Task UpdateOnlyUserCannotReleaseQuality()
+        {
+            HttpClient client = _factory.CreateAuthenticatedClient("fulfillment-user",
+                roles: _fulfillmentRoles,
+                permissions: _updateOnlyPermissions);
+
+            string orderId = await CreateTestOrderAsync("Finished");
+            var request = new { Status = "QualityReleased", InternalNotes = "QC passed" };
+
+            HttpResponseMessage response = await client.PostAsJsonAsync($"/order/v1/orders/{orderId}/statuses", request);
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
         public async Task FulfillmentCannotUpdatePricing()
         {
             // Arrange
             HttpClient client = _factory.CreateAuthenticatedClient("fulfillment-user",
-                roles: FulfillmentRoles,
-                permissions: UpdateOnlyPermissions); // Has update but not approve
+                roles: _fulfillmentRoles,
+                permissions: _updateOnlyPermissions); // Has update but not approve
 
             string orderId = await CreateTestOrderAsync();
 
