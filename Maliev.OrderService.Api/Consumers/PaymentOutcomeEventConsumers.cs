@@ -91,6 +91,91 @@ namespace Maliev.OrderService.Api.Consumers
     }
 
     /// <summary>
+    /// Consumer for payment failure events that cancel the associated accepted order.
+    /// </summary>
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="PaymentFailedEventConsumer"/> class.
+    /// </remarks>
+    /// <param name="orderStatusService">The order status service.</param>
+    /// <param name="logger">The logger instance.</param>
+    public sealed partial class PaymentFailedEventConsumer(
+        IOrderStatusService orderStatusService,
+        ILogger<PaymentFailedEventConsumer> logger) : IConsumer<PaymentFailedEvent>
+    {
+        private readonly IOrderStatusService _orderStatusService = orderStatusService;
+        private readonly ILogger<PaymentFailedEventConsumer> _logger = logger;
+
+        /// <summary>
+        /// Consumes a payment failure event and cancels the associated order when routed here.
+        /// </summary>
+        /// <param name="context">The message context containing the payment failure event.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public async Task Consume(ConsumeContext<PaymentFailedEvent> context)
+        {
+            PaymentFailedEvent message = context.Message;
+            PaymentFailedEventPayload? payload = message.Payload;
+
+            if (payload is null)
+            {
+                Log.PaymentFailedEventPayloadMissing(_logger);
+                return;
+            }
+
+            if (!PaymentOutcomeConsumerHelper.IsRoutedToOrderService(message.ConsumedBy))
+            {
+                Log.IgnoringUntargetedPaymentFailedEvent(_logger, payload.OrderId, payload.TransactionId);
+                return;
+            }
+
+            var request = new CreateOrderStatusRequest
+            {
+                Status = "Cancelled",
+                InternalNotes = $"Payment {payload.TransactionId} failed - {payload.ErrorMessage} ({payload.ProviderErrorCode})",
+                CustomerNotes = "Payment failed before completion."
+            };
+
+            try
+            {
+                _ = await _orderStatusService.CreateOrderStatusAsync(
+                    payload.OrderId,
+                    request,
+                    "System-PaymentService",
+                    context.CancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                if (await PaymentOutcomeConsumerHelper.IsDuplicateCancelledOutcomeAsync(
+                        _orderStatusService,
+                        payload.OrderId,
+                        payload.TransactionId,
+                        context.CancellationToken))
+                {
+                    Log.DuplicatePaymentFailedEventIgnored(_logger, payload.OrderId, payload.TransactionId);
+                    return;
+                }
+
+                Log.FailedToCancelOrderAfterPaymentFailure(_logger, ex, payload.OrderId, ex.Message);
+                throw;
+            }
+        }
+
+        private static partial class Log
+        {
+            [LoggerMessage(Level = LogLevel.Warning, Message = "PaymentFailedEvent received without payload; skipping")]
+            public static partial void PaymentFailedEventPayloadMissing(ILogger logger);
+
+            [LoggerMessage(Level = LogLevel.Debug, Message = "Ignoring untargeted PaymentFailedEvent for order {OrderId}, transaction {TransactionId}")]
+            public static partial void IgnoringUntargetedPaymentFailedEvent(ILogger logger, string orderId, Guid transactionId);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "Ignoring duplicate PaymentFailedEvent for order {OrderId}, transaction {TransactionId}")]
+            public static partial void DuplicatePaymentFailedEventIgnored(ILogger logger, string orderId, Guid transactionId);
+
+            [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to cancel order {OrderId} after payment failure: {Message}")]
+            public static partial void FailedToCancelOrderAfterPaymentFailure(ILogger logger, Exception exception, string orderId, string message);
+        }
+    }
+
+    /// <summary>
     /// Consumer for payment expiration events that cancel the associated accepted order.
     /// </summary>
     /// <remarks>

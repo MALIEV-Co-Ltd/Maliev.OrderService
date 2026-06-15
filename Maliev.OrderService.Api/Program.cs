@@ -39,6 +39,7 @@ try
 
         _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
         _ = cfg.AddConsumer<PaymentCancelledEventConsumer>();
+        _ = cfg.AddConsumer<PaymentFailedEventConsumer>();
         _ = cfg.AddConsumer<PaymentExpiredEventConsumer>();
         _ = cfg.AddConsumer<FileDeletedEventConsumer>();
         _ = cfg.AddConsumer<PreviewImagesGeneratedEventConsumer>();

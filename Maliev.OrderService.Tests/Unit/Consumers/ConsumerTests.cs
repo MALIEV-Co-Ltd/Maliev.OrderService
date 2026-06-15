@@ -16,6 +16,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         private readonly Mock<ILogger<PaymentCompletedEventConsumer>> _paymentLoggerMock = new();
         private readonly Mock<ILogger<PaymentCancelledEventConsumer>> _paymentCancelledLoggerMock = new();
         private readonly Mock<ILogger<PaymentExpiredEventConsumer>> _paymentExpiredLoggerMock = new();
+        private readonly Mock<ILogger<PaymentFailedEventConsumer>> _paymentFailedLoggerMock = new();
         private readonly Mock<ILogger<JobStatusChangedEventConsumer>> _jobStatusLoggerMock = new();
 
         [Fact]
@@ -397,6 +398,60 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                     r.InternalNotes != null &&
                     r.InternalNotes.Contains(transactionId.ToString(), StringComparison.OrdinalIgnoreCase) &&
                     r.InternalNotes.Contains("Checkout session expired", StringComparison.OrdinalIgnoreCase)),
+                "System-PaymentService",
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task PaymentFailedEventConsumerWithOrderServiceRoutingCancelsOrder()
+        {
+            var consumer = new PaymentFailedEventConsumer(_statusServiceMock.Object, _paymentFailedLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentFailedEvent>>();
+            var transactionId = Guid.NewGuid();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentFailedEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = new PaymentFailedEventPayload
+                {
+                    TransactionId = transactionId,
+                    IdempotencyKey = "payment-failed",
+                    Amount = 100,
+                    Currency = "THB",
+                    CustomerId = "customer-1",
+                    OrderId = "ORD-FAILED-1",
+                    ProviderName = "stripe",
+                    ErrorMessage = "Card was declined",
+                    ProviderErrorCode = "card_declined",
+                    FailedAt = DateTimeOffset.UtcNow
+                }
+            });
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<CreateOrderStatusRequest>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderStatusResponse
+                {
+                    StatusId = 1,
+                    OrderId = "ORD-FAILED-1",
+                    Status = "Cancelled",
+                    UpdatedBy = "System-PaymentService",
+                    Timestamp = DateTime.UtcNow
+                });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                "ORD-FAILED-1",
+                It.Is<CreateOrderStatusRequest>(r =>
+                    r.Status == "Cancelled" &&
+                    r.InternalNotes != null &&
+                    r.InternalNotes.Contains(transactionId.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                    r.InternalNotes.Contains("Card was declined", StringComparison.OrdinalIgnoreCase) &&
+                    r.InternalNotes.Contains("card_declined", StringComparison.OrdinalIgnoreCase) &&
+                    r.CustomerNotes == "Payment failed before completion."),
                 "System-PaymentService",
                 It.IsAny<CancellationToken>()), Times.Once);
         }

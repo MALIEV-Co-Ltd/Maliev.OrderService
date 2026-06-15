@@ -462,6 +462,93 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
+        public async Task PaymentFailedEventConsumerShouldCancelAcceptedOrder()
+        {
+            var createRequest = new CreateOrderRequest
+            {
+                CustomerId = "CUST-FAILED-001",
+                CustomerType = "Customer",
+                ServiceCategoryId = 1,
+                ProcessTypeId = 1,
+                OrderedQuantity = 2,
+                Requirements = "Test order for payment failure consumer"
+            };
+
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            OrderResponse? createdOrder = await createResponse.Content.ReadFromJsonAsync<OrderResponse>();
+            Assert.NotNull(createdOrder);
+
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Reviewing" });
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Reviewed" });
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Quoted" });
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Accepted" });
+
+            ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
+            IConsumerTestHarness<PaymentFailedEventConsumer> consumerHarness = harness.GetConsumerHarness<PaymentFailedEventConsumer>();
+            var transactionId = Guid.NewGuid();
+            var paymentFailedEvent = new PaymentFailedEvent(
+                MessageId: Guid.NewGuid(),
+                MessageName: nameof(PaymentFailedEvent),
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "PaymentService",
+                ConsumedBy: ["OrderService"],
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new PaymentFailedEventPayload(
+                    TransactionId: transactionId,
+                    IdempotencyKey: "stripe-failure",
+                    Amount: 1500.00,
+                    Currency: "THB",
+                    CustomerId: createdOrder.CustomerId,
+                    OrderId: createdOrder.OrderId,
+                    ProviderName: "stripe",
+                    ErrorMessage: "Card was declined",
+                    ProviderErrorCode: "card_declined",
+                    FailedAt: DateTimeOffset.UtcNow));
+
+            await harness.Bus.Publish(paymentFailedEvent);
+
+            bool consumed = await TestHelpers.WaitForAsync(
+                async ct =>
+                    await consumerHarness.Consumed.Any<PaymentFailedEvent>(
+                        x => x.Context.Message.Payload.OrderId == createdOrder.OrderId,
+                        ct),
+                static result => result,
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMilliseconds(100),
+                $"PaymentFailedEvent should be consumed. Expected OrderId: {createdOrder.OrderId}");
+
+            Assert.True(consumed, $"PaymentFailedEvent should be consumed. Expected OrderId: {createdOrder.OrderId}");
+
+            List<OrderStatusResponse>? statuses = await TestHelpers.WaitForAsync(
+                async ct =>
+                {
+                    HttpResponseMessage statusHistoryResponse = await _client.GetAsync(
+                        $"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                        ct);
+                    Assert.Equal(HttpStatusCode.OK, statusHistoryResponse.StatusCode);
+                    return await statusHistoryResponse.Content.ReadFromJsonAsync<List<OrderStatusResponse>>(cancellationToken: ct);
+                },
+                statusHistory => statusHistory?.Any(s => s.Status == "Cancelled") == true,
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMilliseconds(100),
+                $"Cancelled status should be persisted for order {createdOrder.OrderId}");
+
+            Assert.NotNull(statuses);
+            OrderStatusResponse cancelledStatus = Assert.Single(statuses, s => s.Status == "Cancelled");
+            Assert.Contains(transactionId.ToString(), cancelledStatus.InternalNotes ?? string.Empty);
+            Assert.Contains("Card was declined", cancelledStatus.InternalNotes ?? string.Empty);
+            Assert.Contains("card_declined", cancelledStatus.InternalNotes ?? string.Empty);
+        }
+
+        [Fact]
         public async Task UpdateStatusToPaidShouldPublishOrderPaidEvent()
         {
             // Arrange
