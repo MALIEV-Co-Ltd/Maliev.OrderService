@@ -14,6 +14,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
     {
         private readonly Mock<IOrderStatusService> _statusServiceMock = new();
         private readonly Mock<ILogger<PaymentCompletedEventConsumer>> _paymentLoggerMock = new();
+        private readonly Mock<ILogger<PaymentPendingEventConsumer>> _paymentPendingLoggerMock = new();
         private readonly Mock<ILogger<PaymentCancelledEventConsumer>> _paymentCancelledLoggerMock = new();
         private readonly Mock<ILogger<PaymentExpiredEventConsumer>> _paymentExpiredLoggerMock = new();
         private readonly Mock<ILogger<PaymentFailedEventConsumer>> _paymentFailedLoggerMock = new();
@@ -145,6 +146,74 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
             _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(
                 orderId.ToString(),
                 It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task PaymentPendingEventConsumerWithOrderServiceRoutingMarksPaymentProcessing()
+        {
+            var consumer = new PaymentPendingEventConsumer(_statusServiceMock.Object, _paymentPendingLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentPendingEvent>>();
+            var transactionId = Guid.NewGuid();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentPendingEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = new PaymentPendingEventPayload
+                {
+                    OrderId = "ORD-PENDING-001",
+                    CustomerId = "customer-123",
+                    TransactionId = transactionId,
+                    Amount = 1250,
+                    Currency = "THB",
+                    ProviderName = "stripe",
+                    ProviderEventCode = "ProviderSuccess",
+                    PendingAt = DateTimeOffset.UtcNow
+                }
+            });
+            _ = contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.MarkPaymentProcessingAsync(
+                "ORD-PENDING-001",
+                transactionId.ToString(),
+                "stripe",
+                "ProviderSuccess",
+                "System-PaymentService",
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task PaymentPendingEventConsumerWithoutOrderServiceRoutingIsIgnored()
+        {
+            var consumer = new PaymentPendingEventConsumer(_statusServiceMock.Object, _paymentPendingLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentPendingEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new PaymentPendingEvent
+            {
+                ConsumedBy = ["NotificationService"],
+                Payload = new PaymentPendingEventPayload
+                {
+                    OrderId = "ORD-PENDING-002",
+                    CustomerId = "customer-123",
+                    TransactionId = Guid.NewGuid(),
+                    Amount = 1250,
+                    Currency = "THB",
+                    ProviderName = "stripe",
+                    ProviderEventCode = "ProviderSuccess",
+                    PendingAt = DateTimeOffset.UtcNow
+                }
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.MarkPaymentProcessingAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]

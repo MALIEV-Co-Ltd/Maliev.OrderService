@@ -38,6 +38,7 @@ try
         });
 
         _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
+        _ = cfg.AddConsumer<PaymentPendingEventConsumer>();
         _ = cfg.AddConsumer<PaymentCancelledEventConsumer>();
         _ = cfg.AddConsumer<PaymentFailedEventConsumer>();
         _ = cfg.AddConsumer<PaymentExpiredEventConsumer>();

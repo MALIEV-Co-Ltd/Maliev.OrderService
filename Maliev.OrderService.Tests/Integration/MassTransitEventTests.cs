@@ -462,6 +462,89 @@ namespace Maliev.OrderService.Tests.Integration
         }
 
         [Fact]
+        public async Task PaymentPendingEventConsumerShouldMarkAcceptedOrderPaymentProcessing()
+        {
+            var createRequest = new CreateOrderRequest
+            {
+                CustomerId = "CUST-PENDING-001",
+                CustomerType = "Customer",
+                ServiceCategoryId = 1,
+                ProcessTypeId = 1,
+                OrderedQuantity = 2,
+                Requirements = "Test order for payment pending consumer"
+            };
+
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            OrderResponse? createdOrder = await createResponse.Content.ReadFromJsonAsync<OrderResponse>();
+            Assert.NotNull(createdOrder);
+
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Reviewing" });
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Reviewed" });
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Quoted" });
+            _ = await _client.PostAsJsonAsync($"/order/v1/orders/{createdOrder.OrderId}/statuses",
+                new CreateOrderStatusRequest { Status = "Accepted" });
+
+            ITestHarness harness = _factory.Services.GetRequiredService<ITestHarness>();
+            IConsumerTestHarness<PaymentPendingEventConsumer> consumerHarness = harness.GetConsumerHarness<PaymentPendingEventConsumer>();
+            var transactionId = Guid.NewGuid();
+            var paymentPendingEvent = new PaymentPendingEvent(
+                MessageId: Guid.NewGuid(),
+                MessageName: nameof(PaymentPendingEvent),
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "PaymentService",
+                ConsumedBy: ["OrderService"],
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new PaymentPendingEventPayload(
+                    TransactionId: transactionId,
+                    IdempotencyKey: "stripe-pending",
+                    Amount: 1500.00,
+                    Currency: "THB",
+                    CustomerId: createdOrder.CustomerId,
+                    OrderId: createdOrder.OrderId,
+                    ProviderName: "stripe",
+                    ProviderEventCode: "ProviderSuccess",
+                    PendingAt: DateTimeOffset.UtcNow));
+
+            await harness.Bus.Publish(paymentPendingEvent);
+
+            bool consumed = await TestHelpers.WaitForAsync(
+                async ct =>
+                    await consumerHarness.Consumed.Any<PaymentPendingEvent>(
+                        x => x.Context.Message.Payload.OrderId == createdOrder.OrderId,
+                        ct),
+                static result => result,
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMilliseconds(100),
+                $"PaymentPendingEvent should be consumed. Expected OrderId: {createdOrder.OrderId}");
+
+            Assert.True(consumed, $"PaymentPendingEvent should be consumed. Expected OrderId: {createdOrder.OrderId}");
+
+            OrderResponse? pendingOrder = await TestHelpers.WaitForAsync(
+                async ct => await _client.GetFromJsonAsync<OrderResponse>(
+                    $"/order/v1/orders/{createdOrder.OrderId}",
+                    ct),
+                order => order?.PaymentStatus == "Processing" && order.PaymentId == transactionId.ToString(),
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMilliseconds(100),
+                $"Order payment state should be Processing for order {createdOrder.OrderId}");
+
+            Assert.NotNull(pendingOrder);
+            Assert.Equal("Processing", pendingOrder.PaymentStatus);
+            Assert.Equal(transactionId.ToString(), pendingOrder.PaymentId);
+
+            List<OrderStatusResponse>? statuses = await _client.GetFromJsonAsync<List<OrderStatusResponse>>($"/order/v1/orders/{createdOrder.OrderId}/statuses");
+            Assert.NotNull(statuses);
+            Assert.DoesNotContain(statuses, status => status.Status == "Paid");
+        }
+
+        [Fact]
         public async Task PaymentFailedEventConsumerShouldCancelAcceptedOrder()
         {
             var createRequest = new CreateOrderRequest

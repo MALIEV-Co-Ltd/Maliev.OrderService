@@ -6,6 +6,62 @@ using MassTransit;
 namespace Maliev.OrderService.Api.Consumers
 {
     /// <summary>
+    /// Consumer for payment pending events that record provider checkout processing state.
+    /// </summary>
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="PaymentPendingEventConsumer"/> class.
+    /// </remarks>
+    /// <param name="orderStatusService">The order status service.</param>
+    /// <param name="logger">The logger instance.</param>
+    public sealed partial class PaymentPendingEventConsumer(
+        IOrderStatusService orderStatusService,
+        ILogger<PaymentPendingEventConsumer> logger) : IConsumer<PaymentPendingEvent>
+    {
+        private readonly IOrderStatusService _orderStatusService = orderStatusService;
+        private readonly ILogger<PaymentPendingEventConsumer> _logger = logger;
+
+        /// <summary>
+        /// Consumes a payment pending event and records payment processing state when routed here.
+        /// </summary>
+        /// <param name="context">The message context containing the payment pending event.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public async Task Consume(ConsumeContext<PaymentPendingEvent> context)
+        {
+            PaymentPendingEvent message = context.Message;
+            PaymentPendingEventPayload? payload = message.Payload;
+
+            if (payload is null)
+            {
+                Log.PaymentPendingEventPayloadMissing(_logger);
+                return;
+            }
+
+            if (!PaymentOutcomeConsumerHelper.IsRoutedToOrderService(message.ConsumedBy))
+            {
+                Log.IgnoringUntargetedPaymentPendingEvent(_logger, payload.OrderId, payload.TransactionId);
+                return;
+            }
+
+            await _orderStatusService.MarkPaymentProcessingAsync(
+                payload.OrderId,
+                payload.TransactionId.ToString(),
+                payload.ProviderName,
+                payload.ProviderEventCode,
+                "System-PaymentService",
+                context.CancellationToken);
+        }
+
+        private static partial class Log
+        {
+            [LoggerMessage(Level = LogLevel.Warning, Message = "PaymentPendingEvent received without payload; skipping")]
+            public static partial void PaymentPendingEventPayloadMissing(ILogger logger);
+
+            [LoggerMessage(Level = LogLevel.Debug, Message = "Ignoring untargeted PaymentPendingEvent for order {OrderId}, transaction {TransactionId}")]
+            public static partial void IgnoringUntargetedPaymentPendingEvent(ILogger logger, string orderId, Guid transactionId);
+        }
+    }
+
+    /// <summary>
     /// Consumer for payment cancellation events that cancel the associated accepted order.
     /// </summary>
     /// <remarks>

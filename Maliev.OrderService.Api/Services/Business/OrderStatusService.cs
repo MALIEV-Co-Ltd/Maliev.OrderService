@@ -119,6 +119,55 @@ namespace Maliev.OrderService.Api.Services.Business
             return newStatus.ToOrderStatusResponse();
         }
 
+        /// <inheritdoc />
+        public async Task MarkPaymentProcessingAsync(
+            string orderId,
+            string paymentId,
+            string providerName,
+            string providerEventCode,
+            string updatedBy,
+            CancellationToken cancellationToken = default)
+        {
+            Order order = await _context.Orders.FindAsync([orderId], cancellationToken)
+                ?? throw new InvalidOperationException($"Order {orderId} not found");
+
+            if (string.Equals(order.PaymentStatus, "Processing", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(order.PaymentId, paymentId, StringComparison.OrdinalIgnoreCase))
+            {
+                Log.PaymentProcessingAlreadyRecorded(_logger, orderId, paymentId);
+                return;
+            }
+
+            string previousPaymentStatus = order.PaymentStatus;
+            string? previousPaymentId = order.PaymentId;
+
+            order.PaymentStatus = "Processing";
+            order.PaymentId = paymentId;
+
+            _ = _context.AuditLogs.Add(new AuditLog
+            {
+                OrderId = orderId,
+                Action = "PaymentProcessingRecorded",
+                PerformedBy = updatedBy,
+                PerformedAt = DateTime.UtcNow,
+                EntityType = "Order",
+                EntityId = orderId,
+                ChangeDetails = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    previousPaymentStatus,
+                    newPaymentStatus = order.PaymentStatus,
+                    previousPaymentId,
+                    newPaymentId = paymentId,
+                    providerName,
+                    providerEventCode
+                })
+            });
+
+            _ = await _context.SaveChangesAsync(cancellationToken);
+
+            Log.PaymentProcessingRecorded(_logger, orderId, paymentId, providerName, providerEventCode);
+        }
+
         private static bool IsValidTransition(OrderStatusValue from, OrderStatusValue to)
         {
             return from != to && from switch
@@ -515,6 +564,12 @@ namespace Maliev.OrderService.Api.Services.Business
 
         private static partial class Log
         {
+            [LoggerMessage(Level = LogLevel.Information, Message = "Payment processing already recorded for order {OrderId}, payment {PaymentId}")]
+            public static partial void PaymentProcessingAlreadyRecorded(ILogger logger, string orderId, string paymentId);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "Recorded payment processing for order {OrderId}, payment {PaymentId}, provider {ProviderName}, event {ProviderEventCode}")]
+            public static partial void PaymentProcessingRecorded(ILogger logger, string orderId, string paymentId, string providerName, string providerEventCode);
+
             [LoggerMessage(Level = LogLevel.Information, Message = "Published status change events for order {OrderId}: {PreviousStatus} → {NewStatus}")]
             public static partial void StatusChangeEventsPublished(ILogger logger, string orderId, string previousStatus, string newStatus);
         }
