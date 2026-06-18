@@ -47,6 +47,7 @@ namespace Maliev.OrderService.Api.Consumers
             try
             {
                 // Update order status to "Paid"
+                string orderIdentifier = ResolveOrderIdentifier(payload);
                 var statusRequest = new CreateOrderStatusRequest
                 {
                     Status = "Paid",
@@ -58,7 +59,7 @@ namespace Maliev.OrderService.Api.Consumers
                 };
 
                 _ = await _orderStatusService.CreateOrderStatusAsync(
-                    payload.OrderNumber,
+                    orderIdentifier,
                     statusRequest,
                     updatedBy: "System-PaymentService",
                     context.CancellationToken);
@@ -67,7 +68,7 @@ namespace Maliev.OrderService.Api.Consumers
             }
             catch (InvalidOperationException ex)
             {
-                if (await IsDuplicatePaidEventAsync(payload, context.CancellationToken))
+                if (await IsDuplicatePaidEventAsync(payload, ResolveOrderIdentifier(payload), context.CancellationToken))
                 {
                     Log.DuplicatePaymentCompletedEventIgnored(_logger, payload.OrderId, payload.PaymentId);
                     return;
@@ -89,12 +90,13 @@ namespace Maliev.OrderService.Api.Consumers
 
         private async Task<bool> IsDuplicatePaidEventAsync(
             PaymentCompletedEventPayload payload,
+            string orderIdentifier,
             CancellationToken cancellationToken)
         {
             List<DTOs.Response.OrderStatusResponse> history;
             try
             {
-                history = await _orderStatusService.GetOrderStatusHistoryAsync(payload.OrderNumber, cancellationToken);
+                history = await _orderStatusService.GetOrderStatusHistoryAsync(orderIdentifier, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -106,6 +108,13 @@ namespace Maliev.OrderService.Api.Consumers
             return history?.Any(status =>
                 string.Equals(status.Status, "Paid", StringComparison.OrdinalIgnoreCase) &&
                 status.InternalNotes?.Contains(paymentId, StringComparison.OrdinalIgnoreCase) == true) == true;
+        }
+
+        private static string ResolveOrderIdentifier(PaymentCompletedEventPayload payload)
+        {
+            return string.IsNullOrWhiteSpace(payload.OrderNumber)
+                ? payload.OrderId.ToString("D")
+                : payload.OrderNumber;
         }
 
         private static bool IsRoutedToOrderService(PaymentCompletedEvent message)

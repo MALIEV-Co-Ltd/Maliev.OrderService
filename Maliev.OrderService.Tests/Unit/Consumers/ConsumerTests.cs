@@ -71,6 +71,55 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
+        public async Task PaymentCompletedEventConsumerWithoutOrderNumberUsesOrderIdFallback()
+        {
+            _ = _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
+            var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
+
+            var orderId = Guid.NewGuid();
+            var paymentId = Guid.NewGuid();
+            var message = new PaymentCompletedEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = new PaymentCompletedEventPayload
+                {
+                    OrderId = orderId,
+                    OrderNumber = "   ",
+                    PaymentId = paymentId,
+                    Amount = 100,
+                    Currency = "USD"
+                }
+            };
+            _ = contextMock.Setup(c => c.Message).Returns(message);
+            _ = contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                    orderId.ToString(),
+                    It.IsAny<CreateOrderStatusRequest>(),
+                    "System-PaymentService",
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderStatusResponse
+                {
+                    StatusId = 1,
+                    OrderId = orderId.ToString(),
+                    Status = "Paid",
+                    UpdatedBy = "System-PaymentService",
+                    Timestamp = DateTime.UtcNow
+                });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                orderId.ToString(),
+                It.Is<CreateOrderStatusRequest>(r =>
+                    r.Status == "Paid" &&
+                    r.PaymentId == paymentId.ToString()),
+                "System-PaymentService",
+                CancellationToken.None), Times.Once);
+        }
+
+        [Fact]
         public async Task PaymentCompletedEventConsumerErrorThrows()
         {
             // Arrange
@@ -143,6 +192,61 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
             await consumer.Consume(contextMock.Object);
 
             // Assert
+            _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(
+                orderId.ToString(),
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task PaymentCompletedEventConsumerDuplicatePaidFallbackUsesOrderIdForHistoryLookup()
+        {
+            _ = _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Information)).Returns(true);
+            _ = _paymentLoggerMock.Setup(x => x.IsEnabled(LogLevel.Warning)).Returns(true);
+            var consumer = new PaymentCompletedEventConsumer(_statusServiceMock.Object, _paymentLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<PaymentCompletedEvent>>();
+
+            var orderId = Guid.NewGuid();
+            var paymentId = Guid.NewGuid();
+            var message = new PaymentCompletedEvent
+            {
+                ConsumedBy = ["OrderService"],
+                Payload = new PaymentCompletedEventPayload
+                {
+                    OrderId = orderId,
+                    OrderNumber = "",
+                    PaymentId = paymentId,
+                    Amount = 100,
+                    Currency = "USD"
+                }
+            };
+            _ = contextMock.Setup(c => c.Message).Returns(message);
+            _ = contextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+
+            _ = _statusServiceMock.Setup(s => s.CreateOrderStatusAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<CreateOrderStatusRequest>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Invalid transition from Paid to Paid"));
+
+            _ = _statusServiceMock.Setup(s => s.GetOrderStatusHistoryAsync(
+                    orderId.ToString(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(
+                [
+                    new()
+                    {
+                        StatusId = 12,
+                        OrderId = orderId.ToString(),
+                        Status = "Paid",
+                        InternalNotes = $"Payment {paymentId} completed - Amount: 100 USD",
+                        UpdatedBy = "System-PaymentService",
+                        Timestamp = DateTime.UtcNow
+                    }
+                ]);
+
+            await consumer.Consume(contextMock.Object);
+
             _statusServiceMock.Verify(s => s.GetOrderStatusHistoryAsync(
                 orderId.ToString(),
                 It.IsAny<CancellationToken>()), Times.Once);
