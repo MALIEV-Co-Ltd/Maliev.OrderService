@@ -67,7 +67,7 @@ namespace Maliev.OrderService.Api.Consumers
                     {
                         Status = "Finished",
                         InternalNotes = $"All production jobs completed after job {payload.JobId} completed.",
-                        CustomerNotes = "Production completed; order is ready for quality review."
+                        CustomerNotes = "Production completed; QC release is required before shipping."
                     },
                     updatedBy: "System-JobService",
                     context.CancellationToken);

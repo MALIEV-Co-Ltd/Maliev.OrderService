@@ -630,7 +630,7 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
-        public async Task JobStatusChangedEventConsumerCompletedStatusUpdatesOrderToFinished()
+        public async Task JobStatusChangedEventConsumerCompletedStatusMovesOrderToQcGateBeforeShipping()
         {
             var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
             var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
@@ -674,8 +674,13 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
                 orderNumber,
                 It.Is<CreateOrderStatusRequest>(r =>
                     r.Status == "Finished" &&
+                    r.Status != "QualityReleased" &&
+                    r.Status != "Shipped" &&
                     r.InternalNotes != null &&
-                    r.InternalNotes.Contains(jobId.ToString(), StringComparison.Ordinal)),
+                    r.InternalNotes.Contains(jobId.ToString(), StringComparison.Ordinal) &&
+                    r.CustomerNotes != null &&
+                    r.CustomerNotes.Contains("QC release", StringComparison.OrdinalIgnoreCase) &&
+                    r.CustomerNotes.Contains("shipping", StringComparison.OrdinalIgnoreCase)),
                 "System-JobService",
                 It.IsAny<CancellationToken>()), Times.Once);
         }
