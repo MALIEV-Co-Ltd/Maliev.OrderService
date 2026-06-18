@@ -632,6 +632,37 @@ namespace Maliev.OrderService.Tests.Unit.Consumers
         }
 
         [Fact]
+        public async Task JobStatusChangedEventConsumerWithoutRoutingListIsIgnored()
+        {
+            var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);
+            var contextMock = new Mock<ConsumeContext<JobStatusChangedEvent>>();
+
+            _ = contextMock.Setup(c => c.Message).Returns(new JobStatusChangedEvent
+            {
+                ConsumedBy = null!,
+                Payload = new JobStatusChangedEventPayload
+                {
+                    JobId = Guid.NewGuid(),
+                    OrderId = Guid.NewGuid(),
+                    OrderNumber = "ORD-2026-NULL-ROUTE",
+                    PreviousStatus = "Finishing",
+                    NewStatus = "Completed",
+                    Technology = "FDM",
+                    ChangedAt = DateTimeOffset.UtcNow,
+                    ChangedBy = "scanner-operator"
+                }
+            });
+
+            await consumer.Consume(contextMock.Object);
+
+            _statusServiceMock.Verify(s => s.CreateOrderStatusAsync(
+                It.IsAny<string>(),
+                It.IsAny<CreateOrderStatusRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
         public async Task JobStatusChangedEventConsumerInProgressStatusUpdatesOrderToInProgress()
         {
             var consumer = new JobStatusChangedEventConsumer(_statusServiceMock.Object, _jobStatusLoggerMock.Object);

@@ -144,8 +144,8 @@ namespace Maliev.OrderService.Api.Consumers
 
         private static bool IsRoutedToOrderService(JobStatusChangedEvent message)
         {
-            return message.ConsumedBy.Any(consumer =>
-                string.Equals(consumer, "OrderService", StringComparison.OrdinalIgnoreCase));
+            return message.ConsumedBy?.Any(consumer =>
+                string.Equals(consumer, "OrderService", StringComparison.OrdinalIgnoreCase)) == true;
         }
 
         private static partial class Log
