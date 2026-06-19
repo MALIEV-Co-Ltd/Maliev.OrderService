@@ -53,9 +53,10 @@ namespace Maliev.OrderService.Tests.Integration
             var sourceProjectId = Guid.NewGuid();
             var sourceProjectPartId = Guid.NewGuid();
             var materialId = Guid.NewGuid();
+            var customerId = Guid.NewGuid();
             var createRequest = new CreateOrderRequest
             {
-                CustomerId = "CUST-001",
+                CustomerId = customerId.ToString("D"),
                 CustomerType = "Customer",
                 ServiceCategoryId = 1,
                 ProcessTypeId = 1,
@@ -102,6 +103,7 @@ namespace Maliev.OrderService.Tests.Integration
                 Assert.Equal(MessageType.Event, @event.MessageType);
                 Assert.NotNull(@event.Payload);
                 Assert.NotEqual(Guid.Empty, @event.Payload.OrderId);
+                Assert.Equal(customerId, @event.Payload.CustomerId);
                 Assert.Contains("ORD-", @event.Payload.OrderNumber);
                 Assert.Equal("THB", @event.Payload.Currency);
                 Assert.Contains("ProjectService", @event.ConsumedBy);

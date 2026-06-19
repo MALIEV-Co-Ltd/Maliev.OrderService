@@ -322,11 +322,16 @@ namespace Maliev.OrderService.Api.Services.Business
         }
 
         /// <summary>
-        /// Converts a string ID to a deterministic Guid using MD5 hashing
+        /// Converts a string ID to a stable Guid, preserving GUID strings when supplied.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5351:Do Not Use Broken Cryptographic Algorithms", Justification = "MD5 is used for deterministic hashing, not cryptography")]
         private static Guid StringToGuid(string value)
         {
+            if (Guid.TryParse(value, out Guid parsedGuid))
+            {
+                return parsedGuid;
+            }
+
             byte[] hash = MD5.HashData(System.Text.Encoding.UTF8.GetBytes(value));
             return new Guid(hash);
         }
