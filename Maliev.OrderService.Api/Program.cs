@@ -51,6 +51,7 @@ try
         {
             rabbitMq.ReceiveEndpoint("order-payment-outcomes", endpoint =>
             {
+                endpoint.UseMessageRetry(retry => retry.Interval(5, TimeSpan.FromSeconds(2)));
                 endpoint.ConfigureConsumer<PaymentCompletedEventConsumer>(context);
                 endpoint.ConfigureConsumer<PaymentPendingEventConsumer>(context);
                 endpoint.ConfigureConsumer<PaymentCancelledEventConsumer>(context);
