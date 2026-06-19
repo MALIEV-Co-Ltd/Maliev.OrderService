@@ -83,7 +83,9 @@ try
     _ = builder.AddServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService");
     _ = builder.AddServiceClient<IMaterialServiceClient, MaterialServiceClient>("MaterialService");
     _ = builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
-    _ = builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadService");
+    _ = builder.AddAuthenticatedServiceClient<IUploadServiceClient, UploadServiceClient>(
+        "UploadService",
+        sourceServiceName: "order");
     _ = builder.AddServiceClient<IAuthServiceClient, AuthServiceClient>("AuthService");
     _ = builder.AddServiceClient<IEmployeeServiceClient, EmployeeServiceClient>("EmployeeService");
     _ = builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");

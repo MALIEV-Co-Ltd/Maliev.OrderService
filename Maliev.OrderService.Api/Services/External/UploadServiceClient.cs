@@ -18,46 +18,27 @@ namespace Maliev.OrderService.Api.Services.External
         {
             try
             {
-                if (!fileStream.CanSeek)
-                {
-                    throw new InvalidOperationException("Direct GCS uploads require a seekable stream.");
-                }
-
-                var initiateRequest = new InitiateResumableUploadRequest(
-                    Path: objectPath,
-                    FileName: Path.GetFileName(objectPath),
-                    ServiceName: "OrderService",
+                using var memoryStream = new MemoryStream();
+                await fileStream.CopyToAsync(memoryStream, cancellationToken);
+                var artifactRequest = new UploadArtifactRequest(
+                    ArtifactId: Guid.NewGuid(),
+                    ParentUploadId: Guid.NewGuid(),
+                    StoragePath: objectPath,
                     ContentType: contentType,
-                    TotalSize: fileStream.Length,
-                    Overwrite: true);
-
-                HttpResponseMessage initiateResponse = await _httpClient.PostAsJsonAsync(
-                    "/upload/v1/uploads/resumable",
-                    initiateRequest,
-                    cancellationToken);
-                _ = initiateResponse.EnsureSuccessStatusCode();
-
-                InitiateResumableUploadResponse session = await initiateResponse.Content
-                    .ReadFromJsonAsync<InitiateResumableUploadResponse>(cancellationToken: cancellationToken)
-                    ?? throw new InvalidOperationException("Upload service returned null resumable session");
-
-                fileStream.Position = 0;
-                using var gcsClient = new HttpClient();
-                using var streamContent = new StreamContent(fileStream);
-                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-                streamContent.Headers.ContentLength = fileStream.Length;
-                streamContent.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(0, fileStream.Length - 1, fileStream.Length);
-
-                HttpResponseMessage gcsResponse = await gcsClient.PutAsync(session.SessionUri, streamContent, cancellationToken);
-                _ = gcsResponse.EnsureSuccessStatusCode();
+                    ArtifactData: Convert.ToBase64String(memoryStream.ToArray()));
 
                 HttpResponseMessage response = await _httpClient.PostAsJsonAsync(
-                    $"/upload/v1/uploads/resumable/{session.UploadId}/complete",
-                    new { },
+                    "/upload/v1/uploads/artifacts",
+                    artifactRequest,
                     cancellationToken);
-                _ = response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                    throw new InvalidOperationException(
+                        $"UploadService artifact upload failed with HTTP {(int)response.StatusCode}: {body}");
+                }
 
-                UploadServiceResponse? result = await response.Content.ReadFromJsonAsync<UploadServiceResponse>(cancellationToken: cancellationToken);
+                ArtifactUploadResponse? result = await response.Content.ReadFromJsonAsync<ArtifactUploadResponse>(cancellationToken: cancellationToken);
                 if (result == null)
                 {
                     throw new InvalidOperationException("Upload service returned null result");
@@ -66,9 +47,9 @@ namespace Maliev.OrderService.Api.Services.External
                 return new UploadFileResult
                 {
                     ObjectPath = result.StoragePath,
-                    FileSizeBytes = result.FileSize,
-                    ContentType = result.ContentType,
-                    UploadedAt = result.UploadedAt
+                    FileSizeBytes = memoryStream.Length,
+                    ContentType = contentType,
+                    UploadedAt = DateTime.UtcNow
                 };
             }
             catch (HttpRequestException ex)
@@ -123,24 +104,16 @@ namespace Maliev.OrderService.Api.Services.External
             public static partial void FailedToDeleteFile(ILogger logger, string objectPath, Exception ex);
         }
 
-        private sealed record InitiateResumableUploadRequest(
-            string Path,
-            string FileName,
-            string ServiceName,
-            string ContentType,
-            long TotalSize,
-            bool Overwrite);
-
-        private sealed record InitiateResumableUploadResponse(
-            string UploadId,
-            string SessionUri,
-            DateTime ExpiresAt,
-            long TotalSize);
-
-        private sealed record UploadServiceResponse(
+        private sealed record UploadArtifactRequest(
+            Guid ArtifactId,
+            Guid ParentUploadId,
             string StoragePath,
-            long FileSize,
             string ContentType,
-            DateTime UploadedAt);
+            string ArtifactData);
+
+        private sealed record ArtifactUploadResponse(
+            Guid ArtifactId,
+            string StoragePath,
+            string DownloadUrl);
     }
 }

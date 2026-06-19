@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Net.Sockets;
-using System.Text;
+using System.Text.Json;
 using Maliev.OrderService.Api.Services.External;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -254,11 +253,7 @@ namespace Maliev.OrderService.Tests.Unit.Services
         {
             // Arrange
             var expected = new UploadFileResult { ObjectPath = "path/to/file", FileSizeBytes = 10, ContentType = "application/pdf", UploadedAt = DateTime.UtcNow };
-            using var uploadSink = new TcpListener(IPAddress.Loopback, 0);
-            uploadSink.Start();
-            var uploadPort = ((IPEndPoint)uploadSink.LocalEndpoint).Port;
-            var sessionUri = new Uri($"http://127.0.0.1:{uploadPort}/resumable-session");
-            var uploadSinkTask = AcceptSuccessfulPutAsync(uploadSink);
+            JsonDocument? capturedRequest = null;
 
             var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
             handlerMock
@@ -267,37 +262,21 @@ namespace Maliev.OrderService.Tests.Unit.Services
                    "SendAsync",
                    ItExpr.Is<HttpRequestMessage>(request =>
                        request.Method == HttpMethod.Post &&
-                       request.RequestUri!.AbsolutePath == "/upload/v1/uploads/resumable"),
+                       request.RequestUri!.AbsolutePath == "/upload/v1/uploads/artifacts"),
                    ItExpr.IsAny<CancellationToken>())
-               .ReturnsAsync(new HttpResponseMessage
+               .ReturnsAsync((HttpRequestMessage request, CancellationToken _) =>
                {
-                   StatusCode = HttpStatusCode.OK,
-                   Content = JsonContent.Create(new
+                   capturedRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync(CancellationToken.None).GetAwaiter().GetResult());
+                   return new HttpResponseMessage
                    {
-                       uploadId = "upload-1",
-                       sessionUri = sessionUri.ToString(),
-                       expiresAt = DateTime.UtcNow.AddMinutes(15),
-                       totalSize = 3
-                   })
-               });
-            handlerMock
-               .Protected()
-               .Setup<Task<HttpResponseMessage>>(
-                   "SendAsync",
-                   ItExpr.Is<HttpRequestMessage>(request =>
-                       request.Method == HttpMethod.Post &&
-                       request.RequestUri!.AbsolutePath == "/upload/v1/uploads/resumable/upload-1/complete"),
-                   ItExpr.IsAny<CancellationToken>())
-               .ReturnsAsync(new HttpResponseMessage
-               {
-                   StatusCode = HttpStatusCode.OK,
-                   Content = JsonContent.Create(new
-                   {
-                       storagePath = expected.ObjectPath,
-                       fileSize = expected.FileSizeBytes,
-                       contentType = expected.ContentType,
-                       uploadedAt = expected.UploadedAt
-                   })
+                       StatusCode = HttpStatusCode.OK,
+                       Content = JsonContent.Create(new
+                       {
+                           artifactId = Guid.NewGuid(),
+                           storagePath = expected.ObjectPath,
+                           downloadUrl = "https://upload.example.test/download/path"
+                       })
+                   };
                });
 
             var httpClient = new HttpClient(handlerMock.Object) { BaseAddress = new Uri("http://upload-service") };
@@ -306,27 +285,16 @@ namespace Maliev.OrderService.Tests.Unit.Services
             // Act
             using var stream = new MemoryStream(new byte[] { 1, 2, 3 });
             var result = await client.UploadFileAsync("path/to/file", stream, "application/pdf");
-            await uploadSinkTask.WaitAsync(TimeSpan.FromSeconds(5));
 
             // Assert
+            Assert.NotNull(capturedRequest);
+            var capturedRoot = capturedRequest.RootElement;
+            Assert.Equal("path/to/file", capturedRoot.GetProperty("storagePath").GetString());
+            Assert.Equal("application/pdf", capturedRoot.GetProperty("contentType").GetString());
+            Assert.Equal(Convert.ToBase64String(new byte[] { 1, 2, 3 }), capturedRoot.GetProperty("artifactData").GetString());
             Assert.Equal(expected.ObjectPath, result.ObjectPath);
-        }
-
-        private static async Task AcceptSuccessfulPutAsync(TcpListener listener)
-        {
-            using var client = await listener.AcceptTcpClientAsync();
-            await using var stream = client.GetStream();
-            using var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
-
-            string? requestLine = await reader.ReadLineAsync();
-            Assert.StartsWith("PUT /resumable-session HTTP/", requestLine);
-
-            while (!string.IsNullOrEmpty(await reader.ReadLineAsync()))
-            {
-            }
-
-            byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-            await stream.WriteAsync(response);
+            Assert.Equal(3, result.FileSizeBytes);
+            Assert.Equal(expected.ContentType, result.ContentType);
         }
     }
 }
