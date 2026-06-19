@@ -30,6 +30,8 @@ namespace Maliev.OrderService.Api.Services.Business
         private readonly IOrderAuthorizationService _authService = authService;
         private readonly ILogger<OrderManagementService> _logger = logger;
         private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
+        private static readonly System.Text.Json.JsonSerializerOptions _productionItemJsonOptions =
+            new(System.Text.Json.JsonSerializerDefaults.Web);
 
         /// <inheritdoc />
         public async Task<OrderResponse?> GetOrderByIdAsync(string orderId, CancellationToken cancellationToken = default)
@@ -117,16 +119,7 @@ namespace Maliev.OrderService.Api.Services.Business
                     Currency: order.QuoteCurrency ?? "THB",
                     CreatedAt: new DateTimeOffset(order.CreatedAt, TimeSpan.Zero),
                     AssignedEmployeeId: order.AssignedEmployeeId != null ? StringToGuid(order.AssignedEmployeeId) : null,
-                    Items: [
-                        new OrderCreatedEventPayloadItemsItem(
-                            ProductId: order.MaterialId.HasValue ? StringToGuid(order.MaterialId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) : Guid.Empty,
-                            ProductCode: order.MaterialName ?? "Unknown",
-                            ProductName: order.MaterialName ?? "Unknown",
-                            Quantity: order.OrderedQuantity ?? 1,
-                            UnitPrice: (double)((order.QuotedAmount ?? 0) / (order.OrderedQuantity ?? 1)),
-                            LineTotal: (double)(order.QuotedAmount ?? 0)
-                        )
-                    ]
+                    Items: BuildOrderCreatedItems(order)
                 )
             ), cancellationToken);
 
@@ -327,7 +320,61 @@ namespace Maliev.OrderService.Api.Services.Business
             return new Guid(hash);
         }
 
-        private static readonly List<string> _orderCreatedConsumers = ["InvoiceService", "NotificationService"];
+        private static IReadOnlyList<OrderCreatedEventPayloadItemsItem> BuildOrderCreatedItems(Order order)
+        {
+            if (!string.IsNullOrWhiteSpace(order.ProductionItemsJson))
+            {
+                List<CreateOrderProductionItemRequest>? productionItems = System.Text.Json.JsonSerializer.Deserialize<List<CreateOrderProductionItemRequest>>(
+                    order.ProductionItemsJson,
+                    _productionItemJsonOptions);
+                if (productionItems is { Count: > 0 })
+                {
+                    return productionItems.Select((item, index) =>
+                    {
+                        var quantity = Math.Max(1, item.Quantity);
+                        var lineTotal = CalculateLineTotal(order, quantity, productionItems.Count);
+                        return new OrderCreatedEventPayloadItemsItem(
+                            ProductId: StringToGuid($"order-item:{order.OrderId}:{item.SourceProjectPartId?.ToString("D") ?? index.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
+                            ProductCode: item.MaterialId.ToString("D"),
+                            ProductName: item.Technology,
+                            SourceProjectId: item.SourceProjectId,
+                            SourceProjectPartId: item.SourceProjectPartId,
+                            Quantity: quantity,
+                            UnitPrice: lineTotal / quantity,
+                            LineTotal: lineTotal);
+                    }).ToArray();
+                }
+            }
+
+            var fallbackQuantity = Math.Max(1, order.OrderedQuantity ?? 1);
+            var fallbackLineTotal = (double)(order.QuotedAmount ?? 0);
+            return
+            [
+                new OrderCreatedEventPayloadItemsItem(
+                    ProductId: order.MaterialId.HasValue ? StringToGuid(order.MaterialId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) : Guid.Empty,
+                    ProductCode: order.MaterialName ?? "Unknown",
+                    ProductName: order.MaterialName ?? "Unknown",
+                    SourceProjectId: null,
+                    SourceProjectPartId: null,
+                    Quantity: fallbackQuantity,
+                    UnitPrice: fallbackLineTotal / fallbackQuantity,
+                    LineTotal: fallbackLineTotal)
+            ];
+        }
+
+        private static double CalculateLineTotal(Order order, int itemQuantity, int itemCount)
+        {
+            var total = (double)(order.QuotedAmount ?? 0);
+            if (total <= 0)
+            {
+                return 0;
+            }
+
+            var orderedQuantity = Math.Max(1, order.OrderedQuantity ?? itemQuantity);
+            return Math.Round(total * itemQuantity / orderedQuantity, 2);
+        }
+
+        private static readonly List<string> _orderCreatedConsumers = ["InvoiceService", "NotificationService", "ProjectService"];
         private static readonly List<string> _outsourcingChangedConsumers = ["JobService", "NotificationService"];
 
         private static partial class Log

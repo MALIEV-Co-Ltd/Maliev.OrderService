@@ -50,6 +50,9 @@ namespace Maliev.OrderService.Tests.Integration
         public async Task CreateOrderShouldPublishOrderCreatedEvent()
         {
             // Arrange
+            var sourceProjectId = Guid.NewGuid();
+            var sourceProjectPartId = Guid.NewGuid();
+            var materialId = Guid.NewGuid();
             var createRequest = new CreateOrderRequest
             {
                 CustomerId = "CUST-001",
@@ -57,7 +60,22 @@ namespace Maliev.OrderService.Tests.Integration
                 ServiceCategoryId = 1,
                 ProcessTypeId = 1,
                 OrderedQuantity = 10,
-                Requirements = "Test order for event publishing"
+                Requirements = "Test order for event publishing",
+                QuotedAmount = 1000m,
+                QuoteCurrency = "THB",
+                ProductionItems =
+                [
+                    new CreateOrderProductionItemRequest
+                    {
+                        SourceProjectId = sourceProjectId,
+                        SourceProjectPartId = sourceProjectPartId,
+                        MaterialId = materialId,
+                        MaterialSnapshotJson = "{}",
+                        ConfigurationSnapshotJson = "{}",
+                        Technology = "FDM",
+                        Quantity = 10
+                    }
+                ]
             };
 
             // Get the test harness
@@ -86,6 +104,13 @@ namespace Maliev.OrderService.Tests.Integration
                 Assert.NotEqual(Guid.Empty, @event.Payload.OrderId);
                 Assert.Contains("ORD-", @event.Payload.OrderNumber);
                 Assert.Equal("THB", @event.Payload.Currency);
+                Assert.Contains("ProjectService", @event.ConsumedBy);
+                var item = Assert.Single(@event.Payload.Items);
+                Assert.Equal(sourceProjectId, item.SourceProjectId);
+                Assert.Equal(sourceProjectPartId, item.SourceProjectPartId);
+                Assert.NotEqual(Guid.Empty, item.ProductId);
+                Assert.Equal(10, item.Quantity);
+                Assert.Equal(1000, item.LineTotal);
             }
             finally
             {
