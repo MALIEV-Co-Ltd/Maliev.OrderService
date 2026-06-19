@@ -404,6 +404,29 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
+        public async Task GetOrdersSearchByOrderNumberReturnsMatchingOrder()
+        {
+            var createRequest = new
+            {
+                customerId = "CUST-SEARCH-ORDER",
+                customerType = "Customer",
+                serviceCategoryId = 1
+            };
+
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string orderId = createdOrder.GetProperty("orderId").GetString()!;
+
+            HttpResponseMessage response = await _client.GetAsync($"/order/v1/orders?search={Uri.EscapeDataString(orderId)}");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            JsonElement list = await response.Content.ReadFromJsonAsync<JsonElement>();
+            JsonElement item = Assert.Single(list.GetProperty("items").EnumerateArray());
+            Assert.Equal(orderId, item.GetProperty("orderId").GetString());
+        }
+
+        [Fact]
         public async Task GetOrdersFilteredByStatus()
         {
             // Create an order

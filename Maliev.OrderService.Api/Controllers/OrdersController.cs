@@ -62,6 +62,7 @@ namespace Maliev.OrderService.Api.Controllers
         /// <param name="pageSize">The number of items per page (default: 20)</param>
         /// <param name="customerId">Optional filter by customer ID</param>
         /// <param name="status">Optional filter by order status</param>
+        /// <param name="search">Optional free-text filter by order number or customer fields.</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>A paginated list of orders</returns>
         [HttpGet]
@@ -71,9 +72,10 @@ namespace Maliev.OrderService.Api.Controllers
             [FromQuery, Range(1, 100)] int pageSize = 20,
             [FromQuery] string? customerId = null,
             [FromQuery] string? status = null,
+            [FromQuery] string? search = null,
             CancellationToken cancellationToken = default)
         {
-            PaginatedResponse<OrderResponse> result = await _orderService.GetOrdersAsync(page, pageSize, User, customerId, status, cancellationToken);
+            PaginatedResponse<OrderResponse> result = await _orderService.GetOrdersAsync(page, pageSize, User, customerId, status, search, cancellationToken);
             return Ok(result);
         }
 

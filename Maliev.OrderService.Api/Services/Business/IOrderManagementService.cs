@@ -25,9 +25,10 @@ namespace Maliev.OrderService.Api.Services.Business
         /// <param name="user">The user requesting the list (for authorization)</param>
         /// <param name="customerId">Optional customer ID filter</param>
         /// <param name="status">Optional status filter</param>
+        /// <param name="search">Optional free-text search filter for order number or customer fields.</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Paginated list of orders</returns>
-        Task<PaginatedResponse<OrderResponse>> GetOrdersAsync(int page, int pageSize, System.Security.Claims.ClaimsPrincipal user, string? customerId = null, string? status = null, CancellationToken cancellationToken = default);
+        Task<PaginatedResponse<OrderResponse>> GetOrdersAsync(int page, int pageSize, System.Security.Claims.ClaimsPrincipal user, string? customerId = null, string? status = null, string? search = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Creates a new order

@@ -57,6 +57,7 @@ namespace Maliev.OrderService.Api.Services.Business
             System.Security.Claims.ClaimsPrincipal user,
             string? customerId = null,
             string? status = null,
+            string? search = null,
             CancellationToken cancellationToken = default)
         {
             IQueryable<Order> query = _context.Orders
@@ -76,6 +77,16 @@ namespace Maliev.OrderService.Api.Services.Business
             if (!string.IsNullOrEmpty(status))
             {
                 query = query.Where(o => o.OrderStatuses.OrderByDescending(s => s.Timestamp).Select(s => s.Status).FirstOrDefault() == status);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                string term = search.Trim();
+                query = query.Where(o =>
+                    o.OrderId.Contains(term) ||
+                    (o.CustomerId != null && o.CustomerId.Contains(term)) ||
+                    (o.BillingCompanyName != null && o.BillingCompanyName.Contains(term)) ||
+                    (o.DeliveryContactName != null && o.DeliveryContactName.Contains(term)));
             }
 
             int totalCount = await query.CountAsync(cancellationToken);
