@@ -29,23 +29,37 @@ try
     _ = builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
 
     _ = builder.AddStandardCache("order:"); // Redis + in-memory fallback, memory-optimized
-    _ = builder.AddMassTransitWithRabbitMq(cfg =>
-    {
-        cfg.AddEntityFrameworkOutbox<OrderDbContext>(options =>
+    _ = builder.AddMassTransitWithRabbitMq(
+        cfg =>
         {
-            _ = options.UsePostgres();
-            options.UseBusOutbox();
-        });
+            cfg.AddEntityFrameworkOutbox<OrderDbContext>(options =>
+            {
+                _ = options.UsePostgres();
+                options.UseBusOutbox();
+            });
 
-        _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
-        _ = cfg.AddConsumer<PaymentPendingEventConsumer>();
-        _ = cfg.AddConsumer<PaymentCancelledEventConsumer>();
-        _ = cfg.AddConsumer<PaymentFailedEventConsumer>();
-        _ = cfg.AddConsumer<PaymentExpiredEventConsumer>();
-        _ = cfg.AddConsumer<FileDeletedEventConsumer>();
-        _ = cfg.AddConsumer<PreviewImagesGeneratedEventConsumer>();
-        _ = cfg.AddConsumer<JobStatusChangedEventConsumer>();
-    }); // RabbitMQ message bus with consumers
+            _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
+            _ = cfg.AddConsumer<PaymentPendingEventConsumer>();
+            _ = cfg.AddConsumer<PaymentCancelledEventConsumer>();
+            _ = cfg.AddConsumer<PaymentFailedEventConsumer>();
+            _ = cfg.AddConsumer<PaymentExpiredEventConsumer>();
+            _ = cfg.AddConsumer<FileDeletedEventConsumer>();
+            _ = cfg.AddConsumer<PreviewImagesGeneratedEventConsumer>();
+            _ = cfg.AddConsumer<JobStatusChangedEventConsumer>();
+        },
+        configureRabbitMq: (context, rabbitMq) =>
+        {
+            rabbitMq.ReceiveEndpoint("order-payment-outcomes", endpoint =>
+            {
+                endpoint.ConfigureConsumer<PaymentCompletedEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentPendingEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentCancelledEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentFailedEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentExpiredEventConsumer>(context);
+            });
+
+            rabbitMq.ConfigureEndpoints(context);
+        }); // RabbitMQ message bus with consumers
     _ = builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
     // --- API Configuration ---
