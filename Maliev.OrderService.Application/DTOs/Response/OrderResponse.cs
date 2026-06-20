@@ -77,6 +77,18 @@ namespace Maliev.OrderService.Application.DTOs.Response
         /// <summary>Gets or sets the quote currency code.</summary>
         public string? QuoteCurrency { get; set; }
 
+        /// <summary>Gets or sets the formal quotation identifier accepted for this order.</summary>
+        public Guid? QuoteId { get; set; }
+
+        /// <summary>Gets or sets the formal quotation number accepted for this order.</summary>
+        public string? QuoteNumber { get; set; }
+
+        /// <summary>Gets or sets the immutable quotation version identifier accepted for this order.</summary>
+        public Guid? QuoteVersionId { get; set; }
+
+        /// <summary>Gets or sets the immutable quotation version number accepted for this order.</summary>
+        public int? QuoteVersionNumber { get; set; }
+
         /// <summary>Gets or sets the customer purchase order number.</summary>
         public string? CustomerPoNumber { get; set; }
 

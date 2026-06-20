@@ -69,6 +69,18 @@ namespace Maliev.OrderService.Domain.Entities
         /// <summary>Gets or sets the quote currency code.</summary>
         public string? QuoteCurrency { get; set; } = "THB";
 
+        /// <summary>Gets or sets the formal quotation identifier accepted for this order.</summary>
+        public Guid? QuoteId { get; set; }
+
+        /// <summary>Gets or sets the formal quotation number accepted for this order.</summary>
+        public string? QuoteNumber { get; set; }
+
+        /// <summary>Gets or sets the immutable quotation version identifier accepted for this order.</summary>
+        public Guid? QuoteVersionId { get; set; }
+
+        /// <summary>Gets or sets the immutable quotation version number accepted for this order.</summary>
+        public int? QuoteVersionNumber { get; set; }
+
         // Confidentiality (Auto-set based on NDA)
         /// <summary>Gets or sets a value indicating whether this order is confidential.</summary>
         public bool IsConfidential { get; set; }

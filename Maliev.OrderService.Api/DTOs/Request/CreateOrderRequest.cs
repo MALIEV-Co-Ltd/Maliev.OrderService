@@ -78,6 +78,20 @@ namespace Maliev.OrderService.Api.DTOs.Request
         [StringLength(3, MinimumLength = 3)]
         public string? QuoteCurrency { get; set; }
 
+        /// <summary>Gets or sets the formal quotation identifier accepted for this order.</summary>
+        public Guid? QuoteId { get; set; }
+
+        /// <summary>Gets or sets the formal quotation number accepted for this order.</summary>
+        [MaxLength(80)]
+        public string? QuoteNumber { get; set; }
+
+        /// <summary>Gets or sets the immutable quotation version identifier accepted for this order.</summary>
+        public Guid? QuoteVersionId { get; set; }
+
+        /// <summary>Gets or sets the immutable quotation version number accepted for this order.</summary>
+        [Range(1, int.MaxValue)]
+        public int? QuoteVersionNumber { get; set; }
+
         /// <summary>Gets or sets the selected billing address ID</summary>
         public Guid? BillingAddressId { get; set; }
 

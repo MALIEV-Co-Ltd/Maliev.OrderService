@@ -36,6 +36,10 @@ namespace Maliev.OrderService.Infrastructure.Persistence.Configurations
 
             _ = builder.Property(o => o.QuotedAmount).HasColumnName("quoted_amount").HasColumnType("decimal(10,2)");
             _ = builder.Property(o => o.QuoteCurrency).HasColumnName("quote_currency").HasMaxLength(10).HasDefaultValue("THB");
+            _ = builder.Property(o => o.QuoteId).HasColumnName("quote_id");
+            _ = builder.Property(o => o.QuoteNumber).HasColumnName("quote_number").HasMaxLength(80);
+            _ = builder.Property(o => o.QuoteVersionId).HasColumnName("quote_version_id");
+            _ = builder.Property(o => o.QuoteVersionNumber).HasColumnName("quote_version_number");
 
             _ = builder.Property(o => o.IsConfidential).HasColumnName("is_confidential").HasDefaultValue(false);
 

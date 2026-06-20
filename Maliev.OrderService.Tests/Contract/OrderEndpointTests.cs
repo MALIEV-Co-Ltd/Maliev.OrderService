@@ -67,6 +67,43 @@ namespace Maliev.OrderService.Tests.Contract
         }
 
         [Fact]
+        public async Task PostOrdersPersistsAcceptedQuoteVersionReference()
+        {
+            Guid quoteId = Guid.NewGuid();
+            Guid quoteVersionId = Guid.NewGuid();
+            var createRequest = new
+            {
+                customerId = "CUST-QUOTE-VERSION",
+                customerType = "Customer",
+                serviceCategoryId = 1,
+                quoteId,
+                quoteNumber = "QT-2026-00042",
+                quoteVersionId,
+                quoteVersionNumber = 3,
+                quotedAmount = 4200.50m,
+                quoteCurrency = "THB"
+            };
+
+            HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/order/v1/orders", createRequest);
+            Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+            JsonElement createdOrder = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            string orderId = createdOrder.GetProperty("orderId").GetString()!;
+            Assert.Equal(quoteId, createdOrder.GetProperty("quoteId").GetGuid());
+            Assert.Equal("QT-2026-00042", createdOrder.GetProperty("quoteNumber").GetString());
+            Assert.Equal(quoteVersionId, createdOrder.GetProperty("quoteVersionId").GetGuid());
+            Assert.Equal(3, createdOrder.GetProperty("quoteVersionNumber").GetInt32());
+
+            HttpResponseMessage detailResponse = await _client.GetAsync($"/order/v1/orders/{orderId}");
+            Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+            JsonElement detail = await detailResponse.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(quoteId, detail.GetProperty("quoteId").GetGuid());
+            Assert.Equal("QT-2026-00042", detail.GetProperty("quoteNumber").GetString());
+            Assert.Equal(quoteVersionId, detail.GetProperty("quoteVersionId").GetGuid());
+            Assert.Equal(3, detail.GetProperty("quoteVersionNumber").GetInt32());
+        }
+
+        [Fact]
         public async Task PostOrdersCreatesOrderWithDeliverySnapshot()
         {
             var shippingAddressId = Guid.NewGuid();
