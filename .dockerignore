@@ -13,6 +13,9 @@
 **/*.nupkg
 **/*.snupkg
 **/packages/
+!.ci-packages/*.nupkg
+.ci-sources/
+.ci-nuget/
 
 # IDE and editor files
 **/.idea/

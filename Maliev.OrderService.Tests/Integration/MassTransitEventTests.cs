@@ -90,12 +90,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-                // Verify OrderCreatedEvent was published
-                Assert.True(await harness.Published.Any<OrderCreatedEvent>(), "OrderCreatedEvent should be published");
-
-                // Get the published message
-                IPublishedMessage<OrderCreatedEvent>? publishedMessage = harness.Published.Select<OrderCreatedEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderCreatedEvent> publishedMessage = await WaitForPublishedAsync<OrderCreatedEvent>(
+                    harness,
+                    message => message.Payload.CustomerId == customerId,
+                    "OrderCreatedEvent should be published for the created customer");
 
                 OrderCreatedEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderCreatedEvent", @event.MessageName);
@@ -107,7 +105,7 @@ namespace Maliev.OrderService.Tests.Integration
                 Assert.Contains("ORD-", @event.Payload.OrderNumber);
                 Assert.Equal("THB", @event.Payload.Currency);
                 Assert.Contains("ProjectService", @event.ConsumedBy);
-                var item = Assert.Single(@event.Payload.Items);
+                OrderCreatedEventPayloadItemsItem item = Assert.Single(@event.Payload.Items);
                 Assert.Equal(sourceProjectId, item.SourceProjectId);
                 Assert.Equal(sourceProjectPartId, item.SourceProjectPartId);
                 Assert.NotEqual(Guid.Empty, item.ProductId);
@@ -157,12 +155,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, statusResponse.StatusCode);
 
-                // Verify OrderStatusChangedEvent was published
-                Assert.True(await harness.Published.Any<OrderStatusChangedEvent>(),
-                    "OrderStatusChangedEvent should be published");
-
-                IPublishedMessage<OrderStatusChangedEvent>? publishedMessage = harness.Published.Select<OrderStatusChangedEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderStatusChangedEvent> publishedMessage = await WaitForPublishedAsync<OrderStatusChangedEvent>(
+                    harness,
+                    message => message.Payload.OrderNumber == createdOrder.OrderId && message.Payload.NewStatus == "Reviewing",
+                    "OrderStatusChangedEvent should be published for the created order");
 
                 OrderStatusChangedEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderStatusChangedEvent", @event.MessageName);
@@ -221,12 +217,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, statusResponse.StatusCode);
 
-                // Verify OrderQuotedEvent was published
-                Assert.True(await harness.Published.Any<OrderQuotedEvent>(),
-                    "OrderQuotedEvent should be published");
-
-                IPublishedMessage<OrderQuotedEvent>? publishedMessage = harness.Published.Select<OrderQuotedEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderQuotedEvent> publishedMessage = await WaitForPublishedAsync<OrderQuotedEvent>(
+                    harness,
+                    message => message.Payload.OrderNumber == createdOrder.OrderId,
+                    "OrderQuotedEvent should be published for the created order");
 
                 OrderQuotedEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderQuotedEvent", @event.MessageName);
@@ -284,12 +278,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, statusResponse.StatusCode);
 
-                // Verify OrderAcceptedEvent was published
-                Assert.True(await harness.Published.Any<OrderAcceptedEvent>(),
-                    "OrderAcceptedEvent should be published");
-
-                IPublishedMessage<OrderAcceptedEvent>? publishedMessage = harness.Published.Select<OrderAcceptedEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderAcceptedEvent> publishedMessage = await WaitForPublishedAsync<OrderAcceptedEvent>(
+                    harness,
+                    message => message.Payload.OrderNumber == createdOrder.OrderId,
+                    "OrderAcceptedEvent should be published for the created order");
 
                 OrderAcceptedEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderAcceptedEvent", @event.MessageName);
@@ -339,12 +331,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, statusResponse.StatusCode);
 
-                // Verify OrderCancelledEvent was published
-                Assert.True(await harness.Published.Any<OrderCancelledEvent>(),
-                    "OrderCancelledEvent should be published");
-
-                IPublishedMessage<OrderCancelledEvent>? publishedMessage = harness.Published.Select<OrderCancelledEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderCancelledEvent> publishedMessage = await WaitForPublishedAsync<OrderCancelledEvent>(
+                    harness,
+                    message => message.Payload.OrderNumber == createdOrder.OrderId,
+                    "OrderCancelledEvent should be published for the created order");
 
                 OrderCancelledEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderCancelledEvent", @event.MessageName);
@@ -466,12 +456,10 @@ namespace Maliev.OrderService.Tests.Integration
                 Assert.Contains("Payment", paidStatus.InternalNotes ?? "");
                 Assert.Contains("completed", paidStatus.InternalNotes ?? "");
 
-                // Verify OrderPaidEvent was also published
-                Assert.True(await harness.Published.Any<OrderPaidEvent>(),
-                    "OrderPaidEvent should be published after consuming PaymentCompletedEvent");
-
-                IPublishedMessage<OrderPaidEvent>? orderPaidEvent = harness.Published.Select<OrderPaidEvent>().FirstOrDefault();
-                Assert.NotNull(orderPaidEvent);
+                IPublishedMessage<OrderPaidEvent> orderPaidEvent = await WaitForPublishedAsync<OrderPaidEvent>(
+                    harness,
+                    message => message.Payload.PaymentId == paymentId,
+                    "OrderPaidEvent should be published for the completed payment");
                 Assert.Equal(paymentId, orderPaidEvent.Context.Message.Payload.PaymentId);
                 Assert.Equal(1500.00, orderPaidEvent.Context.Message.Payload.PaidAmount);
                 Assert.Equal("THB", orderPaidEvent.Context.Message.Payload.Currency);
@@ -705,12 +693,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, statusResponse.StatusCode);
 
-                // Verify OrderPaidEvent was published
-                Assert.True(await harness.Published.Any<OrderPaidEvent>(),
-                    "OrderPaidEvent should be published");
-
-                IPublishedMessage<OrderPaidEvent>? publishedMessage = harness.Published.Select<OrderPaidEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderPaidEvent> publishedMessage = await WaitForPublishedAsync<OrderPaidEvent>(
+                    harness,
+                    message => message.Payload.OrderNumber == createdOrder.OrderId,
+                    "OrderPaidEvent should be published for the created order");
 
                 OrderPaidEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderPaidEvent", @event.MessageName);
@@ -773,12 +759,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, statusResponse.StatusCode);
 
-                // Verify OrderInProgressEvent was published
-                Assert.True(await harness.Published.Any<OrderInProgressEvent>(),
-                    "OrderInProgressEvent should be published");
-
-                IPublishedMessage<OrderInProgressEvent>? publishedMessage = harness.Published.Select<OrderInProgressEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderInProgressEvent> publishedMessage = await WaitForPublishedAsync<OrderInProgressEvent>(
+                    harness,
+                    message => message.Payload.OrderNumber == createdOrder.OrderId,
+                    "OrderInProgressEvent should be published for the created order");
 
                 OrderInProgressEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderInProgressEvent", @event.MessageName);
@@ -845,12 +829,10 @@ namespace Maliev.OrderService.Tests.Integration
                 // Assert
                 Assert.Equal(HttpStatusCode.Created, statusResponse.StatusCode);
 
-                // Verify OrderCompletedEvent was published
-                Assert.True(await harness.Published.Any<OrderCompletedEvent>(),
-                    "OrderCompletedEvent should be published");
-
-                IPublishedMessage<OrderCompletedEvent>? publishedMessage = harness.Published.Select<OrderCompletedEvent>().FirstOrDefault();
-                Assert.NotNull(publishedMessage);
+                IPublishedMessage<OrderCompletedEvent> publishedMessage = await WaitForPublishedAsync<OrderCompletedEvent>(
+                    harness,
+                    message => message.Payload.OrderNumber == createdOrder.OrderId,
+                    "OrderCompletedEvent should be published for the created order");
 
                 OrderCompletedEvent @event = publishedMessage.Context.Message;
                 Assert.Equal("OrderCompletedEvent", @event.MessageName);
@@ -863,6 +845,25 @@ namespace Maliev.OrderService.Tests.Integration
             {
                 // No need to stop harness manually here
             }
+        }
+
+        private static async Task<IPublishedMessage<TMessage>> WaitForPublishedAsync<TMessage>(
+            ITestHarness harness,
+            Func<TMessage, bool> predicate,
+            string failureMessage)
+            where TMessage : class
+        {
+            IPublishedMessage<TMessage>? publishedMessage = await TestHelpers.WaitForAsync(
+                cancellationToken => Task.FromResult(
+                    harness.Published
+                        .Select<TMessage>(cancellationToken)
+                        .FirstOrDefault(message => predicate(message.Context.Message))),
+                static message => message is not null,
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMilliseconds(100),
+                failureMessage);
+
+            return Assert.IsAssignableFrom<IPublishedMessage<TMessage>>(publishedMessage);
         }
     }
 }
