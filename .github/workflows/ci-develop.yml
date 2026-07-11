@@ -6,20 +6,24 @@ on:
       - develop
 
 jobs:
+  build-and-test:
+    uses: ./.github/workflows/_build-and-test.yml
+    with:
+      solution_file: Maliev.OrderService.slnx
+      extra_args: >-
+        -p:GITHUB_ACTIONS=true
+        -p:ServiceDefaultsVersion=1.0.81-alpha
+        -p:MessagingContractsVersion=1.0.91-alpha
+    secrets:
+      gitops_pat: ${{ secrets.GITOPS_PAT }}
+
   build-and-deploy:
+    needs: build-and-test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
-      - name: Switch to PackageReference for Docker build
-        run: |
-          # Use develop version format for shared libraries
-          VERSION_FORMAT="1.0.*-alpha*"
-          find . -name "*.csproj" -type f -exec sed -i             's|<ProjectReference Include=".*Maliev.Aspire.ServiceDefaults.*.csproj" />|<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="'$VERSION_FORMAT'" />|g'             {} +
-          find . -name "*.csproj" -type f -exec sed -i             's|<ProjectReference Include=".*Maliev.MessagingContracts.*.csproj" />|<PackageReference Include="Maliev.MessagingContracts" Version="'$VERSION_FORMAT'" />|g'             {} +
-          echo "Switched to PackageReference for ServiceDefaults and MessagingContracts"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
