@@ -114,6 +114,7 @@ namespace Maliev.OrderService.Tests
             Assert.Contains("include-hidden-files: true", workflow, StringComparison.Ordinal);
             Assert.Contains("overwrite: true", workflow, StringComparison.Ordinal);
             Assert.Contains("artifact-digest", workflow, StringComparison.Ordinal);
+            Assert.Contains("[[ \"$ARTIFACT_DIGEST\" =~ ^[0-9a-f]{64}$ ]]", workflow, StringComparison.Ordinal);
             Assert.Contains("sha256sum --check SHA256SUMS.txt", workflow, StringComparison.Ordinal);
 
             Assert.Contains("dotnet restore Maliev.OrderService.slnx", workflow, StringComparison.Ordinal);
