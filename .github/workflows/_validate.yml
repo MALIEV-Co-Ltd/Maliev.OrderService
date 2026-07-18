@@ -1,0 +1,76 @@
+name: Validate
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout OrderService
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Checkout Aspire shared source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: MALIEV-Co-Ltd/Maliev.Aspire
+          ref: 7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc
+          path: shared/Maliev.Aspire
+
+      - name: Checkout messaging contracts source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: MALIEV-Co-Ltd/Maliev.MessagingContracts
+          ref: 0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7
+          path: shared/Maliev.MessagingContracts
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: >-
+          dotnet restore Maliev.OrderService.slnx
+          --configfile nuget.validation.config
+          /p:SharedSourceRoot=${{ github.workspace }}/shared
+          /p:GITHUB_ACTIONS=false
+
+      - name: Audit NuGet dependencies
+        shell: bash
+        run: |
+          audit_output="$(dotnet list Maliev.OrderService.slnx package --vulnerable --include-transitive --no-restore)"
+          printf '%s\n' "$audit_output"
+          if grep -q "has the following vulnerable packages" <<<"$audit_output"; then
+            exit 1
+          fi
+
+      - name: Build
+        run: >-
+          dotnet build Maliev.OrderService.slnx
+          --configuration Release
+          --no-restore
+          /p:SharedSourceRoot=${{ github.workspace }}/shared
+          /p:GITHUB_ACTIONS=false
+
+      - name: Test
+        run: >-
+          dotnet test Maliev.OrderService.slnx
+          --configuration Release
+          --no-build
+          --no-restore
+          --verbosity normal
+          /p:SharedSourceRoot=${{ github.workspace }}/shared
+          /p:GITHUB_ACTIONS=false
+
+      - name: Verify formatting
+        run: >-
+          dotnet format whitespace Maliev.OrderService.slnx
+          --verify-no-changes
+          --no-restore
+          /p:SharedSourceRoot=${{ github.workspace }}/shared
+          /p:GITHUB_ACTIONS=false

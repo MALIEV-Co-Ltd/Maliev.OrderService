@@ -27,7 +27,7 @@ namespace Maliev.OrderService.Tests
         /// </summary>
         public async Task InitializeAsync()
         {
-            _postgresContainer = 
+            _postgresContainer =
 #pragma warning disable CS0618
         new PostgreSqlBuilder().WithImage("postgres:18-alpine")
                 .WithDatabase("order_test_db")

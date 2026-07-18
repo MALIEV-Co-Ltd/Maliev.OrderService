@@ -19,7 +19,7 @@ namespace Maliev.OrderService.Api.Controllers;
 /// Initializes a new instance of the <see cref="GeometryAnalysisController"/> class
 /// </remarks>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("geometryanalysis/v{version:apiVersion}/[controller]")]
 [EnableRateLimiting(RateLimitPolicies.Api)]
 [RequirePermission(OrderPermissions.OrdersUpdate)]

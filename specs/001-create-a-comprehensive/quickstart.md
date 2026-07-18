@@ -71,7 +71,7 @@ Verify that orders are automatically marked confidential when customer has signe
 
 ```bash
 # Step 1: Obtain customer JWT token (mock Auth Service)
-export CUSTOMER_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # CUST-001 (NDA signed)
+export CUSTOMER_TOKEN="<customer-jwt>" # CUST-001 (NDA signed)
 
 # Step 2: Create order for 3D printing service
 curl -X POST http://localhost:5000/orders/v1/orders \
@@ -123,7 +123,7 @@ Verify status update with internal (employee-only) and customer-facing notes, pl
 
 ```bash
 # Step 1: Obtain employee JWT token
-export EMPLOYEE_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # EMP-001
+export EMPLOYEE_TOKEN="<employee-jwt>" # EMP-001
 
 # Step 2: Update status from New → Reviewing with dual notes
 curl -X POST http://localhost:5000/orders/v1/orders/ORD-2025-00001/statuses \
@@ -405,7 +405,7 @@ export ORDER_V1=$(curl -s -X GET http://localhost:5000/orders/v1/orders/ORD-2025
 echo "Employee 1 version: $ORDER_V1"  # AAAAAAAAB9E=
 
 # Employee 2 (different token):
-export EMPLOYEE2_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # EMP-002
+export EMPLOYEE2_TOKEN="<second-employee-jwt>" # EMP-002
 export ORDER_V2=$(curl -s -X GET http://localhost:5000/orders/v1/orders/ORD-2025-00002 \
   -H "Authorization: Bearer $EMPLOYEE2_TOKEN" | jq -r '.version')
 echo "Employee 2 version: $ORDER_V2"  # AAAAAAAAB9E= (same version)
@@ -472,7 +472,7 @@ Verify role-based access control with context from Auth Service (Customer/Employ
 
 ```bash
 # Step 1: Customer attempts to access another customer's order
-export CUSTOMER2_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # CUST-003
+export CUSTOMER2_TOKEN="<second-customer-jwt>" # CUST-003
 
 curl -X GET http://localhost:5000/orders/v1/orders/ORD-2025-00001 \
   -H "Authorization: Bearer $CUSTOMER2_TOKEN"
@@ -500,7 +500,7 @@ curl -X GET http://localhost:5000/orders/v1/orders/ORD-2025-00001 \
 }
 
 # Step 4: Manager accesses all department orders (allowed)
-export MANAGER_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # MGR-001, DEPT-001
+export MANAGER_TOKEN="<manager-jwt>" # MGR-001, DEPT-001
 
 curl -X GET "http://localhost:5000/orders/v1/orders?departmentId=DEPT-001" \
   -H "Authorization: Bearer $MANAGER_TOKEN"
@@ -508,7 +508,7 @@ curl -X GET "http://localhost:5000/orders/v1/orders?departmentId=DEPT-001" \
 # Expected: 200 OK with all DEPT-001 orders
 
 # Step 5: Admin accesses all orders including confidential (allowed)
-export ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # ADMIN-001
+export ADMIN_TOKEN="<admin-jwt>" # ADMIN-001
 
 curl -X GET "http://localhost:5000/orders/v1/orders?isConfidential=true" \
   -H "Authorization: Bearer $ADMIN_TOKEN"

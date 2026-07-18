@@ -17,7 +17,7 @@ namespace Maliev.OrderService.Api.Controllers
     /// Initializes a new instance of the <see cref="OrderNotesController"/> class
     /// </remarks>
     [ApiController]
-    [ApiVersion("1")]
+    [ApiVersion("1.0")]
     [Route("order/v{version:apiVersion}/orders/{orderId}/notes")]
     [Produces("application/json")]
     public class OrderNotesController(

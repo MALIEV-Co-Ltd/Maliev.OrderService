@@ -70,7 +70,7 @@ namespace Maliev.OrderService.Tests.Testing
             {
                 if (!_containersStarted)
                 {
-                    _postgresContainer = 
+                    _postgresContainer =
 #pragma warning disable CS0618
         new PostgreSqlBuilder().WithImage("postgres:18-alpine")
                         .Build();
