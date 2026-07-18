@@ -87,7 +87,7 @@ public sealed partial class DeploymentReadinessSourceTests
 
         foreach (string projectPath in Directory.GetFiles(root, "*.csproj", SearchOption.AllDirectories))
         {
-            if (projectPath.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            if (!IsOwnedProject(root, projectPath))
             {
                 continue;
             }
@@ -103,6 +103,20 @@ public sealed partial class DeploymentReadinessSourceTests
                 Assert.Contains("$(SharedSourceRoot)/Maliev.MessagingContracts/", project, StringComparison.Ordinal);
             }
         }
+    }
+
+    /// <summary>
+    /// Verifies external and generated project paths are excluded on both runner path conventions.
+    /// </summary>
+    [Theory]
+    [InlineData("Maliev.OrderService.Api/Maliev.OrderService.Api.csproj", true)]
+    [InlineData("Maliev.OrderService.Api\\Maliev.OrderService.Api.csproj", true)]
+    [InlineData("shared/Maliev.Aspire/Maliev.Aspire.ServiceDefaults/Maliev.Aspire.ServiceDefaults.csproj", false)]
+    [InlineData("shared\\Maliev.MessagingContracts\\generated\\csharp\\Maliev.MessagingContracts.csproj", false)]
+    [InlineData("Maliev.OrderService.Api/obj/Generated.csproj", false)]
+    public void SharedSourceOwnershipIsPlatformIndependent(string relativePath, bool expected)
+    {
+        Assert.Equal(expected, IsOwnedRelativeProject(relativePath));
     }
 
     /// <summary>
@@ -125,6 +139,18 @@ public sealed partial class DeploymentReadinessSourceTests
 
     [GeneratedRegex(@"uses:\s+[^\s@]+@(?![0-9a-f]{40}(?:\s|$))[^\s]+", RegexOptions.CultureInvariant)]
     private static partial Regex UnpinnedActionRegex();
+
+    private static bool IsOwnedProject(string root, string projectPath)
+    {
+        return IsOwnedRelativeProject(Path.GetRelativePath(root, projectPath));
+    }
+
+    private static bool IsOwnedRelativeProject(string relativePath)
+    {
+        string normalizedPath = relativePath.Replace('\\', '/');
+        return !normalizedPath.StartsWith("shared/", StringComparison.OrdinalIgnoreCase)
+            && !normalizedPath.Contains("/obj/", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string FindRepoRoot()
     {
