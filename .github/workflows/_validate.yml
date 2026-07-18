@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout OrderService
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Checkout Aspire shared source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -20,6 +22,7 @@ jobs:
           repository: MALIEV-Co-Ltd/Maliev.Aspire
           ref: 7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc
           path: shared/Maliev.Aspire
+          persist-credentials: false
 
       - name: Checkout messaging contracts source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -27,6 +30,7 @@ jobs:
           repository: MALIEV-Co-Ltd/Maliev.MessagingContracts
           ref: 0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7
           path: shared/Maliev.MessagingContracts
+          persist-credentials: false
 
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0

@@ -76,6 +76,10 @@ public sealed partial class DeploymentReadinessSourceTests
         Assert.Contains("dotnet test Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
         Assert.Contains("dotnet format whitespace Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
         Assert.Contains("package --vulnerable --include-transitive", validationWorkflow, StringComparison.Ordinal);
+        Assert.Equal(3, validationWorkflow.Split("persist-credentials: false", StringSplitOptions.None).Length - 1);
+
+        string sharedEditorConfig = File.ReadAllText(Path.Combine(root, "shared", ".editorconfig"));
+        Assert.Contains("root = true", sharedEditorConfig, StringComparison.Ordinal);
 
         Assert.Contains("https://api.nuget.org/v3/index.json", validationNuGetConfig, StringComparison.Ordinal);
         Assert.DoesNotContain("nuget.pkg.github.com", validationNuGetConfig, StringComparison.OrdinalIgnoreCase);
