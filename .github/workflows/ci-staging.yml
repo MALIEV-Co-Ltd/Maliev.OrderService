@@ -1,0 +1,16 @@
+name: Validate - Release Tag
+
+on:
+  push:
+    tags: [release/v*]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: order-validate-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    uses: ./.github/workflows/_validate.yml

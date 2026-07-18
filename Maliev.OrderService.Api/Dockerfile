@@ -1,30 +1,21 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# syntax=docker/dockerfile:1.7
 
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
-USER $APP_UID
+# The deployment lane must publish the validated application into /publish before
+# building this runtime-only image. Dependency restore never receives image credentials.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.source="https://github.com/MALIEV-Co-Ltd/Maliev.OrderService" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+
 WORKDIR /app
+COPY --chown=app:app publish/ .
+
+USER app
 EXPOSE 8080
 EXPOSE 8081
+ENV ASPNETCORE_HTTP_PORTS=8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_EnableDiagnostics=0
 
-
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-ARG BUILD_CONFIGURATION=Release
-WORKDIR /src
-COPY ["Maliev.OrderService.Api/Maliev.OrderService.Api.csproj", "Maliev.OrderService.Api/"]
-RUN dotnet restore "./Maliev.OrderService.Api/Maliev.OrderService.Api.csproj"
-COPY . .
-WORKDIR "/src/Maliev.OrderService.Api"
-RUN dotnet build "./Maliev.OrderService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
-
-# This stage is used to publish the service project to be copied to the final stage
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Maliev.OrderService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Maliev.OrderService.Api.dll"]

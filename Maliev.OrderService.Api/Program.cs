@@ -1,175 +1,176 @@
-using AutoMapper;
-using Maliev.OrderService.Api.Profiles;
+using Maliev.Aspire.ServiceDefaults;
+using Maliev.OrderService.Api.Consumers;
 using Maliev.OrderService.Api.Services;
-using Maliev.OrderService.Data.Data;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using System.Reflection;
-using System.Text;
-using Asp.Versioning;
-using Asp.Versioning.ApiExplorer;
+using Maliev.OrderService.Api.Services.Business;
+using Maliev.OrderService.Api.Services.External;
+using Maliev.OrderService.Infrastructure.Persistence;
+using MassTransit;
 
-var builder = WebApplication.CreateBuilder(args);
+// Initialize bootstrap logging
+using ILoggerFactory loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
+ILogger bootstrapLogger = loggerFactory.CreateLogger("Program");
 
-// Add AutoMapper
-builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
-
-// Add DbContext
-builder.Services.AddDbContext<OrderContext>(options =>
+try
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("OrderServiceDbContext"));
-});
+    Log.StartingHost(bootstrapLogger, "Order Service");
 
-// Configure Authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+    // --- Secrets & Configuration ---
+    _ = builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
+
+    // --- Infrastructure & Observability ---
+    _ = builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+    _ = builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
+    _ = builder.AddStandardMiddleware(options =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSecurityKey"] ?? throw new InvalidOperationException("JwtSecurityKey not configured"))),
-        };
+        options.EnableRequestLogging = true;
     });
+    _ = builder.AddServiceMeters("orders-meter"); // Register service meters for OpenTelemetry business metrics
 
-// Configure API Versioning Services
-builder.Services.AddApiVersioning(options =>
-{
-    options.ReportApiVersions = true;
-    options.AssumeDefaultVersionWhenUnspecified = true;
-    options.DefaultApiVersion = new ApiVersion(1, 0);
-})
-.AddApiExplorer(options =>
-{
-    options.GroupNameFormat = "'v'VVV";
-    options.SubstituteApiVersionInUrl = true;
-});
-
-// Configure Swagger
-builder.Services.AddSwaggerGen(options =>
-{
-    OpenApiSecurityScheme apiKey = new OpenApiSecurityScheme
-    {
-        Description = @"JWT Authorization header using the Bearer scheme. Example: ""Bearer {token}""",
-        In = ParameterLocation.Header,
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-    };
-
-    OpenApiInfo info = new OpenApiInfo
-    {
-        Title = "Order Service",
-        Version = "v1", // Explicitly set to v1
-        Contact = new OpenApiContact
+    _ = builder.AddStandardCache("order:"); // Redis + in-memory fallback, memory-optimized
+    _ = builder.AddMassTransitWithRabbitMq(
+        cfg =>
         {
-            Name = "MALIEV Co., Ltd.",
-            Email = "support@maliev.com",
-            Url = new Uri("https://www.maliev.com"),
-        },
-    };
-
-    options.SwaggerDoc("v1", info); // Define a single SwaggerDoc for v1
-    options.AddSecurityDefinition("Bearer", apiKey);
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
+            cfg.AddEntityFrameworkOutbox<OrderDbContext>(options =>
             {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer",
-                },
-                Scheme = "oauth2",
-                Name = "Bearer",
-                In = ParameterLocation.Header,
-            },
-            new List<string>()
+                _ = options.UsePostgres();
+                options.UseBusOutbox();
+            });
+
+            _ = cfg.AddConsumer<PaymentCompletedEventConsumer>();
+            _ = cfg.AddConsumer<PaymentPendingEventConsumer>();
+            _ = cfg.AddConsumer<PaymentCancelledEventConsumer>();
+            _ = cfg.AddConsumer<PaymentFailedEventConsumer>();
+            _ = cfg.AddConsumer<PaymentExpiredEventConsumer>();
+            _ = cfg.AddConsumer<FileDeletedEventConsumer>();
+            _ = cfg.AddConsumer<PreviewImagesGeneratedEventConsumer>();
+            _ = cfg.AddConsumer<JobStatusChangedEventConsumer>();
         },
-    });
-    options.DescribeAllParametersInCamelCase();
-
-    // Set the comments path for the Swagger JSON and UI.
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    options.IncludeXmlComments(xmlPath);
-});
-
-// Configure CORS
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(
-        policy =>
+        configureRabbitMq: (context, rabbitMq) =>
         {
-            policy.WithOrigins(
-                "http://*.maliev.com",
-                "https://*.maliev.com")
-            .SetIsOriginAllowedToAllowWildcardSubdomains()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-        });
-});
+            rabbitMq.ReceiveEndpoint("order-payment-outcomes", endpoint =>
+            {
+                endpoint.UseMessageRetry(retry => retry.Interval(5, TimeSpan.FromSeconds(2)));
+                endpoint.ConfigureConsumer<PaymentCompletedEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentPendingEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentCancelledEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentFailedEventConsumer>(context);
+                endpoint.ConfigureConsumer<PaymentExpiredEventConsumer>(context);
+            });
 
-// Register service layer
-builder.Services.AddScoped<IOrderServiceService, OrderServiceService>();
+            rabbitMq.ConfigureEndpoints(context);
+        }); // RabbitMQ message bus with consumers
+    _ = builder.AddPostgresDbContext<OrderDbContext>(connectionName: "OrderDbContext"); // PostgreSQL with retry logic
 
-builder.Services.AddControllers();
+    // --- API Configuration ---
+    _ = builder.AddStandardCors(); // CORS with fail-fast validation
 
-var app = builder.Build();
+    // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
+    _ = builder.AddJwtAuthentication();
+    _ = builder.Services.AddPermissionAuthorization();
 
-// Configure Base Path Middleware
-app.UsePathBase("/orders");
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-    // app.UseMigrationsEndPoint(); // Not needed for this project
-}
-else
-{
-    app.UseExceptionHandler(errorApp =>
+    // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
+    if (!builder.Environment.IsProduction())
     {
-        errorApp.Run(async context =>
-        {
-            var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
-            var exception = exceptionHandlerPathFeature?.Error;
-
-            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(exception, "An unhandled exception has occurred.");
-
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await context.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred." });
-        });
-    });
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-
-app.UseCors();
-
-app.UseAuthentication();
-
-app.UseAuthorization();
-
-app.UseSwagger();
-app.UseSwaggerUI(options =>
-{
-    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-    foreach (var description in provider.ApiVersionDescriptions)
-    {
-        options.SwaggerEndpoint($"/orders/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
+        _ = builder.AddStandardOpenApi(
+            title: "MALIEV Order Service API",
+            description: "Sales order processing service. Manages order lifecycle from creation to fulfillment, batch order operations, status history tracking, file attachments, internal notes, and cancellation with reason tracking.");
     }
-    options.RoutePrefix = "swagger";
-});
 
-app.MapControllers();
+    _ = builder.Services.AddControllers();
+    // External Service HttpClients with Standard Resilience Handler
+    _ = builder.AddServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService");
+    _ = builder.AddServiceClient<IMaterialServiceClient, MaterialServiceClient>("MaterialService");
+    _ = builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
+    _ = builder.AddAuthenticatedServiceClient<IUploadServiceClient, UploadServiceClient>(
+        "UploadService",
+        sourceServiceName: "order");
+    _ = builder.AddServiceClient<IAuthServiceClient, AuthServiceClient>("AuthService");
+    _ = builder.AddServiceClient<IEmployeeServiceClient, EmployeeServiceClient>("EmployeeService");
+    _ = builder.AddServiceClient<INotificationServiceClient, NotificationServiceClient>("NotificationService");
+    _ = builder.AddServiceClient<IGeometryServiceClient, GeometryServiceClient>("GeometryService");
 
-app.Run();
+    // Business Services
+    _ = builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
+    _ = builder.Services.AddScoped<IOrderAuthorizationService, OrderAuthorizationService>();
+    _ = builder.Services.AddScoped<IOrderStatusService, OrderStatusService>();
+    _ = builder.Services.AddScoped<IOrderFileService, OrderFileService>();
+    _ = builder.Services.AddScoped<IOrderNoteService, OrderNoteService>();
+    _ = builder.Services.AddScoped<IOrderPreviewImageService, OrderPreviewImageService>();
+
+    // Rate Limiting (memory-optimized for low-spec nodes)
+    _ = builder.AddStandardRateLimiting();
+
+    // IAM Integration
+    _ = builder.AddIAMServiceClient("order");
+    _ = builder.Services.AddIAMRegistration<OrderIAMRegistrationService>("order");
+
+    WebApplication app = builder.Build();
+    ILogger<Program> logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+    // --- Database Migrations ---
+    await app.MigrateDatabaseAsync<OrderDbContext>();
+    using (IServiceScope seedScope = app.Services.CreateScope())
+    {
+        OrderDbContext dbContext = seedScope.ServiceProvider.GetRequiredService<OrderDbContext>();
+        await OrderReferenceDataSeeder.SeedAsync(dbContext);
+    }
+
+    // Middleware Pipeline
+    _ = app.UseStandardMiddleware();
+
+    if (!app.Environment.IsDevelopment())
+    {
+        _ = app.UseHttpsRedirection();
+    }
+    _ = app.UseCors();
+
+    _ = app.UseAuthentication();
+    _ = app.UseAuthorization();
+
+    // Map endpoints after middleware
+    _ = app.MapControllers();
+
+    // Map Aspire default endpoints (/health, /alive, /metrics)
+    _ = app.MapDefaultEndpoints(servicePrefix: "order");
+
+    // Map OpenAPI and Scalar documentation (dev/staging only)
+    _ = app.MapApiDocumentation(servicePrefix: "order");
+
+    Log.ServiceStarted(logger, "Order Service");
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.HostTerminated(bootstrapLogger, ex, "Order Service");
+    // Force flush to ensure Aspire captures the error before process exits
+    Console.Out.Flush();
+    Console.Error.Flush();
+    throw;
+}
+finally
+{
+    loggerFactory.Dispose();
+}
+
+/// <summary>
+/// Main program class for the Order Service API.
+/// </summary>
+public partial class Program
+{
+    internal static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+        public static partial void StartingHost(ILogger logger, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+        public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+        public static partial void ServiceStarted(ILogger logger, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
+        public static partial void MigrationFailed(ILogger logger, Exception exception);
+    }
+}

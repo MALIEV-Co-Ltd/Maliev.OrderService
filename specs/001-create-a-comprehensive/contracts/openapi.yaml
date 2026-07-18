@@ -1,0 +1,994 @@
+openapi: 3.0.3
+info:
+  title: MALIEV Order Service API
+  description: |
+    Order Service API for managing manufacturing and rapid prototyping orders.
+    Supports multi-service order creation, 16-state workflow, batch operations, and file management.
+  version: 1.0.0
+  contact:
+    name: MALIEV Engineering
+    url: https://www.maliev.com
+
+servers:
+  - url: https://api.maliev.com/orders/v1
+    description: Production
+  - url: https://staging.api.maliev.com/orders/v1
+    description: Staging
+  - url: https://dev.api.maliev.com/orders/v1
+    description: Development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Orders
+    description: Order management operations
+  - name: Status
+    description: Order status tracking and history
+  - name: Files
+    description: Order file management
+  - name: Notes
+    description: Order notes management (separate from status notes)
+
+paths:
+  # ========== ORDERS ==========
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List orders with filtering and pagination
+      operationId: listOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+          description: Filter by customer ID
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatusEnum'
+          description: Filter by current status
+        - name: serviceCategoryId
+          in: query
+          schema:
+            type: integer
+          description: Filter by service category
+        - name: isConfidential
+          in: query
+          schema:
+            type: boolean
+          description: Filter confidential orders (Admin only)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number (1-indexed)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Items per page
+      responses:
+        '200':
+          description: Paginated list of orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    post:
+      tags: [Orders]
+      summary: Create new order
+      operationId: createOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '503':
+          description: Customer Service unavailable (cannot verify NDA status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/batch:
+    post:
+      tags: [Orders]
+      summary: Batch create orders (Employee+ only)
+      operationId: batchCreateOrders
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CreateOrderRequest'
+              maxItems: 100
+      responses:
+        '201':
+          description: Orders created successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderDto'
+        '400':
+          $ref: '#/components/responses/BatchValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    put:
+      tags: [Orders]
+      summary: Batch update orders (Employee+ only)
+      operationId: batchUpdateOrders
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/UpdateOrderRequest'
+              maxItems: 100
+      responses:
+        '200':
+          description: Orders updated successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderDto'
+        '400':
+          $ref: '#/components/responses/BatchValidationError'
+        '409':
+          description: Concurrency conflict (version mismatch)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Orders]
+      summary: Batch cancel orders (Employee+ only)
+      operationId: batchCancelOrders
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CancelOrderRequest'
+              maxItems: 100
+      responses:
+        '200':
+          description: Orders cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CancellationResult'
+
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Get order details
+      operationId: getOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDto'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags: [Orders]
+      summary: Update order
+      operationId: updateOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderRequest'
+      responses:
+        '200':
+          description: Order updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Concurrency conflict (version mismatch)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Orders]
+      summary: Cancel order
+      operationId: cancelOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+        - name: reason
+          in: query
+          schema:
+            type: string
+          description: Cancellation reason
+        - name: calculatePartialCharge
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Calculate partial charge for work completed
+      responses:
+        '200':
+          description: Order cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancellationResult'
+
+  # ========== STATUS ==========
+  /orders/{orderId}/statuses:
+    get:
+      tags: [Status]
+      summary: Get order status history
+      operationId: getOrderStatusHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: Status history (internal notes filtered for Customer role)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderStatusDto'
+
+    post:
+      tags: [Status]
+      summary: Update order status (Employee+ only)
+      operationId: updateOrderStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStatusRequest'
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatusDto'
+        '400':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Invalid transition from 'Shipped' to 'New'"
+                details: "Valid transitions from 'Shipped': Reopen"
+
+  # ========== FILES ==========
+  /orders/{orderId}/files:
+    get:
+      tags: [Files]
+      summary: List order files
+      operationId: listOrderFiles
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: List of files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderFileDto'
+
+    post:
+      tags: [Files]
+      summary: Upload file to order
+      operationId: uploadOrderFile
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, fileRole, fileCategory]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload (max 100MB)
+                fileRole:
+                  type: string
+                  enum: [Input, Output, Supporting]
+                  description: Input (customer), Output (MALIEV), Supporting (other)
+                fileCategory:
+                  type: string
+                  enum: [CAD, Drawing, Image, Document, Archive, Other]
+                  description: File category classification
+                designUnits:
+                  type: string
+                  enum: [mm, inch, cm, m]
+                  description: Unit system (required for CAD files, must be null for others)
+                accessLevel:
+                  type: string
+                  enum: [Internal, Confidential]
+                  default: Internal
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderFileDto'
+        '400':
+          description: Validation error (file too large, unsupported format, total size exceeded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{orderId}/files/{fileId}:
+    get:
+      tags: [Files]
+      summary: Download file
+      operationId: downloadOrderFile
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+        - $ref: '#/components/parameters/FileIdParam'
+      responses:
+        '200':
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+    delete:
+      tags: [Files]
+      summary: Delete file
+      operationId: deleteOrderFile
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+        - $ref: '#/components/parameters/FileIdParam'
+      responses:
+        '204':
+          description: File deleted successfully
+
+  # ========== NOTES ==========
+  /orders/{orderId}/notes:
+    get:
+      tags: [Notes]
+      summary: List order notes
+      operationId: listOrderNotes
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+        - name: noteType
+          in: query
+          schema:
+            type: string
+            enum: [customer, internal]
+          description: Filter by note type (internal notes only visible to Employee+ roles)
+      responses:
+        '200':
+          description: List of notes (internal notes filtered for Customer role)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderNoteDto'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    post:
+      tags: [Notes]
+      summary: Create order note
+      operationId: createOrderNote
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderNoteRequest'
+      responses:
+        '201':
+          description: Note created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderNoteDto'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          description: Forbidden (Customer cannot create internal notes)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    OrderIdParam:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^ORD-\d{4}-\d{5}$'
+      example: ORD-2025-00001
+
+    FileIdParam:
+      name: fileId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  schemas:
+    # ========== DTOs ==========
+    OrderDto:
+      type: object
+      required: [orderId, customerId, serviceCategoryId, isConfidential, currentStatus, version, createdAt]
+      properties:
+        orderId:
+          type: string
+          pattern: '^ORD-\d{4}-\d{5}$'
+          example: ORD-2025-00001
+        customerId:
+          type: string
+        customerType:
+          type: string
+          enum: [Customer, Employee]
+        serviceCategoryId:
+          type: integer
+        serviceCategoryName:
+          type: string
+        processTypeId:
+          type: integer
+          nullable: true
+          description: Nullable for orders that don't fit standard processes (consulting, procurement)
+        processTypeName:
+          type: string
+          nullable: true
+        materialId:
+          type: integer
+          nullable: true
+          description: Reference to Material Service (nullable for non-manufacturing orders)
+        colorId:
+          type: integer
+          nullable: true
+        surfaceFinishingId:
+          type: integer
+          nullable: true
+        materialName:
+          type: string
+          nullable: true
+          description: Cached display name from Material Service (24-hour TTL)
+        colorName:
+          type: string
+          nullable: true
+        surfaceFinishingName:
+          type: string
+          nullable: true
+        orderedQuantity:
+          type: integer
+          nullable: true
+          description: Total parts/units requested (nullable - manufacturing orders only)
+        manufacturedQuantity:
+          type: integer
+          nullable: true
+          description: Running total of completed units
+        remainingQuantity:
+          type: integer
+          nullable: true
+          description: Computed field (orderedQuantity - manufacturedQuantity)
+        leadTimeDays:
+          type: integer
+          nullable: true
+          description: Expected days to complete order
+        promisedDeliveryDate:
+          type: string
+          format: date
+          nullable: true
+          description: Date committed to customer
+        actualDeliveryDate:
+          type: string
+          format: date
+          nullable: true
+          description: Date order actually shipped/delivered
+        quotedAmount:
+          type: number
+          format: decimal
+          nullable: true
+          description: Quote amount from Quoting Service
+        quoteCurrency:
+          type: string
+          nullable: true
+          default: THB
+          description: Currency code (THB, USD, etc.)
+        isConfidential:
+          type: boolean
+        paymentId:
+          type: string
+          nullable: true
+        paymentStatus:
+          type: string
+          enum: [Unpaid, Paid, POIssued]
+        assignedEmployeeId:
+          type: string
+          nullable: true
+        departmentId:
+          type: string
+          nullable: true
+        requirements:
+          type: string
+          nullable: true
+        currentStatus:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        version:
+          type: string
+          description: Base64-encoded concurrency token
+          example: AAAAAAAAB9E=
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        updatedBy:
+          type: string
+
+    CreateOrderRequest:
+      type: object
+      required: [customerId, serviceCategoryId]
+      properties:
+        customerId:
+          type: string
+        serviceCategoryId:
+          type: integer
+        processTypeId:
+          type: integer
+          nullable: true
+          description: Nullable for non-standard orders (consulting, procurement)
+        materialId:
+          type: integer
+          nullable: true
+          description: Reference to Material Service (validated via GET /materials/{id})
+        colorId:
+          type: integer
+          nullable: true
+        surfaceFinishingId:
+          type: integer
+          nullable: true
+        orderedQuantity:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Total parts/units requested (manufacturing orders only)
+        leadTimeDays:
+          type: integer
+          nullable: true
+          minimum: 0
+        promisedDeliveryDate:
+          type: string
+          format: date
+          nullable: true
+        quotedAmount:
+          type: number
+          format: decimal
+          nullable: true
+          minimum: 0
+        quoteCurrency:
+          type: string
+          nullable: true
+          default: THB
+        requirements:
+          type: string
+          maxLength: 5000
+
+    UpdateOrderRequest:
+      type: object
+      required: [version]
+      properties:
+        serviceCategoryId:
+          type: integer
+        processTypeId:
+          type: integer
+          nullable: true
+        materialId:
+          type: integer
+          nullable: true
+        colorId:
+          type: integer
+          nullable: true
+        surfaceFinishingId:
+          type: integer
+          nullable: true
+        orderedQuantity:
+          type: integer
+          nullable: true
+          minimum: 1
+        manufacturedQuantity:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Update running total of completed units
+        leadTimeDays:
+          type: integer
+          nullable: true
+          minimum: 0
+        promisedDeliveryDate:
+          type: string
+          format: date
+          nullable: true
+        actualDeliveryDate:
+          type: string
+          format: date
+          nullable: true
+        quotedAmount:
+          type: number
+          format: decimal
+          nullable: true
+          minimum: 0
+        quoteCurrency:
+          type: string
+          nullable: true
+        assignedEmployeeId:
+          type: string
+          nullable: true
+        departmentId:
+          type: string
+          nullable: true
+        requirements:
+          type: string
+          maxLength: 5000
+        version:
+          type: string
+          description: Concurrency token from previous GET
+
+    CancelOrderRequest:
+      type: object
+      required: [orderId]
+      properties:
+        orderId:
+          type: string
+        reason:
+          type: string
+        calculatePartialCharge:
+          type: boolean
+          default: false
+
+    OrderStatusDto:
+      type: object
+      required: [statusId, orderId, status, timestamp, updatedBy]
+      properties:
+        statusId:
+          type: integer
+          format: int64
+        orderId:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        internalNotes:
+          type: string
+          nullable: true
+          description: Only visible to Employee+ roles
+        customerNotes:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+
+    UpdateStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        internalNotes:
+          type: string
+          maxLength: 2000
+        customerNotes:
+          type: string
+          maxLength: 2000
+
+    OrderFileDto:
+      type: object
+      required: [fileId, orderId, fileRole, fileCategory, objectPath, fileName, fileSize, fileType, uploadedAt, uploadedBy]
+      properties:
+        fileId:
+          type: integer
+          format: int64
+        orderId:
+          type: string
+        fileRole:
+          type: string
+          enum: [Input, Output, Supporting]
+          description: Input (customer-provided), Output (MALIEV-delivered), Supporting (other docs)
+        fileCategory:
+          type: string
+          enum: [CAD, Drawing, Image, Document, Archive, Other]
+          description: File category classification
+        designUnits:
+          type: string
+          enum: [mm, inch, cm, m]
+          nullable: true
+          description: Unit system for CAD files only (nullable for non-CAD files)
+        objectPath:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+          description: Size in bytes (max 100MB)
+        fileType:
+          type: string
+        accessLevel:
+          type: string
+          enum: [Internal, Confidential]
+        uploadedAt:
+          type: string
+          format: date-time
+        uploadedBy:
+          type: string
+
+    CancellationResult:
+      type: object
+      required: [orderId, cancelled, reason]
+      properties:
+        orderId:
+          type: string
+        cancelled:
+          type: boolean
+        reason:
+          type: string
+        refundAmount:
+          type: number
+          format: decimal
+          nullable: true
+        partialChargeAmount:
+          type: number
+          format: decimal
+          nullable: true
+
+    PaginatedOrderListResponse:
+      type: object
+      required: [items, page, pageSize, totalItems, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderDto'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalItems:
+          type: integer
+        totalPages:
+          type: integer
+
+    OrderNoteDto:
+      type: object
+      required: [noteId, orderId, noteType, noteText, createdBy, createdAt]
+      properties:
+        noteId:
+          type: integer
+          format: int64
+        orderId:
+          type: string
+        noteType:
+          type: string
+          enum: [customer, internal]
+          description: customer (visible to all), internal (Employee+ only)
+        noteText:
+          type: string
+        createdBy:
+          type: string
+          description: UserId from Auth Service
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateOrderNoteRequest:
+      type: object
+      required: [noteType, noteText]
+      properties:
+        noteType:
+          type: string
+          enum: [customer, internal]
+          description: customer (visible to all), internal (Employee+ only, Customer cannot create)
+        noteText:
+          type: string
+          maxLength: 10000
+          description: Note content
+
+    OrderStatusEnum:
+      type: string
+      enum:
+        - New
+        - Reviewing
+        - Rejected
+        - Reviewed
+        - Quoted
+        - Declined
+        - Accepted
+        - Expired
+        - Paid
+        - POIssued
+        - InProgress
+        - OnHold
+        - Finished
+        - Shipped
+        - Reopen
+        - Cancelled
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+        traceId:
+          type: string
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized (missing or invalid JWT)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ForbiddenError:
+      description: Forbidden (insufficient permissions)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    BatchValidationError:
+      description: Batch validation error (all-or-nothing rollback)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              failedItems:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    index:
+                      type: integer
+                    item:
+                      type: object
+                    validationErrors:
+                      type: array
+                      items:
+                        type: string
