@@ -72,9 +72,9 @@ jobs:
           /p:GITHUB_ACTIONS=false
 
       - name: Verify formatting
+        env:
+          SharedSourceRoot: ${{ github.workspace }}/shared
         run: >-
           dotnet format whitespace Maliev.OrderService.slnx
           --verify-no-changes
           --no-restore
-          /p:SharedSourceRoot=${{ github.workspace }}/shared
-          /p:GITHUB_ACTIONS=false
