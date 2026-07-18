@@ -74,7 +74,8 @@ public sealed partial class DeploymentReadinessSourceTests
         Assert.Contains("--configfile nuget.validation.config", validationWorkflow, StringComparison.Ordinal);
         Assert.Contains("dotnet build Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
         Assert.Contains("dotnet test Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
-        Assert.Contains("dotnet format whitespace Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("dotnet format Maliev.OrderService.slnx whitespace", validationWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet format whitespace Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
         Assert.Contains("SharedSourceRoot: ${{ github.workspace }}/shared", validationWorkflow, StringComparison.Ordinal);
         Assert.Contains("package --vulnerable --include-transitive", validationWorkflow, StringComparison.Ordinal);
         Assert.Equal(3, validationWorkflow.Split("persist-credentials: false", StringSplitOptions.None).Length - 1);

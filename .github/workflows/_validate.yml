@@ -75,6 +75,6 @@ jobs:
         env:
           SharedSourceRoot: ${{ github.workspace }}/shared
         run: >-
-          dotnet format whitespace Maliev.OrderService.slnx
+          dotnet format Maliev.OrderService.slnx whitespace
           --verify-no-changes
           --no-restore
