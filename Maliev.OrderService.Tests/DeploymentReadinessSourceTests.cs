@@ -1,197 +1,173 @@
 using System.Text.RegularExpressions;
 
-namespace Maliev.OrderService.Tests
+namespace Maliev.OrderService.Tests;
+
+/// <summary>
+/// Guards the credential-free validation boundary used for pull requests and protected branches.
+/// </summary>
+public sealed partial class DeploymentReadinessSourceTests
 {
+    private const string AspireCommit = "7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc";
+    private const string MessagingContractsCommit = "0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7";
 
     /// <summary>
-    /// Guards the deterministic shared-library package boundary used by CI and production images.
+    /// Verifies every active workflow is validation-only and cannot publish or deploy artifacts.
     /// </summary>
-    public sealed partial class DeploymentReadinessSourceTests
+    [Fact]
+    public void WorkflowsAreReadOnlyValidationOnly()
     {
-        /// <summary>
-        /// Verifies package-mode builds use the reviewed ServiceDefaults and MessagingContracts releases.
-        /// </summary>
-        [Fact]
-        public void PackageModePinsReviewedSharedLibrariesAcrossBuildBoundaries()
+        string root = FindRepoRoot();
+        string workflowDirectory = Path.Combine(root, ".github", "workflows");
+        string[] expectedWorkflows =
+        [
+            "_validate.yml",
+            "ci-develop.yml",
+            "ci-main.yml",
+            "ci-staging.yml",
+            "pr-validation.yml"
+        ];
+
+        Assert.Equal(
+            expectedWorkflows,
+            Directory.GetFiles(workflowDirectory, "*.yml")
+                .Select(Path.GetFileName)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+
+        foreach (string workflowPath in Directory.GetFiles(workflowDirectory, "*.yml"))
         {
-            string root = FindRepoRoot();
-            string buildProps = File.ReadAllText(Path.Combine(root, "Directory.Build.props"));
-            string dockerfile = File.ReadAllText(Path.Combine(root, "Maliev.OrderService.Api", "Dockerfile"));
-            string pullRequestWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-validation.yml"));
-            string developWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci-develop.yml"));
-
-            Assert.Contains("<ServiceDefaultsVersion Condition=\"'$(ServiceDefaultsVersion)' == ''\">1.0.81-alpha</ServiceDefaultsVersion>", buildProps, StringComparison.Ordinal);
-            Assert.Contains("<MessagingContractsVersion Condition=\"'$(MessagingContractsVersion)' == ''\">1.0.91-alpha</MessagingContractsVersion>", buildProps, StringComparison.Ordinal);
-            Assert.DoesNotContain("<SharedLibraryVersion", buildProps, StringComparison.Ordinal);
-            Assert.DoesNotContain("1.0.*", buildProps, StringComparison.Ordinal);
-
-            foreach (string projectPath in Directory.GetFiles(root, "*.csproj", SearchOption.AllDirectories))
-            {
-                if (projectPath.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
-                    projectPath.Contains($"{Path.DirectorySeparatorChar}.ci-sources{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                string project = File.ReadAllText(projectPath);
-                Assert.DoesNotContain("$(SharedLibraryVersion)", project, StringComparison.Ordinal);
-
-                if (project.Contains("PackageReference Include=\"Maliev.Aspire.ServiceDefaults\"", StringComparison.Ordinal))
-                {
-                    Assert.Contains("Version=\"$(ServiceDefaultsVersion)\"", project, StringComparison.Ordinal);
-                }
-
-                if (project.Contains("PackageReference Include=\"Maliev.MessagingContracts\"", StringComparison.Ordinal))
-                {
-                    Assert.Contains("Version=\"$(MessagingContractsVersion)\"", project, StringComparison.Ordinal);
-                }
-            }
-
-            Assert.Contains("COPY [\"Directory.Build.props\", \".\"]", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("/p:GITHUB_ACTIONS=true", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("/p:ServiceDefaultsVersion=\"1.0.81-alpha\"", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("/p:MessagingContractsVersion=\"1.0.91-alpha\"", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("--no-restore", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("id=nuget_username,required=true", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("id=nuget_password,required=true", dockerfile, StringComparison.Ordinal);
-
-            Assert.Contains("-p:ServiceDefaultsVersion=1.0.81-alpha", pullRequestWorkflow, StringComparison.Ordinal);
-            Assert.Contains("-p:MessagingContractsVersion=1.0.91-alpha", pullRequestWorkflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("1.0.*", pullRequestWorkflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("sed -i", developWorkflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("1.0.*", developWorkflow, StringComparison.Ordinal);
-        }
-
-        /// <summary>
-        /// Verifies untrusted pull requests reconstruct reviewed shared packages from immutable public
-        /// source without receiving package, deployment, or GitOps credentials.
-        /// </summary>
-        [Fact]
-        public void PullRequestValidationReconstructsExactDependenciesWithoutCredentials()
-        {
-            string root = FindRepoRoot();
-            string workflowPath = Path.Combine(root, ".github", "workflows", "pr-validation.yml");
-            string packageScriptPath = Path.Combine(root, "scripts", "prepare-order-ci-packages.sh");
-            string nuGetConfigPath = Path.Combine(root, "NuGet.PRValidation.Config");
-            string productionNuGetConfigPath = Path.Combine(root, "nuget.config");
-            string dockerfilePath = Path.Combine(root, "Maliev.OrderService.Api", "Dockerfile");
-            string dockerIgnorePath = Path.Combine(root, ".dockerignore");
-            string gitIgnorePath = Path.Combine(root, ".gitignore");
-
-            Assert.True(File.Exists(workflowPath), "Expected a pull-request validation workflow.");
-            Assert.True(File.Exists(packageScriptPath), "Expected an exact dependency reconstruction script.");
-            Assert.True(File.Exists(nuGetConfigPath), "Expected a credential-free NuGet configuration.");
-
             string workflow = File.ReadAllText(workflowPath);
-            string packageScript = File.ReadAllText(packageScriptPath);
-            string nuGetConfig = File.ReadAllText(nuGetConfigPath);
-            string productionNuGetConfig = File.ReadAllText(productionNuGetConfigPath);
-            string dockerfile = File.ReadAllText(dockerfilePath);
-            string dockerIgnore = File.ReadAllText(dockerIgnorePath);
-            string gitIgnore = File.ReadAllText(gitIgnorePath);
-
-            Assert.Contains("pull_request:", workflow, StringComparison.Ordinal);
-            Assert.Contains("workflow_dispatch:", workflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("pull_request_target", workflow, StringComparison.Ordinal);
-            Assert.Contains("permissions:", workflow, StringComparison.Ordinal);
             Assert.Contains("contents: read", workflow, StringComparison.Ordinal);
-            Assert.Contains("NUGET_PACKAGES: ${{ github.workspace }}/.ci-nuget/packages", workflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("packages: read", workflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("secrets:", workflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("GITOPS_PAT", workflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("github.token", workflow, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("NUGET_USERNAME", workflow, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("NUGET_PASSWORD", workflow, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("concurrency:", workflow, StringComparison.Ordinal);
-            Assert.Contains("cancel-in-progress: true", workflow, StringComparison.Ordinal);
-
-            Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.MessagingContracts", workflow, StringComparison.Ordinal);
-            Assert.Contains("ref: 0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7", workflow, StringComparison.Ordinal);
-            Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.Aspire", workflow, StringComparison.Ordinal);
-            Assert.Contains("ref: 7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc", workflow, StringComparison.Ordinal);
-            Assert.Contains("prepare-order-ci-packages.sh", workflow, StringComparison.Ordinal);
-            Assert.Contains("order-ci-packages", workflow, StringComparison.Ordinal);
-            Assert.Contains("include-hidden-files: true", workflow, StringComparison.Ordinal);
-            Assert.Contains("overwrite: true", workflow, StringComparison.Ordinal);
-            Assert.Contains("artifact-digest", workflow, StringComparison.Ordinal);
-            Assert.Contains("[[ \"$ARTIFACT_DIGEST\" =~ ^[0-9a-f]{64}$ ]]", workflow, StringComparison.Ordinal);
-            Assert.Contains("sha256sum --check SHA256SUMS.txt", workflow, StringComparison.Ordinal);
-
-            Assert.Contains("dotnet restore Maliev.OrderService.slnx", workflow, StringComparison.Ordinal);
-            Assert.Contains("--configfile NuGet.PRValidation.Config", workflow, StringComparison.Ordinal);
-            Assert.Contains("dotnet build Maliev.OrderService.slnx --configuration Release --no-restore", workflow, StringComparison.Ordinal);
-            Assert.Contains("dotnet test Maliev.OrderService.slnx --configuration Release --no-build", workflow, StringComparison.Ordinal);
-            Assert.Contains("-p:ServiceDefaultsVersion=1.0.81-alpha", workflow, StringComparison.Ordinal);
-            Assert.Contains("-p:MessagingContractsVersion=1.0.91-alpha", workflow, StringComparison.Ordinal);
-            Assert.Contains("dependency_restore_stage=restore-local", workflow, StringComparison.Ordinal);
-            Assert.Contains("push: false", workflow, StringComparison.Ordinal);
-            Assert.Contains("Smoke test production image", workflow, StringComparison.Ordinal);
-            Assert.Contains("/order/liveness", workflow, StringComparison.Ordinal);
-            Assert.Contains("postgres:18-alpine", workflow, StringComparison.Ordinal);
-            Assert.Contains("CORS__AllowedOrigins__0=http://localhost", workflow, StringComparison.Ordinal);
-            Assert.Contains("severity: HIGH,CRITICAL", workflow, StringComparison.Ordinal);
-            Assert.Contains("exit-code: \"1\"", workflow, StringComparison.Ordinal);
-            Assert.DoesNotContain("argocd", workflow, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("kubectl", workflow, StringComparison.OrdinalIgnoreCase);
-
-            Assert.Contains("readonly messaging_commit=\"0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7\"", packageScript, StringComparison.Ordinal);
-            Assert.Contains("readonly aspire_commit=\"7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc\"", packageScript, StringComparison.Ordinal);
-            Assert.Contains("readonly messaging_version=\"1.0.91-alpha\"", packageScript, StringComparison.Ordinal);
-            Assert.Contains("readonly service_defaults_version=\"1.0.81-alpha\"", packageScript, StringComparison.Ordinal);
-            Assert.Contains("dotnet restore \"$generator_project\" --configfile \"$ci_nuget_config\"", packageScript, StringComparison.Ordinal);
-            Assert.Contains("dotnet run --project tools/Generator/Generator.csproj --configuration Release --no-restore", packageScript, StringComparison.Ordinal);
-            Assert.Contains("printf 'root = true", packageScript, StringComparison.Ordinal);
-            Assert.Contains("SHA256SUMS.txt", packageScript, StringComparison.Ordinal);
-            Assert.DoesNotContain("--source", packageScript, StringComparison.Ordinal);
-
-            Assert.DoesNotContain("nuget.pkg.github.com", nuGetConfig, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("packageSourceCredentials", nuGetConfig, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("<add key=\"maliev-ci\" value=\".ci-packages\" />", nuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<packageSource key=\"nuget.org\">", nuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<package pattern=\"*\" />", nuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<packageSource key=\"maliev-ci\">", nuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<package pattern=\"Maliev.*\" />", nuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<packageSourceMapping>", productionNuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<packageSource key=\"nuget.org\">", productionNuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<packageSource key=\"github\">", productionNuGetConfig, StringComparison.Ordinal);
-            Assert.Contains("<package pattern=\"Maliev.*\" />", productionNuGetConfig, StringComparison.Ordinal);
-
-            Assert.Contains("ARG dependency_restore_stage=restore-private", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("FROM ${dependency_restore_stage} AS build", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("FROM build-base AS restore-local", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("--configfile \"NuGet.PRValidation.Config\"", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("COPY [\".ci-packages/\", \".ci-packages/\"]", dockerfile, StringComparison.Ordinal);
-            Assert.DoesNotContain("HEALTHCHECK", dockerfile, StringComparison.Ordinal);
-            Assert.Contains("!.ci-packages/*.nupkg", dockerIgnore, StringComparison.Ordinal);
-            Assert.Contains(".ci-sources/", dockerIgnore, StringComparison.Ordinal);
-            Assert.Contains(".ci-nuget/", dockerIgnore, StringComparison.Ordinal);
-            Assert.Contains(".ci-packages/*.nupkg", gitIgnore, StringComparison.Ordinal);
-            Assert.Contains(".ci-packages/*.snupkg", gitIgnore, StringComparison.Ordinal);
-            Assert.Contains(".ci-packages/SHA256SUMS.txt", gitIgnore, StringComparison.Ordinal);
-            Assert.Contains(".ci-nuget/", gitIgnore, StringComparison.Ordinal);
+            Assert.DoesNotContain("pull_request_target", workflow, StringComparison.Ordinal);
+            Assert.DoesNotContain("secrets.", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("credentials_json", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("docker push", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("build-push-action", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("gcloud", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("gitops", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("kustomize", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("gh pr", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("contents: write", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("packages: write", workflow, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("id-token: write", workflow, StringComparison.OrdinalIgnoreCase);
 
             MatchCollection unpinnedActions = UnpinnedActionRegex().Matches(workflow);
             Assert.Empty(unpinnedActions.Select(match => match.Value));
         }
+    }
 
-        [GeneratedRegex(@"uses:\s+[^\s@]+@(?![0-9a-f]{40}(?:\s|$))[^\s]+", RegexOptions.CultureInvariant)]
-        private static partial Regex UnpinnedActionRegex();
+    /// <summary>
+    /// Verifies CI restores immutable public shared source without package credentials.
+    /// </summary>
+    [Fact]
+    public void ValidationUsesImmutablePublicSharedSource()
+    {
+        string root = FindRepoRoot();
+        string validationWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "_validate.yml"));
+        string validationNuGetConfig = File.ReadAllText(Path.Combine(root, "nuget.validation.config"));
 
-        private static string FindRepoRoot()
+        Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.Aspire", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains($"ref: {AspireCommit}", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.MessagingContracts", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains($"ref: {MessagingContractsCommit}", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("/p:SharedSourceRoot=${{ github.workspace }}/shared", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("--configfile nuget.validation.config", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("dotnet build Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("dotnet test Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("dotnet format Maliev.OrderService.slnx whitespace", validationWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet format whitespace Maliev.OrderService.slnx", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("SharedSourceRoot: ${{ github.workspace }}/shared", validationWorkflow, StringComparison.Ordinal);
+        Assert.Contains("package --vulnerable --include-transitive", validationWorkflow, StringComparison.Ordinal);
+        Assert.Equal(3, validationWorkflow.Split("persist-credentials: false", StringSplitOptions.None).Length - 1);
+
+        string sharedEditorConfig = File.ReadAllText(Path.Combine(root, "shared", ".editorconfig"));
+        Assert.Contains("root = true", sharedEditorConfig, StringComparison.Ordinal);
+
+        Assert.Contains("https://api.nuget.org/v3/index.json", validationNuGetConfig, StringComparison.Ordinal);
+        Assert.DoesNotContain("nuget.pkg.github.com", validationNuGetConfig, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("packageSourceCredentials", validationNuGetConfig, StringComparison.OrdinalIgnoreCase);
+
+        foreach (string projectPath in Directory.GetFiles(root, "*.csproj", SearchOption.AllDirectories))
         {
-            DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-            while (directory is not null)
+            if (!IsOwnedProject(root, projectPath))
             {
-                if (File.Exists(Path.Combine(directory.FullName, "Maliev.OrderService.slnx")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
+                continue;
             }
 
-            throw new DirectoryNotFoundException("Could not locate the OrderService repository root.");
+            string project = File.ReadAllText(projectPath);
+            if (project.Contains("Maliev.Aspire.ServiceDefaults", StringComparison.Ordinal))
+            {
+                Assert.Contains("$(SharedSourceRoot)/Maliev.Aspire/", project, StringComparison.Ordinal);
+            }
+
+            if (project.Contains("Maliev.MessagingContracts", StringComparison.Ordinal))
+            {
+                Assert.Contains("$(SharedSourceRoot)/Maliev.MessagingContracts/", project, StringComparison.Ordinal);
+            }
         }
+    }
+
+    /// <summary>
+    /// Verifies external and generated project paths are excluded on both runner path conventions.
+    /// </summary>
+    [Theory]
+    [InlineData("Maliev.OrderService.Api/Maliev.OrderService.Api.csproj", true)]
+    [InlineData("Maliev.OrderService.Api\\Maliev.OrderService.Api.csproj", true)]
+    [InlineData("shared/Maliev.Aspire/Maliev.Aspire.ServiceDefaults/Maliev.Aspire.ServiceDefaults.csproj", false)]
+    [InlineData("shared\\Maliev.MessagingContracts\\generated\\csharp\\Maliev.MessagingContracts.csproj", false)]
+    [InlineData("Maliev.OrderService.Api/obj/Generated.csproj", false)]
+    public void SharedSourceOwnershipIsPlatformIndependent(string relativePath, bool expected)
+    {
+        Assert.Equal(expected, IsOwnedRelativeProject(relativePath));
+    }
+
+    /// <summary>
+    /// Verifies image packaging consumes a prevalidated publish artifact without dependency credentials.
+    /// </summary>
+    [Fact]
+    public void RuntimeImageIsCredentialFreeAndTraceable()
+    {
+        string root = FindRepoRoot();
+        string dockerfile = File.ReadAllText(Path.Combine(root, "Maliev.OrderService.Api", "Dockerfile"));
+
+        Assert.Contains("FROM mcr.microsoft.com/dotnet/aspnet:10.0", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("COPY --chown=app:app publish/ .", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("USER app", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("org.opencontainers.image.revision", dockerfile, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet restore", dockerfile, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("nuget_password", dockerfile, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("--mount=type=secret", dockerfile, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [GeneratedRegex(@"uses:\s+[^\s@]+@(?![0-9a-f]{40}(?:\s|$))[^\s]+", RegexOptions.CultureInvariant)]
+    private static partial Regex UnpinnedActionRegex();
+
+    private static bool IsOwnedProject(string root, string projectPath)
+    {
+        return IsOwnedRelativeProject(Path.GetRelativePath(root, projectPath));
+    }
+
+    private static bool IsOwnedRelativeProject(string relativePath)
+    {
+        string normalizedPath = relativePath.Replace('\\', '/');
+        return !normalizedPath.StartsWith("shared/", StringComparison.OrdinalIgnoreCase)
+            && !normalizedPath.Contains("/obj/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FindRepoRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Maliev.OrderService.slnx")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the OrderService repository root.");
     }
 }

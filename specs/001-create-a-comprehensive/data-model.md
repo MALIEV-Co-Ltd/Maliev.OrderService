@@ -659,7 +659,7 @@ This document defines the complete data model for the Order Service, including a
 
 4. **Order → Order3DScanningAttributes** (1:1)
    - One order has one 3D scanning attributes record (if service category = 3D Scanning)
-   - Foreign key: `Order3DScanningAttributes.OrderId`
+   - References `Order3DScanningAttributes.OrderId`
    - Delete behavior: Cascade
 
 5. **Order → Order3DDesignAttributes** (1:1)

@@ -17,7 +17,7 @@ namespace Maliev.OrderService.Api.Controllers
     /// </remarks>
     /// <param name="logger">The logger instance.</param>
     [ApiController]
-    [ApiVersion("1")]
+    [ApiVersion("1.0")]
     [Route("order/v{version:apiVersion}/reports")]
     [EnableRateLimiting(RateLimitPolicies.Batch)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
