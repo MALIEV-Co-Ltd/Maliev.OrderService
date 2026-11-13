@@ -2,7 +2,7 @@
 
 # The deployment lane must publish the validated application into /publish before
 # building this runtime-only image. Dependency restore never receives image credentials.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS final
 
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.source="https://github.com/MALIEV-Co-Ltd/Maliev.OrderService" \
